@@ -6,8 +6,12 @@ A clean, object-oriented implementation of the classic Tetris game, built with P
 
 *   **Classic Gameplay**: Includes all 7 standard tetrominoes with rotation and collision detection.
 *   **Modular Architecture**: Clean separation between game engine logic (`TetrisEngine`) and application framework (`TetrisApp`).
+*   **Dynamic Difficulty**: Speed increases as you level up (every 10 lines).
+*   **UI Features**:
+    *   Real-time score, level, and lines cleared tracking.
+    *   Next piece preview.
+    *   Game Over overlay with restart functionality.
 *   **Smooth Rendering**: Built for 60 FPS performance.
-*   **UI Features**: Next piece preview and real-time score tracking.
 
 ## Prerequisites
 
@@ -31,7 +35,7 @@ A clean, object-oriented implementation of the classic Tetris game, built with P
 
 Run the game using:
 ```bash
-uv run python main.py
+uv run main.py
 ```
 
 ## Controls
@@ -40,3 +44,4 @@ uv run python main.py
 *   **Down Arrow**: Soft drop
 *   **Up Arrow**: Rotate
 *   **Esc**: Quit game
+*   **R**: Restart game (on Game Over)
