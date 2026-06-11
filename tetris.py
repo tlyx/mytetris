@@ -2,7 +2,6 @@ from typing import final
 from random import choice
 import sys
 import time
-from operator import itemgetter
 
 import pygame
 
@@ -297,8 +296,8 @@ class TetrisApp:
         # 绘制预览方块（居中）
         next_shape: list[tuple[int, int]] = SHAPES_DATA[self.game.next_type]
         # 计算形状的包围盒
-        xs: list[int] = list(map(itemgetter(0), next_shape))
-        ys: list[int] = list(map(itemgetter(1), next_shape))
+        xs: list[int] = [dx for dx, _dy in next_shape]
+        ys: list[int] = [dy for _dx, dy in next_shape]
         min_dx = min(xs)
         max_dx = max(xs)
         min_dy = min(ys)
