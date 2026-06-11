@@ -11,3 +11,4 @@ dependencies = [
 [tool.basedpyright]
 reportUnusedCallResult = false  # 关闭未使用返回值警告
 reportAny = false
+reportUnusedVariable = { "exclude" = ["^_"] }
