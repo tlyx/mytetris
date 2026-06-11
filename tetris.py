@@ -2,6 +2,7 @@ from typing import final
 from random import choice
 import sys
 import time
+from operator import itemgetter
 
 import pygame
 
@@ -163,6 +164,7 @@ class TetrisApp:
         self._update_speed()
         self.clock = pygame.time.Clock()
         self.pressing_timer = [0.0]
+        self.sidebar_bg = (20, 22, 28)
 
     def _update_speed(self) -> None:
         """根据等级计算下落速度"""
@@ -246,6 +248,13 @@ class TetrisApp:
 
         # C. 绘制美观侧边栏
         sidebar_x: int = GRID_WIDTH * BLOCK_SIZE + 20
+        sidebar_width: int = SIDEBAR_WIDTH - 40  # 留边距
+
+        # 绘制面板背景
+        panel_rect = pygame.Rect(
+            GRID_WIDTH * BLOCK_SIZE, 0, SIDEBAR_WIDTH, SCREEN_HEIGHT
+        )
+        pygame.draw.rect(self.screen, self.sidebar_bg, panel_rect)
 
         # 1. Top Bar: Level & Lines (Small font)
         level_surf = self.small_font.render(f"LV: {self.game.level}", True, (0, 255, 255))
@@ -253,22 +262,55 @@ class TetrisApp:
         self.screen.blit(level_surf, (sidebar_x, 20))
         self.screen.blit(lines_surf, (sidebar_x + 80, 20))
 
+        # 分隔线
+        pygame.draw.line(
+            self.screen, (60, 60, 60),
+            (sidebar_x, 50), (sidebar_x + sidebar_width, 50), 1
+        )
+
         # 2. Score
         score_label = self.font.render("SCORE", True, (200, 200, 200))
-        self.screen.blit(score_label, (sidebar_x, 60))
+        score_label_x = sidebar_x + (sidebar_width - score_label.get_width()) // 2
+        self.screen.blit(score_label, (score_label_x, 70))
         score_val = self.font.render(str(self.game.score).zfill(6), True, COLORS["SCORE_GOLD"])
-        self.screen.blit(score_val, (sidebar_x, 90))
+        score_val_x = sidebar_x + (sidebar_width - score_val.get_width()) // 2
+        self.screen.blit(score_val, (score_val_x, 105))
+
+        # 分隔线
+        pygame.draw.line(
+            self.screen, (60, 60, 60),
+            (sidebar_x, 145), (sidebar_x + sidebar_width, 145), 1
+        )
 
         # 3. Next
         next_label = self.font.render("NEXT", True, (200, 200, 200))
-        self.screen.blit(next_label, (sidebar_x, 150))
-        preview_rect = (sidebar_x, 190, 4 * BLOCK_SIZE, 4 * BLOCK_SIZE)
-        pygame.draw.rect(self.screen, COLORS["GRID_LINE"], preview_rect, 1)
+        next_label_x = sidebar_x + (sidebar_width - next_label.get_width()) // 2
+        self.screen.blit(next_label, (next_label_x, 160))
 
+        # 预览框（4x4 方块大小）
+        preview_size = 4 * BLOCK_SIZE
+        preview_x = sidebar_x + (sidebar_width - preview_size) // 2
+        preview_y = 200
+        preview_rect = (preview_x, preview_y, preview_size, preview_size)
+        pygame.draw.rect(self.screen, COLORS["GRID_LINE"], preview_rect, 2)
+
+        # 绘制预览方块（居中）
         next_shape: list[tuple[int, int]] = SHAPES_DATA[self.game.next_type]
+        # 计算形状的包围盒
+        xs: list[int] = list(map(itemgetter(0), next_shape))
+        ys: list[int] = list(map(itemgetter(1), next_shape))
+        min_dx = min(xs)
+        max_dx = max(xs)
+        min_dy = min(ys)
+        max_dy = max(ys)
+        shape_width = max_dx - min_dx + 1
+        shape_height = max_dy - min_dy + 1
+        # 预览框中心偏移
+        offset_x = (preview_size - shape_width * BLOCK_SIZE) // 2
+        offset_y = (preview_size - shape_height * BLOCK_SIZE) // 2
         for dx, dy in next_shape:
-            px: float = sidebar_x + (dx + 1.5) * BLOCK_SIZE
-            py: float = 190 + (dy + 1.5) * BLOCK_SIZE
+            px = preview_x + offset_x + (dx - min_dx) * BLOCK_SIZE
+            py = preview_y + offset_y + (dy - min_dy) * BLOCK_SIZE
             pygame.draw.rect(
                 self.screen,
                 COLORS[self.game.next_type],
