@@ -187,10 +187,14 @@ class TetrisApp:
                 sys.exit()
 
             if self.game.game_over:
-                if event.type == pygame.KEYDOWN and event.key == pygame.K_r:
-                    self.game.reset()
-                    self.current_level = 1
-                    self._update_speed()
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_r:
+                        self.game.reset()
+                        self.current_level = 1
+                        self._update_speed()
+                    elif event.key == pygame.K_ESCAPE:
+                        pygame.quit()
+                        sys.exit()
                 continue
 
             if event.type == self.fall_event:
