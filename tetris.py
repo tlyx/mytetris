@@ -26,6 +26,10 @@ CLEAR_SOUND_FILE = "assets/clear.wav"
 GAME_OVER_SOUND_FILE = "assets/game_over.mp3"
 # -----------------------
 
+# ---- 应用图标路径 ----
+LOGO_FILE = "assets/logo.png"
+# -----------------------
+
 
 def _highscore_file() -> str:
     """返回符合 XDG 数据目录的高分记录文件路径，并确保目录存在。"""
@@ -111,6 +115,14 @@ class TetrisApp:
         self.sfx_enabled = True
         self._game_over_sound_played = False
         self._init_audio()
+
+        # ---- 设置 Dock 栏图标 ----
+        if os.path.isfile(LOGO_FILE):
+            try:
+                icon_surf = pygame.image.load(LOGO_FILE).convert_alpha()
+                pygame.display.set_icon(icon_surf)
+            except pygame.error:
+                pass
 
     def _init_audio(self) -> None:
         """尽量加载背景音乐与删除行音效，若缺少文件则静默运行。"""
