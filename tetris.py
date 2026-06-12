@@ -13,6 +13,10 @@ SCREEN_HEIGHT = GRID_HEIGHT * BLOCK_SIZE
 
 HIGH_SCORE_FILE = "highscore.txt"
 
+# 最小窗口尺寸（小于此值会被强制拉伸到该最小尺寸）
+MIN_WINDOW_WIDTH = 400
+MIN_WINDOW_HEIGHT = 400
+
 
 def _highscore_file() -> str:
     """返回符合 XDG 数据目录的高分记录文件路径，并确保目录存在。"""
@@ -37,6 +41,7 @@ def save_high_score(value: int) -> None:
 @final
 class TetrisApp:
     screen: pygame.Surface
+    logical_surface: pygame.Surface
     font: pygame.font.Font
     small_font: pygame.font.Font
     serif_font: pygame.font.Font
@@ -50,10 +55,15 @@ class TetrisApp:
     game_start_ticks: int
     clock: pygame.time.Clock
     sidebar_bg: tuple[int, int, int]
+    window_width: int
+    window_height: int
 
     def __init__(self) -> None:
         pygame.init()
-        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+        # 使用 RESIZABLE 标志允许用户改变窗口大小
+        self.screen = pygame.display.set_mode(
+            (SCREEN_WIDTH, SCREEN_HEIGHT), pygame.RESIZABLE
+        )
         pygame.display.set_caption("Tetris Professional - macOS Lab")
         self.font = pygame.font.SysFont("Arial Black", 32)
         self.small_font = pygame.font.SysFont("Arial Black", 20)
@@ -73,6 +83,12 @@ class TetrisApp:
         self.high_score = load_high_score()
         self.game_start_ticks = pygame.time.get_ticks()
         self.sidebar_bg = (20, 22, 28)
+
+        # 创建逻辑表面，所有游戏内容绘制在此表面上
+        self.logical_surface = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+        # 保存当前窗口实际尺寸，用于缩放
+        self.window_width = SCREEN_WIDTH
+        self.window_height = SCREEN_HEIGHT
 
     def _update_speed(self) -> None:
         """根据等级计算下落速度"""
@@ -103,6 +119,19 @@ class TetrisApp:
                 save_high_score(self.high_score)
                 pygame.quit()
                 sys.exit()
+
+            # 窗口大小改变事件
+            if event.type == pygame.VIDEORESIZE:
+                new_w = max(event.w, MIN_WINDOW_WIDTH)
+                new_h = max(event.h, MIN_WINDOW_HEIGHT)
+                # 避免无限触发事件：只有当尺寸真正改变时才更新
+                if (new_w, new_h) != (self.window_width, self.window_height):
+                    self.window_width = new_w
+                    self.window_height = new_h
+                    self.screen = pygame.display.set_mode(
+                        (new_w, new_h), pygame.RESIZABLE
+                    )
+                continue
 
             # 确认退出状态优先处理
             if self.confirm_quit:
@@ -164,14 +193,17 @@ class TetrisApp:
 
     def _render_game_scene(self) -> None:
         """极致渲染：主场 + 美观侧边栏 + Game Over / Pause / Confirm Quit 弹窗"""
-        self.screen.fill(COLORS["BACKGROUND"])
+        # ---- 所有绘制先画到逻辑表面 ----
+        ds = self.logical_surface
+
+        ds.fill(COLORS["BACKGROUND"])
 
         # A. 绘制主棋盘
         for r in range(GRID_HEIGHT):
             for c in range(GRID_WIDTH):
                 color: tuple[int, int, int] = self.game.grid[r][c] or COLORS["GRID_LINE"]
                 rect = (c * BLOCK_SIZE, r * BLOCK_SIZE, BLOCK_SIZE - 1, BLOCK_SIZE - 1)
-                pygame.draw.rect(self.screen, color, rect)
+                pygame.draw.rect(ds, color, rect)
 
         # B. 绘制当前操控块 (仅在游戏进行时)
         if not self.game.game_over:
@@ -182,7 +214,7 @@ class TetrisApp:
                     BLOCK_SIZE - 1,
                     BLOCK_SIZE - 1,
                 )
-                pygame.draw.rect(self.screen, COLORS[self.game.current_type], rect)
+                pygame.draw.rect(ds, COLORS[self.game.current_type], rect)
 
         # C. 绘制美观侧边栏 -------------------------------------------------
         sidebar_left = GRID_WIDTH * BLOCK_SIZE          # 300
@@ -195,7 +227,7 @@ class TetrisApp:
 
         # 绘制面板背景
         panel_rect = pygame.Rect(sidebar_left, 0, SIDEBAR_WIDTH, SCREEN_HEIGHT)
-        pygame.draw.rect(self.screen, self.sidebar_bg, panel_rect)
+        pygame.draw.rect(ds, self.sidebar_bg, panel_rect)
 
         # ---- 侧边栏内容：新布局 ----
 
@@ -203,8 +235,8 @@ class TetrisApp:
         lv_label = self.small_font.render("LV", True, (150, 150, 160))
         score_label = self.small_font.render("SCORE", True, (150, 150, 160))
         # 将两个标签分别放在左右两侧（等距留白）
-        self.screen.blit(lv_label, (sidebar_content_left, 20))
-        self.screen.blit(
+        ds.blit(lv_label, (sidebar_content_left, 20))
+        ds.blit(
             score_label,
             (sidebar_content_right - score_label.get_width(), 20),
         )
@@ -214,15 +246,15 @@ class TetrisApp:
         score_val = self.font.render(
             f"{self.game.score:6d}", True, COLORS["SCORE_GOLD"]
         )
-        self.screen.blit(lv_val, (sidebar_content_left, 45))
-        self.screen.blit(
+        ds.blit(lv_val, (sidebar_content_left, 45))
+        ds.blit(
             score_val,
             (sidebar_content_right - score_val.get_width(), 45),
         )
 
         # 微弱分隔线
         pygame.draw.line(
-            self.screen,
+            ds,
             (60, 60, 70),
             (sidebar_content_left, 85),
             (sidebar_content_right, 85),
@@ -238,7 +270,7 @@ class TetrisApp:
         preview_rect_inner = pygame.Rect(
             preview_x, preview_y, preview_size, preview_size
         )
-        pygame.draw.rect(self.screen, (20, 22, 28), preview_rect_inner)
+        pygame.draw.rect(ds, (20, 22, 28), preview_rect_inner)
 
         # 绘制预览方块（居中，不带圆角）
         next_shape: list[tuple[int, int]] = SHAPES_DATA[self.game.next_type]
@@ -256,7 +288,7 @@ class TetrisApp:
             px = preview_x + offset_x + (dx - min_dx) * BLOCK_SIZE
             py = preview_y + offset_y + (dy - min_dy) * BLOCK_SIZE
             pygame.draw.rect(
-                self.screen,
+                ds,
                 COLORS[self.game.next_type],
                 (px, py, BLOCK_SIZE - 1, BLOCK_SIZE - 1),
             )
@@ -287,8 +319,8 @@ class TetrisApp:
             value_surf = self.serif_bold_font.render(value_text, True, (255, 255, 255))
 
             # 左对齐，直接放在侧边栏左侧（与内容左边界对齐）
-            self.screen.blit(prefix_surf, (sidebar_content_left, info_y + i * line_spacing))
-            self.screen.blit(
+            ds.blit(prefix_surf, (sidebar_content_left, info_y + i * line_spacing))
+            ds.blit(
                 value_surf,
                 (sidebar_content_left + prefix_surf.get_width(), info_y + i * line_spacing),
             )
@@ -298,17 +330,17 @@ class TetrisApp:
             overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
             overlay.set_alpha(180)
             overlay.fill((0, 0, 0))
-            self.screen.blit(overlay, (0, 0))
+            ds.blit(overlay, (0, 0))
 
             go_text = self.font.render("GAME OVER", True, (255, 0, 0))
             restart_text = self.small_font.render(
                 "Press RETURN to restart", True, (255, 255, 255)
             )
-            self.screen.blit(
+            ds.blit(
                 go_text,
                 (SCREEN_WIDTH // 2 - go_text.get_width() // 2, SCREEN_HEIGHT // 2 - 40),
             )
-            self.screen.blit(
+            ds.blit(
                 restart_text,
                 (
                     SCREEN_WIDTH // 2 - restart_text.get_width() // 2,
@@ -321,17 +353,17 @@ class TetrisApp:
             overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
             overlay.set_alpha(180)
             overlay.fill((0, 0, 0))
-            self.screen.blit(overlay, (0, 0))
+            ds.blit(overlay, (0, 0))
 
             paused_text = self.font.render("PAUSED", True, (255, 255, 0))
             resume_text = self.small_font.render(
                 "Press SPACE to resume", True, (255, 255, 255)
             )
-            self.screen.blit(
+            ds.blit(
                 paused_text,
                 (SCREEN_WIDTH // 2 - paused_text.get_width() // 2, SCREEN_HEIGHT // 2 - 40),
             )
-            self.screen.blit(
+            ds.blit(
                 resume_text,
                 (
                     SCREEN_WIDTH // 2 - resume_text.get_width() // 2,
@@ -344,7 +376,7 @@ class TetrisApp:
             overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
             overlay.set_alpha(200)
             overlay.fill((0, 0, 0))
-            self.screen.blit(overlay, (0, 0))
+            ds.blit(overlay, (0, 0))
 
             quit_title = self.font.render("QUIT ?", True, (255, 100, 100))
             line_esc = self.small_font.render(
@@ -355,17 +387,33 @@ class TetrisApp:
             )
 
             base_y = SCREEN_HEIGHT // 2 - 50
-            self.screen.blit(
+            ds.blit(
                 quit_title,
                 (SCREEN_WIDTH // 2 - quit_title.get_width() // 2, base_y),
             )
-            self.screen.blit(
+            ds.blit(
                 line_esc,
                 (SCREEN_WIDTH // 2 - line_esc.get_width() // 2, base_y + 40),
             )
-            self.screen.blit(
+            ds.blit(
                 line_cancel,
                 (SCREEN_WIDTH // 2 - line_cancel.get_width() // 2, base_y + 75),
             )
+
+        # ---- 缩放并显示到实际窗口 ----
+        # 保持宽高比，在窗口中居中显示
+        scale = min(
+            self.window_width / SCREEN_WIDTH,
+            self.window_height / SCREEN_HEIGHT,
+        )
+        new_w = int(SCREEN_WIDTH * scale)
+        new_h = int(SCREEN_HEIGHT * scale)
+        scaled_surface = pygame.transform.scale(self.logical_surface, (new_w, new_h))
+
+        # 设置窗口背景（黑边）
+        self.screen.fill((0, 0, 0))
+        x_off = (self.window_width - new_w) // 2
+        y_off = (self.window_height - new_h) // 2
+        self.screen.blit(scaled_surface, (x_off, y_off))
 
         pygame.display.flip()
