@@ -76,11 +76,11 @@ class TetrisApp:
 
     def run(self) -> None:
         while True:
-            self.process_events()
-            self.render_game_scene()
+            self._process_events()
+            self._render_game_scene()
             self.clock.tick(60)
 
-    def process_events(self) -> None:
+    def _process_events(self) -> None:
         """处理所有事件（瞬时/持续）"""
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -144,7 +144,7 @@ class TetrisApp:
                 elif event.key == pygame.K_DOWN:
                     self.game.move(0, 1)
 
-    def render_game_scene(self) -> None:
+    def _render_game_scene(self) -> None:
         """极致渲染：主场 + 美观侧边栏 + Game Over / Pause / Confirm Quit 弹窗"""
         self.screen.fill(COLORS["BACKGROUND"])
 

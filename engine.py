@@ -60,19 +60,19 @@ class TetrisEngine:
         self.total_lines = 0
         self.game_over = False
         self.next_type = choice(list(SHAPES_DATA.keys()))
-        self.spawn_piece()
+        self._spawn_piece()
 
-    def spawn_piece(self) -> None:
+    def _spawn_piece(self) -> None:
         self.current_type = self.next_type
         self.current_shape = SHAPES_DATA[self.current_type]
         self.next_type = choice(list(SHAPES_DATA.keys()))
         self.x = 4
         self.y = 1
 
-        if self.check_collision(self.x, self.y):
+        if self._check_collision(self.x, self.y):
             self.game_over = True
 
-    def check_collision(
+    def _check_collision(
         self, nx: int, ny: int, shape: list[tuple[int, int]] | None = None
     ) -> bool:
         shape = shape or self.current_shape
@@ -85,7 +85,7 @@ class TetrisEngine:
         return False
 
     def move(self, dx: int, dy: int) -> bool:
-        if not self.check_collision(self.x + dx, self.y + dy):
+        if not self._check_collision(self.x + dx, self.y + dy):
             self.x += dx
             self.y += dy
             return True
@@ -95,12 +95,12 @@ class TetrisEngine:
         if self.current_type == "O":
             return
         new_shape: list[tuple[int, int]] = [(-dy, dx) for dx, dy in self.current_shape]
-        if not self.check_collision(self.x, self.y, new_shape):
+        if not self._check_collision(self.x, self.y, new_shape):
             self.current_shape = new_shape
             return
         kicks = [(1, 0), (-1, 0), (0, -1), (1, -1), (-1, -1), (0, -2)]
         for ox, oy in kicks:
-            if not self.check_collision(self.x + ox, self.y + oy, new_shape):
+            if not self._check_collision(self.x + ox, self.y + oy, new_shape):
                 self.x += ox
                 self.y += oy
                 self.current_shape = new_shape
@@ -126,4 +126,4 @@ class TetrisEngine:
         while len(new_grid) < GRID_HEIGHT:
             new_grid.insert(0, [None for _ in range(GRID_WIDTH)])
         self.grid = new_grid
-        self.spawn_piece()
+        self._spawn_piece()
