@@ -225,12 +225,7 @@ class TetrisApp:
         preview_x = sidebar_content_left + (sidebar_content_width - preview_size) // 2
         preview_y = 130  # 进一步下移，确保不与上方的数字重叠
 
-        # 外框
-        preview_rect_outer = pygame.Rect(
-            preview_x - 4, preview_y - 4, preview_size + 8, preview_size + 8
-        )
-        pygame.draw.rect(self.screen, (40, 42, 50), preview_rect_outer)
-        # 内框
+        # 内框（直接绘制内部背景，去掉外部一圈）
         preview_rect_inner = pygame.Rect(
             preview_x, preview_y, preview_size, preview_size
         )
