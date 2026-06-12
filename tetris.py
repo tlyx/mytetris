@@ -41,7 +41,6 @@ def save_high_score(value: int) -> None:
 @final
 class TetrisApp:
     screen: pygame.Surface
-    logical_surface: pygame.Surface
     font: pygame.font.Font
     small_font: pygame.font.Font
     game: TetrisEngine
@@ -55,6 +54,7 @@ class TetrisApp:
     sidebar_bg: tuple[int, int, int]
     window_width: int
     window_height: int
+    _logical: pygame.Surface | None  # 根据窗口大小动态创建的绘制表面
 
     def __init__(self) -> None:
         pygame.init()
@@ -63,6 +63,7 @@ class TetrisApp:
             (SCREEN_WIDTH, SCREEN_HEIGHT), pygame.RESIZABLE
         )
         pygame.display.set_caption("Tetris Professional - macOS Lab")
+        # 原始字体尺寸（实际缩放时动态创建，此处仅用于类型提示）
         self.font = pygame.font.SysFont("Arial Black", 32)
         self.small_font = pygame.font.SysFont("Arial Black", 20)
         # 启用按键重复（延迟 200 ms，间隔 50 ms）
@@ -79,11 +80,10 @@ class TetrisApp:
         self.game_start_ticks = pygame.time.get_ticks()
         self.sidebar_bg = (20, 22, 28)
 
-        # 创建逻辑表面，所有游戏内容绘制在此表面上
-        self.logical_surface = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
         # 保存当前窗口实际尺寸，用于缩放
         self.window_width = SCREEN_WIDTH
         self.window_height = SCREEN_HEIGHT
+        self._logical = None  # 延迟创建
 
     def _update_speed(self) -> None:
         """根据等级计算下落速度"""
@@ -187,49 +187,73 @@ class TetrisApp:
                     self.game.move(0, 1)
 
     def _render_game_scene(self) -> None:
-        """极致渲染：主场 + 美观侧边栏 + Game Over / Pause / Confirm Quit 弹窗"""
-        # ---- 所有绘制先画到逻辑表面 ----
-        ds = self.logical_surface
+        """极致渲染：主场 + 美观侧边栏 + Game Over / Pause / Confirm Quit 弹窗
 
+        根据窗口大小动态缩放逻辑表面，确保文字在高分屏下清晰。
+        """
+        # 1. 计算缩放比例并创建对应的逻辑表面
+        scale = min(
+            self.window_width / SCREEN_WIDTH,
+            self.window_height / SCREEN_HEIGHT,
+        )
+        logical_w = int(SCREEN_WIDTH * scale)
+        logical_h = int(SCREEN_HEIGHT * scale)
+        # 只有当尺寸变化时才重新创建表面（避免频繁创建）
+        if (self._logical is None
+                or self._logical.get_width() != logical_w
+                or self._logical.get_height() != logical_h):
+            self._logical = pygame.Surface((logical_w, logical_h))
+        ls = self._logical
+
+        # 2. 计算缩放后的块大小与字体大小
+        bs = int(BLOCK_SIZE * scale)                   # 每个格子像素宽度
+        sb_width = int(SIDEBAR_WIDTH * scale)          # 侧边栏宽度
+        font_size = max(10, int(32 * scale))
+        small_font_size = max(8, int(20 * scale))
+        # 临时创建字体（每次渲染会新建，但开销很小）
+        font_big = pygame.font.SysFont("Arial Black", font_size)
+        font_small = pygame.font.SysFont("Arial Black", small_font_size)
+
+        # 3. 开始绘制
+        ds = ls
         ds.fill(COLORS["BACKGROUND"])
 
         # A. 绘制主棋盘
         for r in range(GRID_HEIGHT):
             for c in range(GRID_WIDTH):
-                color: tuple[int, int, int] = self.game.grid[r][c] or COLORS["GRID_LINE"]
-                rect = (c * BLOCK_SIZE, r * BLOCK_SIZE, BLOCK_SIZE - 1, BLOCK_SIZE - 1)
+                color: tuple[int, int, int] = (
+                    self.game.grid[r][c] or COLORS["GRID_LINE"]
+                )
+                rect = (c * bs, r * bs, bs - 1, bs - 1)
                 pygame.draw.rect(ds, color, rect)
 
         # B. 绘制当前操控块 (仅在游戏进行时)
         if not self.game.game_over:
             for dx, dy in self.game.current_shape:
                 rect = (
-                    (self.game.x + dx) * BLOCK_SIZE,
-                    (self.game.y + dy) * BLOCK_SIZE,
-                    BLOCK_SIZE - 1,
-                    BLOCK_SIZE - 1,
+                    (self.game.x + dx) * bs,
+                    (self.game.y + dy) * bs,
+                    bs - 1,
+                    bs - 1,
                 )
                 pygame.draw.rect(ds, COLORS[self.game.current_type], rect)
 
         # C. 绘制美观侧边栏 -------------------------------------------------
-        sidebar_left = GRID_WIDTH * BLOCK_SIZE          # 300
-        sidebar_right = sidebar_left + SIDEBAR_WIDTH    # 500
-        content_padding = 20                            # 左右留白
+        sidebar_left = GRID_WIDTH * bs                 # 从棋盘右侧开始
+        sidebar_right = sidebar_left + sb_width
+        content_padding = int(20 * scale)              # 左右留白
         sidebar_content_left = sidebar_left + content_padding
         sidebar_content_right = sidebar_right - content_padding
-        # 内部可用宽度
         sidebar_content_width = sidebar_content_right - sidebar_content_left
 
         # 绘制面板背景
-        panel_rect = pygame.Rect(sidebar_left, 0, SIDEBAR_WIDTH, SCREEN_HEIGHT)
+        panel_rect = pygame.Rect(sidebar_left, 0, sb_width, logical_h)
         pygame.draw.rect(ds, self.sidebar_bg, panel_rect)
 
-        # ---- 侧边栏内容：新布局 ----
-
+        # ---- 侧边栏内容 ----
         # 第一行：LV 和 SCORE 标签（小号字体）
-        lv_label = self.small_font.render("LV", True, (150, 150, 160))
-        score_label = self.small_font.render("SCORE", True, (150, 150, 160))
-        # 将两个标签分别放在左右两侧（等距留白）
+        lv_label = font_small.render("LV", True, (150, 150, 160))
+        score_label = font_small.render("SCORE", True, (150, 150, 160))
         ds.blit(lv_label, (sidebar_content_left, 20))
         ds.blit(
             score_label,
@@ -237,8 +261,8 @@ class TetrisApp:
         )
 
         # 第二行：对应数值（大号）
-        lv_val = self.font.render(f"{self.game.level}", True, (255, 255, 255))
-        score_val = self.font.render(
+        lv_val = font_big.render(f"{self.game.level}", True, (255, 255, 255))
+        score_val = font_big.render(
             f"{self.game.score:6d}", True, COLORS["SCORE_GOLD"]
         )
         ds.blit(lv_val, (sidebar_content_left, 45))
@@ -248,26 +272,25 @@ class TetrisApp:
         )
 
         # 微弱分隔线
+        sep_y1 = int(85 * scale)
         pygame.draw.line(
             ds,
             (60, 60, 70),
-            (sidebar_content_left, 85),
-            (sidebar_content_right, 85),
+            (sidebar_content_left, sep_y1),
+            (sidebar_content_right, sep_y1),
             1,
         )
 
-        # 预览框（下一个方块，不写 NEXT 标签） -------------------------------
-        preview_size = 4 * BLOCK_SIZE
+        # 预览框（下一个方块） -------------------------------
+        preview_size = 4 * bs
         preview_x = sidebar_content_left + (sidebar_content_width - preview_size) // 2
-        preview_y = 130  # 进一步下移，确保不与上方的数字重叠
+        preview_y = int(130 * scale)
 
-        # 内框（直接绘制内部背景，去掉外部一圈）
-        preview_rect_inner = pygame.Rect(
-            preview_x, preview_y, preview_size, preview_size
-        )
+        # 内框背景
+        preview_rect_inner = pygame.Rect(preview_x, preview_y, preview_size, preview_size)
         pygame.draw.rect(ds, (20, 22, 28), preview_rect_inner)
 
-        # 绘制预览方块（居中，不带圆角）
+        # 绘制预览方块（居中）
         next_shape: list[tuple[int, int]] = SHAPES_DATA[self.game.next_type]
         xs: list[int] = [dx for dx, _dy in next_shape]
         ys: list[int] = [dy for _dx, dy in next_shape]
@@ -277,130 +300,121 @@ class TetrisApp:
         max_dy = max(ys)
         shape_width = max_dx - min_dx + 1
         shape_height = max_dy - min_dy + 1
-        offset_x = (preview_size - shape_width * BLOCK_SIZE) // 2
-        offset_y = (preview_size - shape_height * BLOCK_SIZE) // 2
+        offset_x = (preview_size - shape_width * bs) // 2
+        offset_y = (preview_size - shape_height * bs) // 2
         for dx, dy in next_shape:
-            px = preview_x + offset_x + (dx - min_dx) * BLOCK_SIZE
-            py = preview_y + offset_y + (dy - min_dy) * BLOCK_SIZE
+            px = preview_x + offset_x + (dx - min_dx) * bs
+            py = preview_y + offset_y + (dy - min_dy) * bs
             pygame.draw.rect(
                 ds,
                 COLORS[self.game.next_type],
-                (px, py, BLOCK_SIZE - 1, BLOCK_SIZE - 1),
+                (px, py, bs - 1, bs - 1),
             )
 
-        # 底部统计信息：Lines, High, Time（使用 small_font，保持可视性）
+        # 底部统计信息：Lines, High, Time
         elapsed_sec = (pygame.time.get_ticks() - self.game_start_ticks) // 1000
         mins = elapsed_sec // 60
         secs = elapsed_sec % 60
         time_str = f"{mins:02d}:{secs:02d}"
 
-        # 每行格式：标签 + 数值（均用 small_font）
         bottom_lines = [
             ("Lines", str(self.game.total_lines)),
             ("High", str(self.high_score)),
             ("Time", time_str),
         ]
 
-        info_y = preview_y + preview_size + 90
-        line_spacing = 35
+        info_y = preview_y + preview_size + int(90 * scale)
+        line_spacing = int(35 * scale)
 
         for i, (label_text, value_text) in enumerate(bottom_lines):
-            # 标签 （浅灰色）
-            label_surf = self.small_font.render(label_text + ": ", True, (200, 200, 200))
-            # 数值 （白色）
-            val_surf = self.small_font.render(value_text, True, (255, 255, 255))
+            label_surf = font_small.render(label_text + ": ", True, (200, 200, 200))
+            val_surf = font_small.render(value_text, True, (255, 255, 255))
             ds.blit(label_surf, (sidebar_content_left, info_y + i * line_spacing))
-            ds.blit(val_surf, (sidebar_content_left + label_surf.get_width(), info_y + i * line_spacing))
+            ds.blit(
+                val_surf,
+                (sidebar_content_left + label_surf.get_width(),
+                 info_y + i * line_spacing),
+            )
 
         # D. 绘制 Game Over 弹窗
         if self.game.game_over:
-            overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+            overlay = pygame.Surface((logical_w, logical_h))
             overlay.set_alpha(180)
             overlay.fill((0, 0, 0))
             ds.blit(overlay, (0, 0))
 
-            go_text = self.font.render("GAME OVER", True, (255, 0, 0))
-            restart_text = self.small_font.render(
+            go_text = font_big.render("GAME OVER", True, (255, 0, 0))
+            restart_text = font_small.render(
                 "Press RETURN to restart", True, (255, 255, 255)
             )
             ds.blit(
                 go_text,
-                (SCREEN_WIDTH // 2 - go_text.get_width() // 2, SCREEN_HEIGHT // 2 - 40),
+                (logical_w // 2 - go_text.get_width() // 2, logical_h // 2 - 40),
             )
             ds.blit(
                 restart_text,
                 (
-                    SCREEN_WIDTH // 2 - restart_text.get_width() // 2,
-                    SCREEN_HEIGHT // 2 + 20,
+                    logical_w // 2 - restart_text.get_width() // 2,
+                    logical_h // 2 + 20,
                 ),
             )
 
-        # E. 绘制暂停弹窗（仅在无 Game Over 且暂停时）
+        # E. 绘制暂停弹窗
         elif self.paused:
-            overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+            overlay = pygame.Surface((logical_w, logical_h))
             overlay.set_alpha(180)
             overlay.fill((0, 0, 0))
             ds.blit(overlay, (0, 0))
 
-            paused_text = self.font.render("PAUSED", True, (255, 255, 0))
-            resume_text = self.small_font.render(
+            paused_text = font_big.render("PAUSED", True, (255, 255, 0))
+            resume_text = font_small.render(
                 "Press SPACE to resume", True, (255, 255, 255)
             )
             ds.blit(
                 paused_text,
-                (SCREEN_WIDTH // 2 - paused_text.get_width() // 2, SCREEN_HEIGHT // 2 - 40),
+                (logical_w // 2 - paused_text.get_width() // 2, logical_h // 2 - 40),
             )
             ds.blit(
                 resume_text,
                 (
-                    SCREEN_WIDTH // 2 - resume_text.get_width() // 2,
-                    SCREEN_HEIGHT // 2 + 20,
+                    logical_w // 2 - resume_text.get_width() // 2,
+                    logical_h // 2 + 20,
                 ),
             )
 
-        # F. 确认退出弹窗（优先级最高，多行排版）
+        # F. 确认退出弹窗
         if self.confirm_quit:
-            overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+            overlay = pygame.Surface((logical_w, logical_h))
             overlay.set_alpha(200)
             overlay.fill((0, 0, 0))
             ds.blit(overlay, (0, 0))
 
-            quit_title = self.font.render("QUIT ?", True, (255, 100, 100))
-            line_esc = self.small_font.render(
+            quit_title = font_big.render("QUIT ?", True, (255, 100, 100))
+            line_esc = font_small.render(
                 "Press ESC to confirm", True, (255, 255, 255)
             )
-            line_cancel = self.small_font.render(
+            line_cancel = font_small.render(
                 "Any other key to cancel", True, (255, 255, 255)
             )
 
-            base_y = SCREEN_HEIGHT // 2 - 50
+            base_y = logical_h // 2 - 50
             ds.blit(
                 quit_title,
-                (SCREEN_WIDTH // 2 - quit_title.get_width() // 2, base_y),
+                (logical_w // 2 - quit_title.get_width() // 2, base_y),
             )
             ds.blit(
                 line_esc,
-                (SCREEN_WIDTH // 2 - line_esc.get_width() // 2, base_y + 40),
+                (logical_w // 2 - line_esc.get_width() // 2, base_y + 40),
             )
             ds.blit(
                 line_cancel,
-                (SCREEN_WIDTH // 2 - line_cancel.get_width() // 2, base_y + 75),
+                (logical_w // 2 - line_cancel.get_width() // 2, base_y + 75),
             )
 
-        # ---- 缩放并显示到实际窗口 ----
-        # 保持宽高比，在窗口中居中显示
-        scale = min(
-            self.window_width / SCREEN_WIDTH,
-            self.window_height / SCREEN_HEIGHT,
-        )
-        new_w = int(SCREEN_WIDTH * scale)
-        new_h = int(SCREEN_HEIGHT * scale)
-        scaled_surface = pygame.transform.scale(self.logical_surface, (new_w, new_h))
-
-        # 设置窗口背景（黑边）
+        # 4. 将逻辑表面显示到窗口（居中，黑边填充）
+        x_off = (self.window_width - logical_w) // 2
+        y_off = (self.window_height - logical_h) // 2
         self.screen.fill((0, 0, 0))
-        x_off = (self.window_width - new_w) // 2
-        y_off = (self.window_height - new_h) // 2
-        self.screen.blit(scaled_surface, (x_off, y_off))
+        self.screen.blit(self._logical, (x_off, y_off))
 
         pygame.display.flip()
