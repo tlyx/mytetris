@@ -30,6 +30,7 @@ class TetrisApp:
     screen: pygame.Surface
     font: pygame.font.Font
     small_font: pygame.font.Font
+    title_font: pygame.font.Font
     game: TetrisEngine
     fall_event: int
     current_level: int
@@ -45,6 +46,7 @@ class TetrisApp:
         pygame.display.set_caption("Tetris Professional - macOS Lab")
         self.font = pygame.font.SysFont("Arial Black", 32)
         self.small_font = pygame.font.SysFont("Arial Black", 20)
+        self.title_font = pygame.font.SysFont("Arial Black", 24, bold=True)
         # 启用按键重复（延迟 200 ms，间隔 50 ms）
         pygame.key.set_repeat(200, 50)
 
@@ -57,12 +59,6 @@ class TetrisApp:
         self.confirm_quit = False
         self.high_score = load_high_score()
         self.sidebar_bg = (20, 22, 28)
-
-    def run(self) -> None:
-        while True:
-            self._process_events()
-            self._render_game_scene()
-            self.clock.tick(60)
 
     def _update_speed(self) -> None:
         """根据等级计算下落速度"""
@@ -79,6 +75,12 @@ class TetrisApp:
         """实时更新最高分（内存中）"""
         if self.game.score > self.high_score:
             self.high_score = self.game.score
+
+    def run(self) -> None:
+        while True:
+            self._process_events()
+            self._render_game_scene()
+            self.clock.tick(60)
 
     def _process_events(self) -> None:
         """处理所有事件（瞬时/持续）"""
@@ -168,7 +170,7 @@ class TetrisApp:
 
         # C. 绘制美观侧边栏
         sidebar_x: int = GRID_WIDTH * BLOCK_SIZE + 20
-        sidebar_width: int = SIDEBAR_WIDTH - 40  # 留边距
+        sidebar_width: int = SIDEBAR_WIDTH - 30  # 留边距
 
         # 绘制面板背景
         panel_rect = pygame.Rect(
@@ -176,50 +178,97 @@ class TetrisApp:
         )
         pygame.draw.rect(self.screen, self.sidebar_bg, panel_rect)
 
-        # 1. Top Bar: Level & Lines (Small font)
-        level_surf = self.small_font.render(f"LV: {self.game.level}", True, (0, 255, 255))
-        lines_surf = self.small_font.render(f"LN: {self.game.total_lines}", True, (0, 255, 0))
-        self.screen.blit(level_surf, (sidebar_x, 20))
-        self.screen.blit(lines_surf, (sidebar_x + 80, 20))
+        # ---- 侧边栏内容 ----
+        # 标题
+        title_surf = self.title_font.render("TETRIS", True, (255, 255, 255))
+        self.screen.blit(
+            title_surf,
+            (GRID_WIDTH * BLOCK_SIZE + (SIDEBAR_WIDTH - title_surf.get_width()) // 2, 12),
+        )
+
+        # 标题下装饰线
+        pygame.draw.line(
+            self.screen,
+            (80, 80, 90),
+            (sidebar_x, 45),
+            (sidebar_x + sidebar_width, 45),
+            2,
+        )
+
+        # 1. 等级 & 消除行数
+        level_label = self.small_font.render("LEVEL", True, (150, 150, 160))
+        level_val = self.font.render(f"{self.game.level}", True, (255, 255, 255))
+        lines_val = self.font.render(f"{self.game.total_lines}", True, (255, 255, 255))
+
+        self.screen.blit(level_label, (sidebar_x, 60))
+        self.screen.blit(level_val, (sidebar_x + 70, 85))
+        lines_label = self.small_font.render("LINES", True, (150, 150, 160))
+        self.screen.blit(lines_label, (sidebar_x + 120, 60))
+        self.screen.blit(lines_val, (sidebar_x + 120, 85))
+
+        # 轻分隔
+        pygame.draw.line(
+            self.screen,
+            (60, 60, 70),
+            (sidebar_x, 125),
+            (sidebar_x + sidebar_width, 125),
+            1,
+        )
+
+        # 2. 得分
+        score_label = self.small_font.render("SCORE", True, (150, 150, 160))
+        self.screen.blit(score_label, (sidebar_x, 140))
+        score_val = self.font.render(
+            str(self.game.score).zfill(6), True, COLORS["SCORE_GOLD"]
+        )
+        score_x = sidebar_x + (sidebar_width - score_val.get_width()) // 2
+        self.screen.blit(score_val, (score_x, 165))
+
+        # 最高分
+        best_label = self.small_font.render("BEST", True, (150, 150, 160))
+        best_label_x = sidebar_x + (sidebar_width - best_label.get_width()) // 2
+        self.screen.blit(best_label, (best_label_x, 205))
+        best_val = self.small_font.render(
+            f"{self.high_score:06d}", True, (255, 255, 100)
+        )
+        best_val_x = sidebar_x + (sidebar_width - best_val.get_width()) // 2
+        self.screen.blit(best_val, (best_val_x, 225))
 
         # 分隔线
         pygame.draw.line(
-            self.screen, (60, 60, 60),
-            (sidebar_x, 50), (sidebar_x + sidebar_width, 50), 1
+            self.screen,
+            (60, 60, 70),
+            (sidebar_x, 255),
+            (sidebar_x + sidebar_width, 255),
+            1,
         )
 
-        # 2. Score
-        score_label = self.font.render("SCORE", True, (200, 200, 200))
-        score_label_x = sidebar_x + (sidebar_width - score_label.get_width()) // 2
-        self.screen.blit(score_label, (score_label_x, 70))
-        score_val = self.font.render(str(self.game.score).zfill(6), True, COLORS["SCORE_GOLD"])
-        score_val_x = sidebar_x + (sidebar_width - score_val.get_width()) // 2
-        self.screen.blit(score_val, (score_val_x, 105))
-
-        # 最佳分（位于得分下方，不重叠）
-        best_text = self.small_font.render(f"BEST: {self.high_score:06d}", True, (255, 255, 0))
-        best_text_x = sidebar_x + (sidebar_width - best_text.get_width()) // 2
-        self.screen.blit(best_text, (best_text_x, 145))
-
-        # 分隔线（下移以容纳最佳分）
-        pygame.draw.line(
-            self.screen, (60, 60, 60),
-            (sidebar_x, 175), (sidebar_x + sidebar_width, 175), 1
-        )
-
-        # 3. Next（下移）
-        next_label = self.font.render("NEXT", True, (200, 200, 200))
+        # 3. NEXT
+        next_label = self.small_font.render("NEXT", True, (150, 150, 160))
         next_label_x = sidebar_x + (sidebar_width - next_label.get_width()) // 2
-        self.screen.blit(next_label, (next_label_x, 195))
+        self.screen.blit(next_label, (next_label_x, 270))
 
         # 预览框（4x4 方块大小）
         preview_size = 4 * BLOCK_SIZE
         preview_x = sidebar_x + (sidebar_width - preview_size) // 2
-        preview_y = 235
-        preview_rect = (preview_x, preview_y, preview_size, preview_size)
-        pygame.draw.rect(self.screen, COLORS["GRID_LINE"], preview_rect, 2)
+        preview_y = 300
 
-        # 绘制预览方块（居中）
+        # 外框（深色，带圆角）
+        preview_rect_outer = pygame.Rect(
+            preview_x - 4, preview_y - 4, preview_size + 8, preview_size + 8
+        )
+        pygame.draw.rect(
+            self.screen, (40, 42, 50), preview_rect_outer, border_radius=8,
+        )
+        # 内框
+        preview_rect_inner = pygame.Rect(
+            preview_x, preview_y, preview_size, preview_size
+        )
+        pygame.draw.rect(
+            self.screen, (20, 22, 28), preview_rect_inner, border_radius=6,
+        )
+
+        # 绘制预览方块（居中，带圆角）
         next_shape: list[tuple[int, int]] = SHAPES_DATA[self.game.next_type]
         # 计算形状的包围盒
         xs: list[int] = [dx for dx, _dy in next_shape]
@@ -240,6 +289,7 @@ class TetrisApp:
                 self.screen,
                 COLORS[self.game.next_type],
                 (px, py, BLOCK_SIZE - 1, BLOCK_SIZE - 1),
+                border_radius=4,
             )
 
         # D. 绘制 Game Over 弹窗
@@ -250,10 +300,20 @@ class TetrisApp:
             self.screen.blit(overlay, (0, 0))
 
             go_text = self.font.render("GAME OVER", True, (255, 0, 0))
-            restart_text = self.small_font.render("Press RETURN to restart", True, (255, 255, 255))
-
-            self.screen.blit(go_text, (SCREEN_WIDTH // 2 - go_text.get_width() // 2, SCREEN_HEIGHT // 2 - 40))
-            self.screen.blit(restart_text, (SCREEN_WIDTH // 2 - restart_text.get_width() // 2, SCREEN_HEIGHT // 2 + 20))
+            restart_text = self.small_font.render(
+                "Press RETURN to restart", True, (255, 255, 255)
+            )
+            self.screen.blit(
+                go_text,
+                (SCREEN_WIDTH // 2 - go_text.get_width() // 2, SCREEN_HEIGHT // 2 - 40),
+            )
+            self.screen.blit(
+                restart_text,
+                (
+                    SCREEN_WIDTH // 2 - restart_text.get_width() // 2,
+                    SCREEN_HEIGHT // 2 + 20,
+                ),
+            )
 
         # E. 绘制暂停弹窗（仅在无 Game Over 且暂停时）
         elif self.paused:
@@ -263,9 +323,20 @@ class TetrisApp:
             self.screen.blit(overlay, (0, 0))
 
             paused_text = self.font.render("PAUSED", True, (255, 255, 0))
-            resume_text = self.small_font.render("Press SPACE to resume", True, (255, 255, 255))
-            self.screen.blit(paused_text, (SCREEN_WIDTH // 2 - paused_text.get_width() // 2, SCREEN_HEIGHT // 2 - 40))
-            self.screen.blit(resume_text, (SCREEN_WIDTH // 2 - resume_text.get_width() // 2, SCREEN_HEIGHT // 2 + 20))
+            resume_text = self.small_font.render(
+                "Press SPACE to resume", True, (255, 255, 255)
+            )
+            self.screen.blit(
+                paused_text,
+                (SCREEN_WIDTH // 2 - paused_text.get_width() // 2, SCREEN_HEIGHT // 2 - 40),
+            )
+            self.screen.blit(
+                resume_text,
+                (
+                    SCREEN_WIDTH // 2 - resume_text.get_width() // 2,
+                    SCREEN_HEIGHT // 2 + 20,
+                ),
+            )
 
         # F. 确认退出弹窗（优先级最高，多行排版）
         if self.confirm_quit:
@@ -275,8 +346,12 @@ class TetrisApp:
             self.screen.blit(overlay, (0, 0))
 
             quit_title = self.font.render("QUIT ?", True, (255, 100, 100))
-            line_esc = self.small_font.render("Press ESC to confirm", True, (255, 255, 255))
-            line_cancel = self.small_font.render("Any other key to cancel", True, (255, 255, 255))
+            line_esc = self.small_font.render(
+                "Press ESC to confirm", True, (255, 255, 255)
+            )
+            line_cancel = self.small_font.render(
+                "Any other key to cancel", True, (255, 255, 255)
+            )
 
             base_y = SCREEN_HEIGHT // 2 - 50
             self.screen.blit(
