@@ -62,28 +62,6 @@ class TetrisEngine:
         self.next_type = choice(list(SHAPES_DATA.keys()))
         self._spawn_piece()
 
-    def _spawn_piece(self) -> None:
-        self.current_type = self.next_type
-        self.current_shape = SHAPES_DATA[self.current_type]
-        self.next_type = choice(list(SHAPES_DATA.keys()))
-        self.x = 4
-        self.y = 1
-
-        if self._check_collision(self.x, self.y):
-            self.game_over = True
-
-    def _check_collision(
-        self, nx: int, ny: int, shape: list[tuple[int, int]] | None = None
-    ) -> bool:
-        shape = shape or self.current_shape
-        for dx, dy in shape:
-            tx, ty = nx + dx, ny + dy
-            if not (0 <= tx < GRID_WIDTH and 0 <= ty < GRID_HEIGHT):
-                return True
-            if ty >= 0 and self.grid[ty][tx]:
-                return True
-        return False
-
     def move(self, dx: int, dy: int) -> bool:
         if not self._check_collision(self.x + dx, self.y + dy):
             self.x += dx
@@ -127,3 +105,25 @@ class TetrisEngine:
             new_grid.insert(0, [None for _ in range(GRID_WIDTH)])
         self.grid = new_grid
         self._spawn_piece()
+
+    def _spawn_piece(self) -> None:
+        self.current_type = self.next_type
+        self.current_shape = SHAPES_DATA[self.current_type]
+        self.next_type = choice(list(SHAPES_DATA.keys()))
+        self.x = 4
+        self.y = 1
+
+        if self._check_collision(self.x, self.y):
+            self.game_over = True
+
+    def _check_collision(
+        self, nx: int, ny: int, shape: list[tuple[int, int]] | None = None
+    ) -> bool:
+        shape = shape or self.current_shape
+        for dx, dy in shape:
+            tx, ty = nx + dx, ny + dy
+            if not (0 <= tx < GRID_WIDTH and 0 <= ty < GRID_HEIGHT):
+                return True
+            if ty >= 0 and self.grid[ty][tx]:
+                return True
+        return False

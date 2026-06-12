@@ -58,6 +58,12 @@ class TetrisApp:
         self.high_score = load_high_score()
         self.sidebar_bg = (20, 22, 28)
 
+    def run(self) -> None:
+        while True:
+            self._process_events()
+            self._render_game_scene()
+            self.clock.tick(60)
+
     def _update_speed(self) -> None:
         """根据等级计算下落速度"""
         speed = max(100, 500 - (self.game.level - 1) * 50)
@@ -73,12 +79,6 @@ class TetrisApp:
         """实时更新最高分（内存中）"""
         if self.game.score > self.high_score:
             self.high_score = self.game.score
-
-    def run(self) -> None:
-        while True:
-            self._process_events()
-            self._render_game_scene()
-            self.clock.tick(60)
 
     def _process_events(self) -> None:
         """处理所有事件（瞬时/持续）"""
