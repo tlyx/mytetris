@@ -1,5 +1,3 @@
-import sys
-
 from tetris import TetrisApp
 
 __version__ = "0.7.0"
