@@ -71,6 +71,7 @@ class TetrisApp:
     music_enabled: bool   # 背景音乐开关
     sfx_enabled: bool     # 音效开关
     _game_over_sound_played: bool   # 确保 Game Over 音效只播放一次
+    _music_paused_for_gamepause: bool   # 记录音乐是否因游戏暂停而暂停
 
     def __init__(self) -> None:
         pygame.init()
@@ -111,6 +112,7 @@ class TetrisApp:
         self.music_enabled = True   # 初始为开启，之后根据音频文件可用性决定
         self.sfx_enabled = True
         self._game_over_sound_played = False
+        self._music_paused_for_gamepause = False
         self._init_audio()
 
         # ---- 设置 Dock 栏图标 ----
@@ -268,8 +270,25 @@ class TetrisApp:
                     self.paused = not self.paused
                     if self.paused:
                         pygame.time.set_timer(self.fall_event, 0)
+                        # 暂停背景音乐，并记录是因游戏暂停而暂停的
+                        if self.music_enabled and pygame.mixer.music.get_busy():
+                            pygame.mixer.music.pause()
+                            self._music_paused_for_gamepause = True
                     else:
                         self._update_speed()
+                        # 恢复背景音乐（只恢复那些由游戏暂停被挂起的音乐）
+                        if self.music_enabled and self._music_paused_for_gamepause:
+                            try:
+                                pygame.mixer.music.unpause()
+                            except pygame.error:
+                                pass
+                            # 如果 unpause 后仍不在播放（例如音乐曾被 stop），则重新开始播放
+                            if not pygame.mixer.music.get_busy():
+                                try:
+                                    pygame.mixer.music.play(-1)
+                                except pygame.error:
+                                    pass
+                            self._music_paused_for_gamepause = False
                 continue  # 切换后不做其他处理
 
             # Game Over 状态只响应 Return 键重开
@@ -283,6 +302,8 @@ class TetrisApp:
                     self.game_start_ticks = pygame.time.get_ticks()
                     # 重置 Game Over 音效标志，以便下次游戏结束再次播放
                     self._game_over_sound_played = False
+                    # 确保音乐暂停标志也随之重置
+                    self._music_paused_for_gamepause = False
                 continue
 
             # 暂停状态下忽略除暂停键外的其他游戏事件
