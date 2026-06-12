@@ -85,6 +85,9 @@ class TetrisApp:
         self.window_height = SCREEN_HEIGHT
         self._logical = None  # 延迟创建
 
+        # 隐藏鼠标指针，避免遮挡游戏画面
+        pygame.mouse.set_visible(False)
+
     def _update_speed(self) -> None:
         """根据等级计算下落速度"""
         speed = max(100, 500 - (self.game.level - 1) * 50)
@@ -112,6 +115,7 @@ class TetrisApp:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 save_high_score(self.high_score)
+                pygame.mouse.set_visible(True)   # 退出前恢复鼠标
                 pygame.quit()
                 sys.exit()
 
@@ -133,6 +137,7 @@ class TetrisApp:
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
                         save_high_score(self.high_score)
+                        pygame.mouse.set_visible(True)   # 退出前恢复鼠标
                         pygame.quit()
                         sys.exit()
                     else:
