@@ -233,14 +233,29 @@ class TetrisApp:
             self.screen.blit(paused_text, (SCREEN_WIDTH // 2 - paused_text.get_width() // 2, SCREEN_HEIGHT // 2 - 40))
             self.screen.blit(resume_text, (SCREEN_WIDTH // 2 - resume_text.get_width() // 2, SCREEN_HEIGHT // 2 + 20))
 
-        # F. 确认退出弹窗（优先级最高）
+        # F. 确认退出弹窗（优先级最高，多行排版）
         if self.confirm_quit:
             overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
             overlay.set_alpha(200)
             overlay.fill((0, 0, 0))
             self.screen.blit(overlay, (0, 0))
 
-            confirm_text = self.small_font.render("Quit? ESC to confirm, any other key to cancel", True, (255, 255, 0))
-            self.screen.blit(confirm_text, (SCREEN_WIDTH // 2 - confirm_text.get_width() // 2, SCREEN_HEIGHT // 2 - 20))
+            quit_title = self.font.render("QUIT ?", True, (255, 100, 100))
+            line_esc = self.small_font.render("Press ESC to confirm", True, (255, 255, 255))
+            line_cancel = self.small_font.render("Any other key to cancel", True, (255, 255, 255))
+
+            base_y = SCREEN_HEIGHT // 2 - 50
+            self.screen.blit(
+                quit_title,
+                (SCREEN_WIDTH // 2 - quit_title.get_width() // 2, base_y),
+            )
+            self.screen.blit(
+                line_esc,
+                (SCREEN_WIDTH // 2 - line_esc.get_width() // 2, base_y + 40),
+            )
+            self.screen.blit(
+                line_cancel,
+                (SCREEN_WIDTH // 2 - line_cancel.get_width() // 2, base_y + 75),
+            )
 
         pygame.display.flip()
