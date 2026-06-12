@@ -20,6 +20,11 @@ __version__ = "0.6.0"
 MIN_WINDOW_WIDTH = 400
 MIN_WINDOW_HEIGHT = 400
 
+# ---- 音频文件路径 ----
+BG_MUSIC_FILE = "assets/bg_music.mp3"
+CLEAR_SOUND_FILE = "assets/clear.wav"
+# -----------------------
+
 
 def _highscore_file() -> str:
     """返回符合 XDG 数据目录的高分记录文件路径，并确保目录存在。"""
@@ -58,6 +63,9 @@ class TetrisApp:
     window_width: int
     window_height: int
     _logical: pygame.Surface | None  # 根据窗口大小动态创建的绘制表面
+    # 音频相关
+    audio_enabled: bool
+    sounds: dict[str, pygame.mixer.Sound]
 
     def __init__(self) -> None:
         pygame.init()
@@ -93,6 +101,40 @@ class TetrisApp:
 
         # 初次强制确保最小尺寸
         self._enforce_min_size()
+
+        # ---- 音频初始化 ----
+        self._init_audio()
+
+    def _init_audio(self) -> None:
+        """尽量加载背景音乐与删除行音效，若缺少文件则静默运行。"""
+        self.audio_enabled = False
+        self.sounds = {}
+        try:
+            if not pygame.mixer.get_init():
+                pygame.mixer.init()
+
+            # 背景音乐
+            if os.path.isfile(BG_MUSIC_FILE):
+                pygame.mixer.music.load(BG_MUSIC_FILE)
+
+            # 仅保留删除行音效
+            if os.path.isfile(CLEAR_SOUND_FILE):
+                self.sounds["clear"] = pygame.mixer.Sound(CLEAR_SOUND_FILE)
+
+            # 只要有音乐或音效可用即认为启用
+            if os.path.isfile(BG_MUSIC_FILE) or self.sounds:
+                self.audio_enabled = True
+
+            # 循环播放背景音乐（需要先 load）
+            if os.path.isfile(BG_MUSIC_FILE):
+                pygame.mixer.music.play(-1)
+
+        except Exception:
+            self.audio_enabled = False
+
+    def _play_sound(self, name: str) -> None:
+        if self.audio_enabled and name in self.sounds:
+            self.sounds[name].play()
 
     def _enforce_min_size(self) -> None:
         """确保当前窗口不小于最小尺寸。"""
@@ -194,6 +236,7 @@ class TetrisApp:
             if event.type == self.fall_event:
                 if not self.game.move(0, 1):
                     self.game.lock_and_clear_lines()
+                    self._play_sound("clear")
                     self._update_high_score()
                     # 检查是否需要更新速度
                     self._check_level_upgrade()
