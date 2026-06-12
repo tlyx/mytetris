@@ -66,7 +66,8 @@ class TetrisApp:
     # 音频相关
     audio_enabled: bool
     sounds: dict[str, pygame.mixer.Sound]
-    music_enabled: bool   # 新加：背景音乐开关
+    music_enabled: bool   # 背景音乐开关
+    sfx_enabled: bool     # 音效开关
 
     def __init__(self) -> None:
         pygame.init()
@@ -105,6 +106,7 @@ class TetrisApp:
 
         # ---- 音频初始化 ----
         self.music_enabled = True   # 初始为开启，之后根据音频文件可用性决定
+        self.sfx_enabled = True
         self._init_audio()
 
     def _init_audio(self) -> None:
@@ -135,7 +137,7 @@ class TetrisApp:
             self.audio_enabled = False
 
     def _toggle_music(self) -> None:
-        """切换背景音乐的开关。"""
+        """切换背景音乐的开关（M键）。"""
         if not self.audio_enabled:
             return
         self.music_enabled = not self.music_enabled
@@ -147,8 +149,14 @@ class TetrisApp:
         else:
             pygame.mixer.music.stop()
 
+    def _toggle_sfx(self) -> None:
+        """切换音效的开关（S键）。"""
+        if not self.audio_enabled:
+            return
+        self.sfx_enabled = not self.sfx_enabled
+
     def _play_sound(self, name: str) -> None:
-        if self.audio_enabled and name in self.sounds:
+        if self.audio_enabled and name in self.sounds and self.sfx_enabled:
             self.sounds[name].play()
 
     def _enforce_min_size(self) -> None:
@@ -188,9 +196,14 @@ class TetrisApp:
     def _process_events(self) -> None:
         """处理所有事件（瞬时/持续）"""
         for event in pygame.event.get():
-            # ---------- 音乐开关（独立于任何状态） ----------
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_s:
+            # ---------- 背景音乐开关（M键） ----------
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_m:
                 self._toggle_music()
+                continue
+
+            # ---------- 音效开关（S键） ----------
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_s:
+                self._toggle_sfx()
                 continue
 
             if event.type == pygame.QUIT:
