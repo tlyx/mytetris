@@ -91,6 +91,19 @@ class TetrisApp:
         # 隐藏鼠标指针，避免遮挡游戏画面
         pygame.mouse.set_visible(False)
 
+        # 初次强制确保最小尺寸
+        self._enforce_min_size()
+
+    def _enforce_min_size(self) -> None:
+        """确保当前窗口不小于最小尺寸。"""
+        current_w, current_h = self.screen.get_size()
+        new_w = max(current_w, MIN_WINDOW_WIDTH)
+        new_h = max(current_h, MIN_WINDOW_HEIGHT)
+        if (new_w, new_h) != (current_w, current_h):
+            self.screen = pygame.display.set_mode((new_w, new_h), pygame.RESIZABLE)
+            self.window_width = new_w
+            self.window_height = new_h
+
     def _update_speed(self) -> None:
         """根据等级计算下落速度"""
         speed = max(100, 500 - (self.game.level - 1) * 50)
@@ -109,6 +122,8 @@ class TetrisApp:
 
     def run(self) -> None:
         while True:
+            # 每次循环开始强制最小尺寸（防止某些系统绕过 VIDEORESIZE）
+            self._enforce_min_size()
             self._process_events()
             self._render_game_scene()
             self.clock.tick(60)
@@ -124,15 +139,14 @@ class TetrisApp:
 
             # 窗口大小改变事件
             if event.type == pygame.VIDEORESIZE:
+                # 直接设置强制最小值（不再检测是否与当前值相等，确保总是应用）
                 new_w = max(event.w, MIN_WINDOW_WIDTH)
                 new_h = max(event.h, MIN_WINDOW_HEIGHT)
-                # 避免无限触发事件：只有当尺寸真正改变时才更新
-                if (new_w, new_h) != (self.window_width, self.window_height):
-                    self.window_width = new_w
-                    self.window_height = new_h
-                    self.screen = pygame.display.set_mode(
-                        (new_w, new_h), pygame.RESIZABLE
-                    )
+                self.window_width = new_w
+                self.window_height = new_h
+                self.screen = pygame.display.set_mode(
+                    (new_w, new_h), pygame.RESIZABLE
+                )
                 continue
 
             # 确认退出状态优先处理
