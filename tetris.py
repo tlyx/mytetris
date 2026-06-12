@@ -19,6 +19,7 @@ class TetrisApp:
     fall_event: int
     current_level: int
     paused: bool
+    confirm_quit: bool
     clock: pygame.time.Clock
     sidebar_bg: tuple[int, int, int]
 
@@ -37,6 +38,7 @@ class TetrisApp:
         self._update_speed()
         self.clock = pygame.time.Clock()
         self.paused = False
+        self.confirm_quit = False
         self.sidebar_bg = (20, 22, 28)
 
     def _update_speed(self) -> None:
@@ -58,13 +60,23 @@ class TetrisApp:
                 pygame.quit()
                 sys.exit()
 
-            # 全局 Esc 退出（无论游戏状态）
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-                pygame.quit()
-                sys.exit()
+            # 确认退出状态优先处理
+            if self.confirm_quit:
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE:
+                        pygame.quit()
+                        sys.exit()
+                    else:
+                        self.confirm_quit = False
+                continue
 
-            # 暂停切换（仅在非 Game Over 时有效）
-            if event.type == pygame.KEYDOWN and event.key in (pygame.K_p, pygame.K_RETURN):
+            # 按下 ESC 触发退出确认
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                self.confirm_quit = True
+                continue
+
+            # 暂停切换，使用空格键（仅在非 Game Over 时有效）
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
                 if not self.game.game_over:
                     self.paused = not self.paused
                     if self.paused:
@@ -73,9 +85,9 @@ class TetrisApp:
                         self._update_speed()
                 continue  # 切换后不做其他处理
 
-            # Game Over 状态只响应 R（重开）
+            # Game Over 状态只响应 Return 键重开
             if self.game.game_over:
-                if event.type == pygame.KEYDOWN and event.key == pygame.K_r:
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN:
                     self.game.reset()
                     self.current_level = 1
                     self._update_speed()
@@ -104,7 +116,7 @@ class TetrisApp:
                     self.game.move(0, 1)
 
     def render_game_scene(self) -> None:
-        """极致渲染：主场 + 美观侧边栏 + Game Over / Pause 弹窗"""
+        """极致渲染：主场 + 美观侧边栏 + Game Over / Pause / Confirm Quit 弹窗"""
         self.screen.fill(COLORS["BACKGROUND"])
 
         # A. 绘制主棋盘
@@ -204,7 +216,7 @@ class TetrisApp:
             self.screen.blit(overlay, (0, 0))
 
             go_text = self.font.render("GAME OVER", True, (255, 0, 0))
-            restart_text = self.small_font.render("Press R to Restart", True, (255, 255, 255))
+            restart_text = self.small_font.render("Press RETURN to restart", True, (255, 255, 255))
 
             self.screen.blit(go_text, (SCREEN_WIDTH // 2 - go_text.get_width() // 2, SCREEN_HEIGHT // 2 - 40))
             self.screen.blit(restart_text, (SCREEN_WIDTH // 2 - restart_text.get_width() // 2, SCREEN_HEIGHT // 2 + 20))
@@ -217,8 +229,18 @@ class TetrisApp:
             self.screen.blit(overlay, (0, 0))
 
             paused_text = self.font.render("PAUSED", True, (255, 255, 0))
-            resume_text = self.small_font.render("Press P to resume", True, (255, 255, 255))
+            resume_text = self.small_font.render("Press SPACE to resume", True, (255, 255, 255))
             self.screen.blit(paused_text, (SCREEN_WIDTH // 2 - paused_text.get_width() // 2, SCREEN_HEIGHT // 2 - 40))
             self.screen.blit(resume_text, (SCREEN_WIDTH // 2 - resume_text.get_width() // 2, SCREEN_HEIGHT // 2 + 20))
+
+        # F. 确认退出弹窗（优先级最高）
+        if self.confirm_quit:
+            overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+            overlay.set_alpha(200)
+            overlay.fill((0, 0, 0))
+            self.screen.blit(overlay, (0, 0))
+
+            confirm_text = self.small_font.render("Quit? ESC to confirm, any other key to cancel", True, (255, 255, 0))
+            self.screen.blit(confirm_text, (SCREEN_WIDTH // 2 - confirm_text.get_width() // 2, SCREEN_HEIGHT // 2 - 20))
 
         pygame.display.flip()
