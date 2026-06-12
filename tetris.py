@@ -48,9 +48,9 @@ class TetrisApp:
         pygame.display.set_caption("Tetris Professional - macOS Lab")
         self.font = pygame.font.SysFont("Arial Black", 32)
         self.small_font = pygame.font.SysFont("Arial Black", 20)
-        # 衬线字体用于底部信息
-        self.serif_font = pygame.font.SysFont("Times New Roman", 16)
-        self.serif_bold_font = pygame.font.SysFont("Times New Roman", 16, bold=True)
+        # 衬线字体用于底部信息，比之前稍大
+        self.serif_font = pygame.font.SysFont("Times New Roman", 18)
+        self.serif_bold_font = pygame.font.SysFont("Times New Roman", 18, bold=True)
         # 启用按键重复（延迟 200 ms，间隔 50 ms）
         pygame.key.set_repeat(200, 50)
 
@@ -187,22 +187,22 @@ class TetrisApp:
 
         # ---- 侧边栏内容：新布局 ----
 
-        # 第一行：LEVEL 和 SCORE 标签（小号字体）
-        level_label = self.small_font.render("LEVEL", True, (150, 150, 160))
+        # 第一行：LV 和 SCORE 标签（小号字体）
+        lv_label = self.small_font.render("LV", True, (150, 150, 160))
         score_label = self.small_font.render("SCORE", True, (150, 150, 160))
         # 将两个标签分别放在左右两侧
-        self.screen.blit(level_label, (sidebar_x, 20))
+        self.screen.blit(lv_label, (sidebar_x, 20))
         self.screen.blit(
             score_label,
             (sidebar_x + sidebar_width - score_label.get_width(), 20),
         )
 
         # 第二行：对应数值（大号）
-        level_val = self.font.render(f"{self.game.level}", True, (255, 255, 255))
+        lv_val = self.font.render(f"{self.game.level}", True, (255, 255, 255))
         score_val = self.font.render(
             f"{self.game.score:6d}", True, COLORS["SCORE_GOLD"]
         )
-        self.screen.blit(level_val, (sidebar_x, 45))
+        self.screen.blit(lv_val, (sidebar_x, 45))
         self.screen.blit(
             score_val,
             (sidebar_x + sidebar_width - score_val.get_width(), 45),
@@ -212,15 +212,15 @@ class TetrisApp:
         pygame.draw.line(
             self.screen,
             (60, 60, 70),
-            (sidebar_x, 75),
-            (sidebar_x + sidebar_width, 75),
+            (sidebar_x, 85),
+            (sidebar_x + sidebar_width, 85),
             1,
         )
 
         # 预览框（下一个方块，不写 NEXT 标签） -------------------------------
         preview_size = 4 * BLOCK_SIZE
         preview_x = sidebar_x + (sidebar_width - preview_size) // 2
-        preview_y = 95
+        preview_y = 110  # 往下移了一些，避免与数字重叠
 
         # 外框
         preview_rect_outer = pygame.Rect(
@@ -254,7 +254,7 @@ class TetrisApp:
                 (px, py, BLOCK_SIZE - 1, BLOCK_SIZE - 1),
             )
 
-        # 底部信息：Lines, Best, Time（衬线字体，小号） --------------------------
+        # 底部统计信息：Lines, Best, Time（衬线字体，稍大，左对齐） --------------
         # 计算游戏时间
         elapsed_sec = (pygame.time.get_ticks() - self.game_start_ticks) // 1000
         mins = elapsed_sec // 60
@@ -268,8 +268,9 @@ class TetrisApp:
             ("Time", time_str),
         ]
 
-        info_y = preview_y + preview_size + 20  # 预览框下方开始
-        line_spacing = 25
+        # 更多下方位置，并且不使用居中，左对齐
+        info_y = preview_y + preview_size + 40  # 预览框下方多留空间
+        line_spacing = 30
 
         for i, (label_text, value_text) in enumerate(bottom_lines):
             # 标签和冒号
@@ -278,14 +279,11 @@ class TetrisApp:
             # 粗体数值
             value_surf = self.serif_bold_font.render(value_text, True, (255, 255, 255))
 
-            # 居中整行：总宽度 = prefix_width + value_width
-            total_width = prefix_surf.get_width() + value_surf.get_width()
-            start_x = sidebar_x + (sidebar_width - total_width) // 2
-
-            self.screen.blit(prefix_surf, (start_x, info_y + i * line_spacing))
+            # 左对齐，直接放在侧边栏左侧
+            self.screen.blit(prefix_surf, (sidebar_x, info_y + i * line_spacing))
             self.screen.blit(
                 value_surf,
-                (start_x + prefix_surf.get_width(), info_y + i * line_spacing),
+                (sidebar_x + prefix_surf.get_width(), info_y + i * line_spacing),
             )
 
         # D. 绘制 Game Over 弹窗
