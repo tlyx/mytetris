@@ -13,6 +13,9 @@ SCREEN_HEIGHT = GRID_HEIGHT * BLOCK_SIZE
 
 HIGH_SCORE_FILE = "highscore.txt"
 
+# 版本号
+__version__ = "0.6.0"
+
 # 最小窗口尺寸（小于此值会被强制拉伸到该最小尺寸）
 MIN_WINDOW_WIDTH = 400
 MIN_WINDOW_HEIGHT = 400
