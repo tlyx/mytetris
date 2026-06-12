@@ -195,63 +195,69 @@ class TetrisApp:
             2,
         )
 
-        # 1. 等级 & 消除行数
-        level_label = self.small_font.render("LEVEL", True, (150, 150, 160))
-        level_val = self.font.render(f"{self.game.level}", True, (255, 255, 255))
-        lines_val = self.font.render(f"{self.game.total_lines}", True, (255, 255, 255))
-
-        self.screen.blit(level_label, (sidebar_x, 60))
-        self.screen.blit(level_val, (sidebar_x + 70, 85))
-        lines_label = self.small_font.render("LINES", True, (150, 150, 160))
-        self.screen.blit(lines_label, (sidebar_x + 120, 60))
-        self.screen.blit(lines_val, (sidebar_x + 120, 85))
-
-        # 轻分隔
-        pygame.draw.line(
-            self.screen,
-            (60, 60, 70),
-            (sidebar_x, 125),
-            (sidebar_x + sidebar_width, 125),
-            1,
-        )
-
-        # 2. 得分
+        # ---------- 第一区域：得分 ----------
+        # SCORE 标签
         score_label = self.small_font.render("SCORE", True, (150, 150, 160))
-        self.screen.blit(score_label, (sidebar_x, 140))
+        self.screen.blit(score_label, (sidebar_x, 60))
+
+        # 当前得分（大号、金色）
         score_val = self.font.render(
             str(self.game.score).zfill(6), True, COLORS["SCORE_GOLD"]
         )
         score_x = sidebar_x + (sidebar_width - score_val.get_width()) // 2
-        self.screen.blit(score_val, (score_x, 165))
+        self.screen.blit(score_val, (score_x, 85))
 
-        # 最高分
+        # BEST 标签
         best_label = self.small_font.render("BEST", True, (150, 150, 160))
         best_label_x = sidebar_x + (sidebar_width - best_label.get_width()) // 2
-        self.screen.blit(best_label, (best_label_x, 205))
+        self.screen.blit(best_label, (best_label_x, 115))
+
+        # 最高分
         best_val = self.small_font.render(
             f"{self.high_score:06d}", True, (255, 255, 100)
         )
         best_val_x = sidebar_x + (sidebar_width - best_val.get_width()) // 2
-        self.screen.blit(best_val, (best_val_x, 225))
+        self.screen.blit(best_val, (best_val_x, 135))
 
-        # 分隔线
+        # 得分区域分隔线
         pygame.draw.line(
             self.screen,
             (60, 60, 70),
-            (sidebar_x, 255),
-            (sidebar_x + sidebar_width, 255),
+            (sidebar_x, 165),
+            (sidebar_x + sidebar_width, 165),
             1,
         )
 
-        # 3. NEXT
+        # ---------- 第二区域：等级 & 消除行数 ----------
+        level_label = self.small_font.render("LEVEL", True, (150, 150, 160))
+        level_val = self.font.render(f"{self.game.level}", True, (255, 255, 255))
+        lines_val = self.font.render(f"{self.game.total_lines}", True, (255, 255, 255))
+
+        self.screen.blit(level_label, (sidebar_x, 175))
+        self.screen.blit(level_val, (sidebar_x + 70, 200))
+
+        lines_label = self.small_font.render("LINES", True, (150, 150, 160))
+        self.screen.blit(lines_label, (sidebar_x + 120, 175))
+        self.screen.blit(lines_val, (sidebar_x + 120, 200))
+
+        # 等级/行数区域分隔线
+        pygame.draw.line(
+            self.screen,
+            (60, 60, 70),
+            (sidebar_x, 235),
+            (sidebar_x + sidebar_width, 235),
+            1,
+        )
+
+        # ---------- 第三区域：NEXT ----------
         next_label = self.small_font.render("NEXT", True, (150, 150, 160))
         next_label_x = sidebar_x + (sidebar_width - next_label.get_width()) // 2
-        self.screen.blit(next_label, (next_label_x, 270))
+        self.screen.blit(next_label, (next_label_x, 250))
 
         # 预览框（4x4 方块大小）
         preview_size = 4 * BLOCK_SIZE
         preview_x = sidebar_x + (sidebar_width - preview_size) // 2
-        preview_y = 300
+        preview_y = 280
 
         # 外框（深色，带圆角）
         preview_rect_outer = pygame.Rect(
