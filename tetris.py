@@ -186,9 +186,9 @@ class TetrisApp:
             (sidebar_x + (sidebar_width - score_label.get_width()) // 2, 20),
         )
 
-        # SCORE 数值（大号、金色，居中）
+        # SCORE 数值（大号、金色，居中；前导零用空格代替）
         score_val = self.font.render(
-            str(self.game.score).zfill(6), True, COLORS["SCORE_GOLD"]
+            f"{self.game.score:6d}", True, COLORS["SCORE_GOLD"]
         )
         self.screen.blit(
             score_val,
@@ -202,9 +202,9 @@ class TetrisApp:
             (sidebar_x + (sidebar_width - best_label.get_width()) // 2, 80),
         )
 
-        # BEST 数值（小号、淡黄色，居中）
+        # BEST 数值（小号、淡黄色，居中；前导零用空格代替）
         best_val = self.small_font.render(
-            f"{self.high_score:06d}", True, (255, 255, 100)
+            f"{self.high_score:6d}", True, (255, 255, 100)
         )
         self.screen.blit(
             best_val,
