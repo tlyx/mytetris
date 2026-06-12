@@ -44,8 +44,6 @@ class TetrisApp:
     logical_surface: pygame.Surface
     font: pygame.font.Font
     small_font: pygame.font.Font
-    serif_font: pygame.font.Font
-    serif_bold_font: pygame.font.Font
     game: TetrisEngine
     fall_event: int
     current_level: int
@@ -67,9 +65,6 @@ class TetrisApp:
         pygame.display.set_caption("Tetris Professional - macOS Lab")
         self.font = pygame.font.SysFont("Arial Black", 32)
         self.small_font = pygame.font.SysFont("Arial Black", 20)
-        # 衬线字体用于底部信息，比之前稍大
-        self.serif_font = pygame.font.SysFont("Times New Roman", 20)
-        self.serif_bold_font = pygame.font.SysFont("Times New Roman", 20, bold=True)
         # 启用按键重复（延迟 200 ms，间隔 50 ms）
         pygame.key.set_repeat(200, 50)
 
@@ -293,37 +288,29 @@ class TetrisApp:
                 (px, py, BLOCK_SIZE - 1, BLOCK_SIZE - 1),
             )
 
-        # 底部统计信息：Lines, High Score, Time（衬线字体，稍大，左对齐） --------------
-        # 计算游戏时间
+        # 底部统计信息：Lines, High Score, Time（使用 small_font，保持可视性）
         elapsed_sec = (pygame.time.get_ticks() - self.game_start_ticks) // 1000
         mins = elapsed_sec // 60
         secs = elapsed_sec % 60
         time_str = f"{mins:02d}:{secs:02d}"
 
-        # 每行格式：标签（非粗体）＋ 数值（粗体）
+        # 每行格式：标签 + 数值（均用 small_font）
         bottom_lines = [
             ("Lines", str(self.game.total_lines)),
             ("High Score", str(self.high_score)),
             ("Time", time_str),
         ]
 
-        # 将统计信息放在更下方的位置，至少三行字的高度再往下
-        info_y = preview_y + preview_size + 90  # 预览框底部再加 90 像素，确保足够空间
-        line_spacing = 35  # 配合更大的字号
+        info_y = preview_y + preview_size + 90
+        line_spacing = 35
 
         for i, (label_text, value_text) in enumerate(bottom_lines):
-            # 标签和冒号
-            prefix = f"{label_text}: "
-            prefix_surf = self.serif_font.render(prefix, True, (200, 200, 200))
-            # 粗体数值
-            value_surf = self.serif_bold_font.render(value_text, True, (255, 255, 255))
-
-            # 左对齐，直接放在侧边栏左侧（与内容左边界对齐）
-            ds.blit(prefix_surf, (sidebar_content_left, info_y + i * line_spacing))
-            ds.blit(
-                value_surf,
-                (sidebar_content_left + prefix_surf.get_width(), info_y + i * line_spacing),
-            )
+            # 标签 （浅灰色）
+            label_surf = self.small_font.render(label_text + ": ", True, (200, 200, 200))
+            # 数值 （白色）
+            val_surf = self.small_font.render(value_text, True, (255, 255, 255))
+            ds.blit(label_surf, (sidebar_content_left, info_y + i * line_spacing))
+            ds.blit(val_surf, (sidebar_content_left + label_surf.get_width(), info_y + i * line_spacing))
 
         # D. 绘制 Game Over 弹窗
         if self.game.game_over:
