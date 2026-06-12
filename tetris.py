@@ -9,6 +9,21 @@ SIDEBAR_WIDTH = 200
 SCREEN_WIDTH = GRID_WIDTH * BLOCK_SIZE + SIDEBAR_WIDTH
 SCREEN_HEIGHT = GRID_HEIGHT * BLOCK_SIZE
 
+HIGH_SCORE_FILE = "highscore.txt"
+
+
+def load_high_score() -> int:
+    try:
+        with open(HIGH_SCORE_FILE, "r") as f:
+            return int(f.read().strip())
+    except (FileNotFoundError, ValueError):
+        return 0
+
+
+def save_high_score(value: int) -> None:
+    with open(HIGH_SCORE_FILE, "w") as f:
+        f.write(str(value))
+
 
 @final
 class TetrisApp:
@@ -20,6 +35,7 @@ class TetrisApp:
     current_level: int
     paused: bool
     confirm_quit: bool
+    high_score: int
     clock: pygame.time.Clock
     sidebar_bg: tuple[int, int, int]
 
@@ -39,6 +55,7 @@ class TetrisApp:
         self.clock = pygame.time.Clock()
         self.paused = False
         self.confirm_quit = False
+        self.high_score = load_high_score()
         self.sidebar_bg = (20, 22, 28)
 
     def _update_speed(self) -> None:
@@ -52,6 +69,11 @@ class TetrisApp:
         if self.game.level != self.current_level:
             self._update_speed()
 
+    def _update_high_score(self) -> None:
+        """实时更新最高分（内存中）"""
+        if self.game.score > self.high_score:
+            self.high_score = self.game.score
+
     def run(self) -> None:
         while True:
             self.process_events()
@@ -62,6 +84,7 @@ class TetrisApp:
         """处理所有事件（瞬时/持续）"""
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
+                save_high_score(self.high_score)
                 pygame.quit()
                 sys.exit()
 
@@ -69,6 +92,7 @@ class TetrisApp:
             if self.confirm_quit:
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
+                        save_high_score(self.high_score)
                         pygame.quit()
                         sys.exit()
                     else:
@@ -106,6 +130,7 @@ class TetrisApp:
             if event.type == self.fall_event:
                 if not self.game.move(0, 1):
                     self.game.lock_and_clear_lines()
+                    self._update_high_score()
                     # 检查是否需要更新速度
                     self._check_level_upgrade()
 
@@ -171,21 +196,26 @@ class TetrisApp:
         score_val_x = sidebar_x + (sidebar_width - score_val.get_width()) // 2
         self.screen.blit(score_val, (score_val_x, 105))
 
-        # 分隔线
+        # 最佳分（位于得分下方，不重叠）
+        best_text = self.small_font.render(f"BEST: {self.high_score:06d}", True, (255, 255, 0))
+        best_text_x = sidebar_x + (sidebar_width - best_text.get_width()) // 2
+        self.screen.blit(best_text, (best_text_x, 145))
+
+        # 分隔线（下移以容纳最佳分）
         pygame.draw.line(
             self.screen, (60, 60, 60),
-            (sidebar_x, 145), (sidebar_x + sidebar_width, 145), 1
+            (sidebar_x, 175), (sidebar_x + sidebar_width, 175), 1
         )
 
-        # 3. Next
+        # 3. Next（下移）
         next_label = self.font.render("NEXT", True, (200, 200, 200))
         next_label_x = sidebar_x + (sidebar_width - next_label.get_width()) // 2
-        self.screen.blit(next_label, (next_label_x, 160))
+        self.screen.blit(next_label, (next_label_x, 195))
 
         # 预览框（4x4 方块大小）
         preview_size = 4 * BLOCK_SIZE
         preview_x = sidebar_x + (sidebar_width - preview_size) // 2
-        preview_y = 200
+        preview_y = 235
         preview_rect = (preview_x, preview_y, preview_size, preview_size)
         pygame.draw.rect(self.screen, COLORS["GRID_LINE"], preview_rect, 2)
 
