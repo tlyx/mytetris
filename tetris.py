@@ -23,6 +23,7 @@ MIN_WINDOW_HEIGHT = 400
 # ---- 音频文件路径 ----
 BG_MUSIC_FILE = "assets/bg_music.mp3"
 CLEAR_SOUND_FILE = "assets/clear.wav"
+GAME_OVER_SOUND_FILE = "assets/game_over.mp3"
 # -----------------------
 
 
@@ -68,6 +69,7 @@ class TetrisApp:
     sounds: dict[str, pygame.mixer.Sound]
     music_enabled: bool   # 背景音乐开关
     sfx_enabled: bool     # 音效开关
+    _game_over_sound_played: bool   # 确保 Game Over 音效只播放一次
 
     def __init__(self) -> None:
         pygame.init()
@@ -107,6 +109,7 @@ class TetrisApp:
         # ---- 音频初始化 ----
         self.music_enabled = True   # 初始为开启，之后根据音频文件可用性决定
         self.sfx_enabled = True
+        self._game_over_sound_played = False
         self._init_audio()
 
     def _init_audio(self) -> None:
@@ -124,6 +127,10 @@ class TetrisApp:
             # 仅保留删除行音效
             if os.path.isfile(CLEAR_SOUND_FILE):
                 self.sounds["clear"] = pygame.mixer.Sound(CLEAR_SOUND_FILE)
+
+            # 新增：Game Over 音效
+            if os.path.isfile(GAME_OVER_SOUND_FILE):
+                self.sounds["game_over"] = pygame.mixer.Sound(GAME_OVER_SOUND_FILE)
 
             # 只要有音乐或音效可用即认为启用
             if os.path.isfile(BG_MUSIC_FILE) or self.sounds:
@@ -195,6 +202,11 @@ class TetrisApp:
 
     def _process_events(self) -> None:
         """处理所有事件（瞬时/持续）"""
+        # 检测 Game Over 并播放音效（只一次）
+        if self.game.game_over and not self._game_over_sound_played:
+            self._play_sound("game_over")
+            self._game_over_sound_played = True
+
         for event in pygame.event.get():
             # ---------- 背景音乐开关（M键） ----------
             if event.type == pygame.KEYDOWN and event.key == pygame.K_m:
@@ -260,6 +272,8 @@ class TetrisApp:
                     self.paused = False
                     # 重置开始时间
                     self.game_start_ticks = pygame.time.get_ticks()
+                    # 重置 Game Over 音效标志，以便下次游戏结束再次播放
+                    self._game_over_sound_played = False
                 continue
 
             # 暂停状态下忽略除暂停键外的其他游戏事件
