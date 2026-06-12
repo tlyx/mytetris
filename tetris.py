@@ -47,6 +47,11 @@ class TetrisApp:
         pygame.time.set_timer(self.fall_event, speed)
         self.current_level = self.game.level
 
+    def _check_level_upgrade(self) -> None:
+        """如果等级发生变化则更新下落速度"""
+        if self.game.level != self.current_level:
+            self._update_speed()
+
     def run(self) -> None:
         while True:
             self.process_events()
@@ -102,8 +107,7 @@ class TetrisApp:
                 if not self.game.move(0, 1):
                     self.game.lock_and_clear_lines()
                     # 检查是否需要更新速度
-                    if self.game.level != self.current_level:
-                        self._update_speed()
+                    self._check_level_upgrade()
 
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_UP:

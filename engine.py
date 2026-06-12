@@ -107,9 +107,10 @@ class TetrisEngine:
                 return
 
     def lock_and_clear_lines(self) -> None:
+        lock_color = COLORS[self.current_type]
         for dx, dy in self.current_shape:
             if 0 <= self.y + dy < GRID_HEIGHT:
-                self.grid[self.y + dy][self.x + dx] = COLORS[self.current_type]
+                self.grid[self.y + dy][self.x + dx] = lock_color
 
         new_grid: list[list[tuple[int, int, int] | None]] = [
             row for row in self.grid if any(cell is None for cell in row)
