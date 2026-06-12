@@ -1,12 +1,10 @@
 from typing import final
 from random import choice
 import sys
-import time
 
 import pygame
 
 # --- 1. 配置与数据中心 ---
-# (Constants remain unchanged)
 BLOCK_SIZE = 30
 GRID_WIDTH, GRID_HEIGHT = 10, 20
 SIDEBAR_WIDTH = 200
@@ -109,8 +107,18 @@ class TetrisEngine:
             return
         # 矩阵旋转逻辑：(x, y) -> (-y, x)
         new_shape: list[tuple[int, int]] = [(-dy, dx) for dx, dy in self.current_shape]
+        # 尝试基本旋转
         if not self.check_collision(self.x, self.y, new_shape):
             self.current_shape = new_shape
+            return
+        # 简单踢墙：依次尝试若干偏移
+        kicks = [(1, 0), (-1, 0), (0, -1), (1, -1), (-1, -1), (0, -2)]
+        for ox, oy in kicks:
+            if not self.check_collision(self.x + ox, self.y + oy, new_shape):
+                self.x += ox
+                self.y += oy
+                self.current_shape = new_shape
+                return
 
     def lock_and_clear_lines(self) -> None:
         """固化方块并执行阶梯计分"""
@@ -147,8 +155,9 @@ class TetrisApp:
     game: TetrisEngine
     fall_event: int
     current_level: int
+    paused: bool
     clock: pygame.time.Clock
-    pressing_timer: list[float]
+    sidebar_bg: tuple[int, int, int]
 
     def __init__(self) -> None:
         pygame.init()
@@ -156,13 +165,15 @@ class TetrisApp:
         pygame.display.set_caption("Tetris Professional - macOS Lab")
         self.font = pygame.font.SysFont("Arial Black", 32)
         self.small_font = pygame.font.SysFont("Arial Black", 20)
-        
+        # 启用按键重复（延迟 200 ms，间隔 50 ms）
+        pygame.key.set_repeat(200, 50)
+
         self.game = TetrisEngine()
         self.fall_event = pygame.USEREVENT + 1
         self.current_level = 1
         self._update_speed()
         self.clock = pygame.time.Clock()
-        self.pressing_timer = [0.0]
+        self.paused = False
         self.sidebar_bg = (20, 22, 28)
 
     def _update_speed(self) -> None:
@@ -174,27 +185,42 @@ class TetrisApp:
     def run(self) -> None:
         while True:
             self.process_events()
-            if not self.game.game_over:
-                self.handle_continuous_input()
             self.render_game_scene()
             self.clock.tick(60)
 
     def process_events(self) -> None:
-        """处理 on_down (瞬时) 事件"""
+        """处理所有事件（瞬时/持续）"""
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
 
-            if self.game.game_over:
-                if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_r:
-                        self.game.reset()
-                        self.current_level = 1
+            # 全局 Esc 退出（无论游戏状态）
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                pygame.quit()
+                sys.exit()
+
+            # 暂停切换（仅在非 Game Over 时有效）
+            if event.type == pygame.KEYDOWN and event.key in (pygame.K_p, pygame.K_RETURN):
+                if not self.game.game_over:
+                    self.paused = not self.paused
+                    if self.paused:
+                        pygame.time.set_timer(self.fall_event, 0)
+                    else:
                         self._update_speed()
-                    elif event.key == pygame.K_ESCAPE:
-                        pygame.quit()
-                        sys.exit()
+                continue  # 切换后不做其他处理
+
+            # Game Over 状态只响应 R（重开）
+            if self.game.game_over:
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_r:
+                    self.game.reset()
+                    self.current_level = 1
+                    self._update_speed()
+                    self.paused = False
+                continue
+
+            # 暂停状态下忽略除暂停键外的其他游戏事件
+            if self.paused:
                 continue
 
             if event.type == self.fall_event:
@@ -204,31 +230,18 @@ class TetrisApp:
                     if self.game.level != self.current_level:
                         self._update_speed()
 
-            if event.type == pygame.KEYDOWN:
+            elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_UP:
                     self.game.rotate()
-                if event.key == pygame.K_ESCAPE:
-                    pygame.quit()
-                    sys.exit()
-
-    def handle_continuous_input(self) -> None:
-        """处理 on_pressing (持续) 事件"""
-        now: float = time.time()
-        if now - self.pressing_timer[0] < 0.08:
-            return
-
-        keys = pygame.key.get_pressed()
-        if keys[pygame.K_LEFT]:
-            self.game.move(-1, 0)
-        if keys[pygame.K_RIGHT]:
-            self.game.move(1, 0)
-        if keys[pygame.K_DOWN]:
-            self.game.move(0, 1)
-
-        self.pressing_timer[0] = now
+                elif event.key == pygame.K_LEFT:
+                    self.game.move(-1, 0)
+                elif event.key == pygame.K_RIGHT:
+                    self.game.move(1, 0)
+                elif event.key == pygame.K_DOWN:
+                    self.game.move(0, 1)
 
     def render_game_scene(self) -> None:
-        """极致渲染：主场 + 美观侧边栏 + Game Over 弹窗"""
+        """极致渲染：主场 + 美观侧边栏 + Game Over / Pause 弹窗"""
         self.screen.fill(COLORS["BACKGROUND"])
 
         # A. 绘制主棋盘
@@ -329,10 +342,20 @@ class TetrisApp:
 
             go_text = self.font.render("GAME OVER", True, (255, 0, 0))
             restart_text = self.small_font.render("Press R to Restart", True, (255, 255, 255))
-            
+
             self.screen.blit(go_text, (SCREEN_WIDTH // 2 - go_text.get_width() // 2, SCREEN_HEIGHT // 2 - 40))
             self.screen.blit(restart_text, (SCREEN_WIDTH // 2 - restart_text.get_width() // 2, SCREEN_HEIGHT // 2 + 20))
 
+        # E. 绘制暂停弹窗（仅在无 Game Over 且暂停时）
+        elif self.paused:
+            overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+            overlay.set_alpha(180)
+            overlay.fill((0, 0, 0))
+            self.screen.blit(overlay, (0, 0))
+
+            paused_text = self.font.render("PAUSED", True, (255, 255, 0))
+            resume_text = self.small_font.render("Press P to resume", True, (255, 255, 255))
+            self.screen.blit(paused_text, (SCREEN_WIDTH // 2 - paused_text.get_width() // 2, SCREEN_HEIGHT // 2 - 40))
+            self.screen.blit(resume_text, (SCREEN_WIDTH // 2 - resume_text.get_width() // 2, SCREEN_HEIGHT // 2 + 20))
+
         pygame.display.flip()
-
-
