@@ -66,6 +66,7 @@ class TetrisApp:
     # 音频相关
     audio_enabled: bool
     sounds: dict[str, pygame.mixer.Sound]
+    music_enabled: bool   # 新加：背景音乐开关
 
     def __init__(self) -> None:
         pygame.init()
@@ -103,6 +104,7 @@ class TetrisApp:
         self._enforce_min_size()
 
         # ---- 音频初始化 ----
+        self.music_enabled = True   # 初始为开启，之后根据音频文件可用性决定
         self._init_audio()
 
     def _init_audio(self) -> None:
@@ -131,6 +133,19 @@ class TetrisApp:
 
         except Exception:
             self.audio_enabled = False
+
+    def _toggle_music(self) -> None:
+        """切换背景音乐的开关。"""
+        if not self.audio_enabled:
+            return
+        self.music_enabled = not self.music_enabled
+        if self.music_enabled:
+            try:
+                pygame.mixer.music.play(-1)
+            except pygame.error:
+                pass
+        else:
+            pygame.mixer.music.stop()
 
     def _play_sound(self, name: str) -> None:
         if self.audio_enabled and name in self.sounds:
@@ -173,6 +188,11 @@ class TetrisApp:
     def _process_events(self) -> None:
         """处理所有事件（瞬时/持续）"""
         for event in pygame.event.get():
+            # ---------- 音乐开关（独立于任何状态） ----------
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_s:
+                self._toggle_music()
+                continue
+
             if event.type == pygame.QUIT:
                 save_high_score(self.high_score)
                 pygame.mouse.set_visible(True)   # 退出前恢复鼠标
