@@ -49,8 +49,8 @@ class TetrisApp:
         self.font = pygame.font.SysFont("Arial Black", 32)
         self.small_font = pygame.font.SysFont("Arial Black", 20)
         # 衬线字体用于底部信息，比之前稍大
-        self.serif_font = pygame.font.SysFont("Times New Roman", 18)
-        self.serif_bold_font = pygame.font.SysFont("Times New Roman", 18, bold=True)
+        self.serif_font = pygame.font.SysFont("Times New Roman", 20)
+        self.serif_bold_font = pygame.font.SysFont("Times New Roman", 20, bold=True)
         # 启用按键重复（延迟 200 ms，间隔 50 ms）
         pygame.key.set_repeat(200, 50)
 
@@ -220,7 +220,7 @@ class TetrisApp:
         # 预览框（下一个方块，不写 NEXT 标签） -------------------------------
         preview_size = 4 * BLOCK_SIZE
         preview_x = sidebar_x + (sidebar_width - preview_size) // 2
-        preview_y = 110  # 往下移了一些，避免与数字重叠
+        preview_y = 130  # 进一步下移，确保不与上方的数字重叠
 
         # 外框
         preview_rect_outer = pygame.Rect(
@@ -268,9 +268,9 @@ class TetrisApp:
             ("Time", time_str),
         ]
 
-        # 更多下方位置，并且不使用居中，左对齐
-        info_y = preview_y + preview_size + 40  # 预览框下方多留空间
-        line_spacing = 30
+        # 将统计信息放在更下方的位置，至少三行字的高度再往下
+        info_y = preview_y + preview_size + 90  # 预览框底部再加 90 像素，确保足够空间
+        line_spacing = 35  # 配合更大的字号
 
         for i, (label_text, value_text) in enumerate(bottom_lines):
             # 标签和冒号
