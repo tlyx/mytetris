@@ -1,7 +1,9 @@
 from typing import final
+import os
 import sys
 
 import pygame
+import platformdirs
 
 from engine import TetrisEngine, BLOCK_SIZE, GRID_WIDTH, GRID_HEIGHT, COLORS, SHAPES_DATA
 
@@ -12,16 +14,23 @@ SCREEN_HEIGHT = GRID_HEIGHT * BLOCK_SIZE
 HIGH_SCORE_FILE = "highscore.txt"
 
 
+def _highscore_file() -> str:
+    """返回符合 XDG 数据目录的高分记录文件路径，并确保目录存在。"""
+    data_dir = platformdirs.user_data_dir("mytetris")
+    os.makedirs(data_dir, exist_ok=True)
+    return os.path.join(data_dir, "highscore.txt")
+
+
 def load_high_score() -> int:
     try:
-        with open(HIGH_SCORE_FILE, "r") as f:
+        with open(_highscore_file(), "r") as f:
             return int(f.read().strip())
     except (FileNotFoundError, ValueError):
         return 0
 
 
 def save_high_score(value: int) -> None:
-    with open(HIGH_SCORE_FILE, "w") as f:
+    with open(_highscore_file(), "w") as f:
         f.write(str(value))
 
 
