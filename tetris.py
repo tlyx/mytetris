@@ -176,13 +176,16 @@ class TetrisApp:
                 pygame.draw.rect(self.screen, COLORS[self.game.current_type], rect)
 
         # C. 绘制美观侧边栏 -------------------------------------------------
-        sidebar_x: int = GRID_WIDTH * BLOCK_SIZE + 20
-        sidebar_width: int = SIDEBAR_WIDTH - 30  # 留边距
+        sidebar_left = GRID_WIDTH * BLOCK_SIZE          # 300
+        sidebar_right = sidebar_left + SIDEBAR_WIDTH    # 500
+        content_padding = 20                            # 左右留白
+        sidebar_content_left = sidebar_left + content_padding
+        sidebar_content_right = sidebar_right - content_padding
+        # 内部可用宽度
+        sidebar_content_width = sidebar_content_right - sidebar_content_left
 
         # 绘制面板背景
-        panel_rect = pygame.Rect(
-            GRID_WIDTH * BLOCK_SIZE, 0, SIDEBAR_WIDTH, SCREEN_HEIGHT
-        )
+        panel_rect = pygame.Rect(sidebar_left, 0, SIDEBAR_WIDTH, SCREEN_HEIGHT)
         pygame.draw.rect(self.screen, self.sidebar_bg, panel_rect)
 
         # ---- 侧边栏内容：新布局 ----
@@ -190,11 +193,11 @@ class TetrisApp:
         # 第一行：LV 和 SCORE 标签（小号字体）
         lv_label = self.small_font.render("LV", True, (150, 150, 160))
         score_label = self.small_font.render("SCORE", True, (150, 150, 160))
-        # 将两个标签分别放在左右两侧
-        self.screen.blit(lv_label, (sidebar_x, 20))
+        # 将两个标签分别放在左右两侧（等距留白）
+        self.screen.blit(lv_label, (sidebar_content_left, 20))
         self.screen.blit(
             score_label,
-            (sidebar_x + sidebar_width - score_label.get_width(), 20),
+            (sidebar_content_right - score_label.get_width(), 20),
         )
 
         # 第二行：对应数值（大号）
@@ -202,24 +205,24 @@ class TetrisApp:
         score_val = self.font.render(
             f"{self.game.score:6d}", True, COLORS["SCORE_GOLD"]
         )
-        self.screen.blit(lv_val, (sidebar_x, 45))
+        self.screen.blit(lv_val, (sidebar_content_left, 45))
         self.screen.blit(
             score_val,
-            (sidebar_x + sidebar_width - score_val.get_width(), 45),
+            (sidebar_content_right - score_val.get_width(), 45),
         )
 
         # 微弱分隔线
         pygame.draw.line(
             self.screen,
             (60, 60, 70),
-            (sidebar_x, 85),
-            (sidebar_x + sidebar_width, 85),
+            (sidebar_content_left, 85),
+            (sidebar_content_right, 85),
             1,
         )
 
         # 预览框（下一个方块，不写 NEXT 标签） -------------------------------
         preview_size = 4 * BLOCK_SIZE
-        preview_x = sidebar_x + (sidebar_width - preview_size) // 2
+        preview_x = sidebar_content_left + (sidebar_content_width - preview_size) // 2
         preview_y = 130  # 进一步下移，确保不与上方的数字重叠
 
         # 外框
@@ -279,11 +282,11 @@ class TetrisApp:
             # 粗体数值
             value_surf = self.serif_bold_font.render(value_text, True, (255, 255, 255))
 
-            # 左对齐，直接放在侧边栏左侧
-            self.screen.blit(prefix_surf, (sidebar_x, info_y + i * line_spacing))
+            # 左对齐，直接放在侧边栏左侧（与内容左边界对齐）
+            self.screen.blit(prefix_surf, (sidebar_content_left, info_y + i * line_spacing))
             self.screen.blit(
                 value_surf,
-                (sidebar_x + prefix_surf.get_width(), info_y + i * line_spacing),
+                (sidebar_content_left + prefix_surf.get_width(), info_y + i * line_spacing),
             )
 
         # D. 绘制 Game Over 弹窗
