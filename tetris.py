@@ -254,7 +254,7 @@ class TetrisApp:
                 (px, py, BLOCK_SIZE - 1, BLOCK_SIZE - 1),
             )
 
-        # 底部统计信息：Lines, Best, Time（衬线字体，稍大，左对齐） --------------
+        # 底部统计信息：Lines, High Score, Time（衬线字体，稍大，左对齐） --------------
         # 计算游戏时间
         elapsed_sec = (pygame.time.get_ticks() - self.game_start_ticks) // 1000
         mins = elapsed_sec // 60
@@ -264,7 +264,7 @@ class TetrisApp:
         # 每行格式：标签（非粗体）＋ 数值（粗体）
         bottom_lines = [
             ("Lines", str(self.game.total_lines)),
-            ("Best", str(self.high_score)),
+            ("High Score", str(self.high_score)),
             ("Time", time_str),
         ]
 
