@@ -235,8 +235,10 @@ class TetrisApp:
 
             if event.type == self.fall_event:
                 if not self.game.move(0, 1):
+                    prev_lines = self.game.total_lines
                     self.game.lock_and_clear_lines()
-                    self._play_sound("clear")
+                    if self.game.total_lines > prev_lines:
+                        self._play_sound("clear")
                     self._update_high_score()
                     # 检查是否需要更新速度
                     self._check_level_upgrade()
