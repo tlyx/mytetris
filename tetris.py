@@ -92,14 +92,38 @@ class TetrisApp:
     def __init__(self) -> None:
         """初始化 Pygame、窗口、字体、游戏引擎、音频等。"""
         pygame.init()
+        # 获取显示器尺寸
         display_info = pygame.display.Info()
         screen_w = display_info.current_w
         screen_h = display_info.current_h
-        init_w = max(int(screen_w * 0.8), MIN_WINDOW_WIDTH)
-        init_h = max(int(screen_h * 0.8), MIN_WINDOW_HEIGHT)
 
+        # 初始窗口大小（物理窗口的80%）
+        init_w = int(screen_w * 0.8)
+        init_h = int(screen_h * 0.8)
+
+        # 计算消除黑边的窗口尺寸
+        scale_w = init_w / SCREEN_WIDTH
+        scale_h = init_h / SCREEN_HEIGHT
+        if scale_w < scale_h:
+            # 上下会有黑边，缩减高度
+            new_w = init_w
+            new_h = int(SCREEN_HEIGHT * scale_w)
+        elif scale_h < scale_w:
+            # 左右会有黑边，缩减宽度
+            new_w = int(SCREEN_WIDTH * scale_h)
+            new_h = init_h
+        else:
+            new_w = init_w
+            new_h = init_h
+
+        # 确保不小于最小尺寸
+        new_w = max(new_w, MIN_WINDOW_WIDTH)
+        new_h = max(new_h, MIN_WINDOW_HEIGHT)
+
+        self.window_width = new_w
+        self.window_height = new_h
         self.screen = pygame.display.set_mode(
-            (init_w, init_h), pygame.RESIZABLE
+            (self.window_width, self.window_height), pygame.RESIZABLE
         )
         pygame.display.set_caption("Tetris Professional - macOS Lab")
         self.font = pygame.font.SysFont("Arial Black", 32)
@@ -118,8 +142,6 @@ class TetrisApp:
         # 提高侧边栏对比度（原来为深黑，现用灰蓝色调）
         self.sidebar_bg = (40, 45, 55)
 
-        self.window_width = init_w
-        self.window_height = init_h
         self._logical = None   # 逻辑表面，渲染时按比例缩放
 
         pygame.mouse.set_visible(False)
