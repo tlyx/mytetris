@@ -386,11 +386,12 @@ class TetrisApp:
         2. 绘制游戏区域背景（覆盖整个左‑右边界之间的高度）
         3. 绘制主棋盘（包括网格和已锁定方块）
         4. 绘制当前操控块
-        5. 绘制左侧面板（游戏名称、版本、音频状态）
-        6. 绘制右侧侧边栏，并拉伸至逻辑表面右边界（消除可能出现的黑色缝隙）
-        7. 在右侧面板左边缘绘制分隔线
-        8. 根据状态覆盖弹窗（Game Over / Pause / Confirm Quit）
-        9. 将逻辑表面显示到物理窗口（侧边栏背景色填充）
+        5. 绘制游戏区域外框（上、左、下三边，右边稍后画）
+        6. 绘制左侧面板（游戏名称、版本、音频状态）
+        7. 绘制右侧侧边栏，并拉伸至逻辑表面右边界（消除可能出现的黑色缝隙）
+        8. 在右侧面板左边缘绘制右边分隔线
+        9. 根据状态覆盖弹窗（Game Over / Pause / Confirm Quit）
+        10. 将逻辑表面显示到物理窗口（侧边栏背景色填充）
         """
         scale = min(
             self.window_width / SCREEN_WIDTH,
@@ -450,7 +451,7 @@ class TetrisApp:
                 )
                 pygame.draw.rect(ds, COLORS[self.game.current_type], rect)
 
-        # C. 游戏区域外框（只保留左、上边）
+        # C. 游戏区域外框（上、左、下边，右边稍后画）
         border_color = (80, 85, 95)
         # 上边
         pygame.draw.line(ds, border_color, (board_left, 0),
@@ -458,6 +459,9 @@ class TetrisApp:
         # 左边
         pygame.draw.line(ds, border_color, (board_left, 0),
                          (board_left, board_h), 2)
+        # 下边（恢复，消除方块浮空感）
+        pygame.draw.line(ds, border_color, (board_left, board_h),
+                         (board_left + board_w, board_h), 2)
 
         # D. 左侧面板（游戏名称、版本、音频状态）
         if left_width_px > 0:
