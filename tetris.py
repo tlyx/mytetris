@@ -533,7 +533,7 @@ class TetrisApp:
                 ),
             )
 
-        # F. 确认退出弹窗
+        # F. 确认退出弹窗（使用动态间隔避免重叠）
         if self.confirm_quit:
             overlay = pygame.Surface((logical_w, logical_h))
             overlay.set_alpha(200)
@@ -548,18 +548,26 @@ class TetrisApp:
                 "Any other key to cancel", True, (255, 255, 255)
             )
 
-            base_y = logical_h // 2 - 50
+            # 根据实际文字高度和缩放因子动态计算间距
+            title_h = quit_title.get_height()
+            small_h = line_esc.get_height()
+            gap = int(15 * scale)  # 可控的最小间隔；随窗口变大而增大
+
+            total_h = title_h + gap + small_h + gap + small_h
+            start_y = (logical_h - total_h) // 2
+
             ds.blit(
                 quit_title,
-                (logical_w // 2 - quit_title.get_width() // 2, base_y),
+                (logical_w // 2 - quit_title.get_width() // 2, start_y),
             )
             ds.blit(
                 line_esc,
-                (logical_w // 2 - line_esc.get_width() // 2, base_y + 40),
+                (logical_w // 2 - line_esc.get_width() // 2, start_y + title_h + gap),
             )
             ds.blit(
                 line_cancel,
-                (logical_w // 2 - line_cancel.get_width() // 2, base_y + 75),
+                (logical_w // 2 - line_cancel.get_width() // 2,
+                 start_y + title_h + gap + small_h + gap),
             )
 
         # 4. 将逻辑表面显示到窗口（居中，黑边填充）
