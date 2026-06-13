@@ -438,14 +438,8 @@ class TetrisApp:
             title_x = left_content_x + (left_content_width - title_surf.get_width()) // 2
             ds.blit(title_surf, (title_x, int(20 * scale)))
 
-            # 版本号与实验室标识
-            ver_str = "v1.0  macOS Lab"
-            ver_surf = font_small.render(ver_str, True, (180, 180, 180))
-            ver_x = left_content_x + (left_content_width - ver_surf.get_width()) // 2
-            ds.blit(ver_surf, (ver_x, int(60 * scale)))
-
-            # 分隔线
-            sep_line_y = int(100 * scale)
+            # 分隔线（标题下方）
+            sep_line_y = int(70 * scale)
             pygame.draw.line(
                 ds,
                 (60, 60, 70),
@@ -454,17 +448,23 @@ class TetrisApp:
                 1,
             )
 
-            # 音乐状态（用绿色表示 ON，红色表示 OFF）
+            # ---- 音乐 / 音效状态（从底部向上排列） ----
             music_str = "Music: " + ("ON" if self.music_enabled else "OFF")
             music_surf = font_small.render(music_str, True,
                                            (0, 255, 0) if self.music_enabled else (200, 50, 50))
-            ds.blit(music_surf, (left_content_x, int(120 * scale)))
-
-            # 音效状态（同样颜色规则）
             sfx_str = "SFX:    " + ("ON" if self.sfx_enabled else "OFF")
             sfx_surf = font_small.render(sfx_str, True,
                                          (0, 255, 0) if self.sfx_enabled else (200, 50, 50))
-            ds.blit(sfx_surf, (left_content_x, int(160 * scale)))
+
+            # 底部留白 60*scale，然后向上依次放置音效行和音乐行
+            bottom_margin = int(60 * scale)
+            gap_between = int(10 * scale)
+
+            sfx_y = logical_h - bottom_margin - sfx_surf.get_height()
+            music_y = sfx_y - music_surf.get_height() - gap_between
+
+            ds.blit(music_surf, (left_content_x, music_y))
+            ds.blit(sfx_surf, (left_content_x, sfx_y))
 
         # E. 绘制右侧侧边栏 -------------------------------------------------
         sidebar_left = board_left + board_w
