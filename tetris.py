@@ -367,7 +367,7 @@ class TetrisApp:
         5. 绘制左侧面板（游戏名称、版本、音频状态）
         6. 绘制右侧侧边栏（等级、分数、预览、统计信息）
         7. 根据状态覆盖弹窗（Game Over / Pause / Confirm Quit）
-        8. 将逻辑表面居中显示到物理窗口（黑边填充）
+        8. 将逻辑表面显示到物理窗口（黑边填充）
         """
         scale = min(
             self.window_width / SCREEN_WIDTH,
@@ -511,7 +511,8 @@ class TetrisApp:
         preview_y = int(130 * scale)
 
         preview_rect_inner = pygame.Rect(preview_x, preview_y, preview_size, preview_size)
-        pygame.draw.rect(ds, (20, 22, 28), preview_rect_inner)
+        # 使用与右侧面板相同的背景色，使其更协调
+        pygame.draw.rect(ds, self.sidebar_bg, preview_rect_inner)
 
         next_shape: list[tuple[int, int]] = SHAPES_DATA[self.game.next_type]
         xs: list[int] = [dx for dx, _dy in next_shape]
