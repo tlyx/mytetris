@@ -92,7 +92,24 @@ class TetrisApp:
     def __init__(self) -> None:
         """初始化 Pygame、窗口、字体、游戏引擎、音频等。"""
         pygame.init()
-        # 获取显示器尺寸
+        self._init_display_sizes()
+        self._init_window_and_surfaces()
+        self._init_input()
+        self._init_game_state()
+        self._init_sidebar_style()
+        self._enforce_min_size()
+        # 先为音频变量赋予默认值，确保类型检查器满意
+        self.audio_enabled = False
+        self.sounds = {}
+        self._init_audio_and_icon()
+        pygame.mouse.set_visible(False)
+
+    # ------------------------------------------------------------------
+    # 初始化辅助方法 (将 __init__ 按功能拆分)
+    # ------------------------------------------------------------------
+
+    def _init_display_sizes(self) -> None:
+        """计算初始窗口尺寸（消除黑边）。"""
         display_info = pygame.display.Info()
         screen_w = display_info.current_w
         screen_h = display_info.current_h
@@ -117,19 +134,25 @@ class TetrisApp:
             new_h = init_h
 
         # 确保不小于最小尺寸
-        new_w = max(new_w, MIN_WINDOW_WIDTH)
-        new_h = max(new_h, MIN_WINDOW_HEIGHT)
+        self.window_width = max(new_w, MIN_WINDOW_WIDTH)
+        self.window_height = max(new_h, MIN_WINDOW_HEIGHT)
 
-        self.window_width = new_w
-        self.window_height = new_h
+    def _init_window_and_surfaces(self) -> None:
+        """创建显示窗口、字体、逻辑表面。"""
         self.screen = pygame.display.set_mode(
             (self.window_width, self.window_height), pygame.RESIZABLE
         )
         pygame.display.set_caption("Tetris Professional - macOS Lab")
         self.font = pygame.font.SysFont("Arial Black", 32)
         self.small_font = pygame.font.SysFont("Arial Black", 20)
+        self._logical = None   # 逻辑表面，渲染时按比例缩放
+
+    def _init_input(self) -> None:
+        """设置按键重复参数。"""
         pygame.key.set_repeat(200, 50)   # 长按方向键时的重复延迟和间隔
 
+    def _init_game_state(self) -> None:
+        """初始化游戏引擎、定时器、等级、分数、暂停等状态。"""
         self.game = TetrisEngine()
         self.fall_event = pygame.USEREVENT + 1
         self.current_level = 1
@@ -139,22 +162,18 @@ class TetrisApp:
         self.confirm_quit = False
         self.high_score = load_high_score()
         self.game_start_ticks = pygame.time.get_ticks()
-        # 提高侧边栏对比度（原来为深黑，现用灰蓝色调）
-        self.sidebar_bg = (40, 45, 55)
-
-        self._logical = None   # 逻辑表面，渲染时按比例缩放
-
-        pygame.mouse.set_visible(False)
-
-        self._enforce_min_size()
-
-        # ---- 音频初始化 ----
         self.music_enabled = True
         self.sfx_enabled = True
         self._game_over_sound_played = False
         self._music_paused_for_gamepause = False
-        self._init_audio()
 
+    def _init_sidebar_style(self) -> None:
+        """设置侧边栏背景色（灰蓝色调）。"""
+        self.sidebar_bg = (40, 45, 55)
+
+    def _init_audio_and_icon(self) -> None:
+        """初始化音频模块并设置窗口图标。"""
+        self._init_audio()
         # ---- 设置 Dock 栏图标 ----
         if os.path.isfile(LOGO_FILE):
             try:
