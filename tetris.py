@@ -1,5 +1,10 @@
 # tetris.py — 俄罗斯方块专业版（macOS Lab）
 # 主窗口渲染、事件处理、音频控制
+#
+# 设计目标：使用逻辑表面（_logical）独立于物理窗口尺寸，
+# 保证所有文字与方块在视网膜屏上依然清晰。
+# 左侧面板展示游戏信息，右侧展示状态与预览。
+# 音频模块尽可能静默加载，不因缺少资源而崩溃。
 
 from typing import final
 import os
@@ -14,12 +19,14 @@ from engine import TetrisEngine, BLOCK_SIZE, GRID_WIDTH, GRID_HEIGHT, COLORS, SH
 LEFT_WIDTH = 160
 RIGHT_WIDTH = 200
 
+# 逻辑分辨率（基于 BLOCK_SIZE=30）
 SCREEN_WIDTH = LEFT_WIDTH + GRID_WIDTH * BLOCK_SIZE + RIGHT_WIDTH
 SCREEN_HEIGHT = GRID_HEIGHT * BLOCK_SIZE
 
 HIGH_SCORE_FILE = "highscore.txt"
 
 # 最小窗口尺寸（小于此值会被强制拉伸到该最小尺寸）
+# 增加50像素避免黑边过窄
 MIN_WINDOW_WIDTH = max(400, LEFT_WIDTH + GRID_WIDTH * BLOCK_SIZE + RIGHT_WIDTH + 50)
 MIN_WINDOW_HEIGHT = 400
 
@@ -97,7 +104,7 @@ class TetrisApp:
         pygame.display.set_caption("Tetris Professional - macOS Lab")
         self.font = pygame.font.SysFont("Arial Black", 32)
         self.small_font = pygame.font.SysFont("Arial Black", 20)
-        pygame.key.set_repeat(200, 50)
+        pygame.key.set_repeat(200, 50)   # 长按方向键时的重复延迟和间隔
 
         self.game = TetrisEngine()
         self.fall_event = pygame.USEREVENT + 1
@@ -108,12 +115,12 @@ class TetrisApp:
         self.confirm_quit = False
         self.high_score = load_high_score()
         self.game_start_ticks = pygame.time.get_ticks()
-        # 提高侧边栏对比度
+        # 提高侧边栏对比度（原来为深黑，现用灰蓝色调）
         self.sidebar_bg = (40, 45, 55)
 
         self.window_width = init_w
         self.window_height = init_h
-        self._logical = None
+        self._logical = None   # 逻辑表面，渲染时按比例缩放
 
         pygame.mouse.set_visible(False)
 
@@ -135,22 +142,29 @@ class TetrisApp:
                 pass
 
     def _init_audio(self) -> None:
-        """尽量加载背景音乐与删除行音效，若缺少文件则静默运行。"""
+        """尽量加载背景音乐与删除行音效，若缺少文件则静默运行。
+           设计思路：允许游戏在没有音频文件的环境下正常执行，
+           不因文件缺失而抛出异常。
+        """
         self.audio_enabled = False
         self.sounds = {}
         try:
             if not pygame.mixer.get_init():
                 pygame.mixer.init()
 
+            # 背景音乐（循环播放）
             if os.path.isfile(BG_MUSIC_FILE):
                 pygame.mixer.music.load(BG_MUSIC_FILE)
 
+            # 消行音效
             if os.path.isfile(CLEAR_SOUND_FILE):
                 self.sounds["clear"] = pygame.mixer.Sound(CLEAR_SOUND_FILE)
 
+            # 游戏结束音效
             if os.path.isfile(GAME_OVER_SOUND_FILE):
                 self.sounds["game_over"] = pygame.mixer.Sound(GAME_OVER_SOUND_FILE)
 
+            # 只要存在任意音频资源就标记可用
             if os.path.isfile(BG_MUSIC_FILE) or self.sounds:
                 self.audio_enabled = True
 
@@ -158,6 +172,7 @@ class TetrisApp:
                 pygame.mixer.music.play(-1)
 
         except Exception:
+            # 任何初始化异常（如设备不支持）都静默关闭音频
             self.audio_enabled = False
 
     def _toggle_music(self) -> None:
@@ -195,7 +210,7 @@ class TetrisApp:
             self.window_height = new_h
 
     def _update_speed(self) -> None:
-        """根据等级计算下落速度"""
+        """根据等级计算下落速度（每级减50ms，最低100ms）。"""
         speed = max(100, 500 - (self.game.level - 1) * 50)
         pygame.time.set_timer(self.fall_event, speed)
         self.current_level = self.game.level
@@ -219,12 +234,20 @@ class TetrisApp:
             self.clock.tick(60)
 
     def _process_events(self) -> None:
-        """处理所有事件（瞬时/持续）"""
+        """处理所有事件（瞬时/持续）
+
+           设计说明：
+           - 使用独立的事件处理，避免在弹窗状态下误触游戏操作。
+           - M / S 在暂停和游戏结束状态下也可切换音频。
+           - 暂停和确认退出状态会覆盖其他按键。
+        """
+        # 游戏结束时（刚进入此帧）播放一次结束音效
         if self.game.game_over and not self._game_over_sound_played:
             self._play_sound("game_over")
             self._game_over_sound_played = True
 
         for event in pygame.event.get():
+            # --- 音频开关（高优先级，任何时候都能响应）---
             if event.type == pygame.KEYDOWN and event.key == pygame.K_m:
                 self._toggle_music()
                 continue
@@ -233,12 +256,14 @@ class TetrisApp:
                 self._toggle_sfx()
                 continue
 
+            # --- 退出 ---
             if event.type == pygame.QUIT:
                 save_high_score(self.high_score)
                 pygame.mouse.set_visible(True)
                 pygame.quit()
                 sys.exit()
 
+            # --- 窗口大小改变 ---
             if event.type == pygame.VIDEORESIZE:
                 new_w = max(event.w, MIN_WINDOW_WIDTH)
                 new_h = max(event.h, MIN_WINDOW_HEIGHT)
@@ -249,6 +274,7 @@ class TetrisApp:
                 )
                 continue
 
+            # --- 退出确认弹窗（覆盖其他所有按键）---
             if self.confirm_quit:
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
@@ -260,20 +286,24 @@ class TetrisApp:
                         self.confirm_quit = False
                 continue
 
+            # --- 首次按下 ESC 进入退出确认 ---
             if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                 self.confirm_quit = True
                 continue
 
+            # --- 暂停 / 恢复（仅在游戏未结束时有效）---
             if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
                 if not self.game.game_over:
                     self.paused = not self.paused
                     if self.paused:
+                        # 暂停：停止自动下落，暂停背景音乐
                         pygame.time.set_timer(self.fall_event, 0)
                         if self.music_enabled and pygame.mixer.music.get_busy():
                             pygame.mixer.music.pause()
                             self._music_paused_for_gamepause = True
                     else:
                         self._update_speed()
+                        # 恢复时，若音乐曾因暂停而被暂停，则恢复
                         if self.music_enabled and self._music_paused_for_gamepause:
                             try:
                                 pygame.mixer.music.unpause()
@@ -287,6 +317,7 @@ class TetrisApp:
                             self._music_paused_for_gamepause = False
                 continue
 
+            # --- 游戏结束时的重置处理 ---
             if self.game.game_over:
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN:
                     self.game.reset()
@@ -298,9 +329,11 @@ class TetrisApp:
                     self._music_paused_for_gamepause = False
                 continue
 
+            # --- 暂停状态下忽略其他操作 ---
             if self.paused:
                 continue
 
+            # --- 下落定时器 ---
             if event.type == self.fall_event:
                 if not self.game.move(0, 1):
                     prev_lines = self.game.total_lines
@@ -310,6 +343,7 @@ class TetrisApp:
                     self._update_high_score()
                     self._check_level_upgrade()
 
+            # --- 方向键操作 ---
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_UP:
                     self.game.rotate()
@@ -324,6 +358,16 @@ class TetrisApp:
         """极致渲染：主场 + 左侧面板 + 美观侧边栏 + Game Over / Pause / Confirm Quit 弹窗
 
         根据窗口大小动态缩放逻辑表面，确保文字在高分屏下清晰。
+
+        绘制顺序：
+        1. 填充背景
+        2. 绘制主棋盘（包括网格和已锁定方块）
+        3. 绘制当前操控块
+        4. 绘制游戏区域外框（视觉分隔最右列）
+        5. 绘制左侧面板（游戏名称、版本、音频状态）
+        6. 绘制右侧侧边栏（等级、分数、预览、统计信息）
+        7. 根据状态覆盖弹窗（Game Over / Pause / Confirm Quit）
+        8. 将逻辑表面居中显示到物理窗口（黑边填充）
         """
         scale = min(
             self.window_width / SCREEN_WIDTH,
@@ -331,6 +375,7 @@ class TetrisApp:
         )
         logical_w = int(SCREEN_WIDTH * scale)
         logical_h = int(SCREEN_HEIGHT * scale)
+        # 如果逻辑表面尺寸改变，则重新创建（避免反复生成新表面）
         if (self._logical is None
                 or self._logical.get_width() != logical_w
                 or self._logical.get_height() != logical_h):
@@ -338,9 +383,9 @@ class TetrisApp:
         ls = self._logical
 
         # 计算缩放后的尺寸
-        bs = int(BLOCK_SIZE * scale)
-        left_width_px = int(LEFT_WIDTH * scale)
-        right_width_px = int(RIGHT_WIDTH * scale)
+        bs = int(BLOCK_SIZE * scale)               # 缩放后的方块大小
+        left_width_px = int(LEFT_WIDTH * scale)    # 左侧面板像素宽
+        right_width_px = int(RIGHT_WIDTH * scale)  # 右侧面板像素宽
         font_size = max(10, int(32 * scale))
         small_font_size = max(8, int(20 * scale))
         font_big = pygame.font.SysFont("Arial Black", font_size)
@@ -350,7 +395,7 @@ class TetrisApp:
         ds = ls
         ds.fill(COLORS["BACKGROUND"])
 
-        # A. 绘制主棋盘
+        # A. 绘制主棋盘（10×20 网格）
         board_left = left_width_px
         for r in range(GRID_HEIGHT):
             for c in range(GRID_WIDTH):
@@ -371,13 +416,14 @@ class TetrisApp:
                 )
                 pygame.draw.rect(ds, COLORS[self.game.current_type], rect)
 
-        # C. 游戏区域外框（解决最右边一列视觉混淆）
+        # C. 游戏区域外框（亮色边框，解决最右边一列视觉混淆）
         board_w = GRID_WIDTH * bs
         board_h = GRID_HEIGHT * bs
         border_color = (80, 85, 95)   # 明显比背景亮
         pygame.draw.rect(ds, border_color, (board_left, 0, board_w, board_h), 2)
 
         # D. 左侧面板（游戏名称、版本、音频状态）
+        #     面板背景、文字均按比例缩放，确保始终清晰
         if left_width_px > 0:
             left_panel_rect = pygame.Rect(0, 0, left_width_px, logical_h)
             pygame.draw.rect(ds, self.sidebar_bg, left_panel_rect)
@@ -386,13 +432,13 @@ class TetrisApp:
             left_content_x = left_padding
             left_content_width = left_width_px - 2 * left_padding
 
-            # 游戏名称
+            # 游戏名称（居中）
             title_str = "Tetris"
             title_surf = font_big.render(title_str, True, (255, 255, 255))
             title_x = left_content_x + (left_content_width - title_surf.get_width()) // 2
             ds.blit(title_surf, (title_x, int(20 * scale)))
 
-            # 版本
+            # 版本号与实验室标识
             ver_str = "v1.0  macOS Lab"
             ver_surf = font_small.render(ver_str, True, (180, 180, 180))
             ver_x = left_content_x + (left_content_width - ver_surf.get_width()) // 2
@@ -408,13 +454,13 @@ class TetrisApp:
                 1,
             )
 
-            # 音乐状态
+            # 音乐状态（用绿色表示 ON，红色表示 OFF）
             music_str = "Music: " + ("ON" if self.music_enabled else "OFF")
             music_surf = font_small.render(music_str, True,
                                            (0, 255, 0) if self.music_enabled else (200, 50, 50))
             ds.blit(music_surf, (left_content_x, int(120 * scale)))
 
-            # 音效状态
+            # 音效状态（同样颜色规则）
             sfx_str = "SFX:    " + ("ON" if self.sfx_enabled else "OFF")
             sfx_surf = font_small.render(sfx_str, True,
                                          (0, 255, 0) if self.sfx_enabled else (200, 50, 50))
@@ -459,7 +505,7 @@ class TetrisApp:
             1,
         )
 
-        # 预览框（下一个方块）
+        # 预览框（下一个方块，显示在深色矩形内）
         preview_size = 4 * bs
         preview_x = sidebar_content_left + (sidebar_content_width - preview_size) // 2
         preview_y = int(130 * scale)
@@ -512,7 +558,7 @@ class TetrisApp:
                  info_y + i * line_spacing),
             )
 
-        # F. 绘制 Game Over 弹窗
+        # F. 绘制 Game Over 弹窗（半透明黑色背景 + 红色文字 + 提示）
         if self.game.game_over:
             overlay = pygame.Surface((logical_w, logical_h))
             overlay.set_alpha(180)
@@ -535,7 +581,7 @@ class TetrisApp:
                 ),
             )
 
-        # G. 绘制暂停弹窗
+        # G. 绘制暂停弹窗（黄色文字 + 提示）
         elif self.paused:
             overlay = pygame.Surface((logical_w, logical_h))
             overlay.set_alpha(180)
