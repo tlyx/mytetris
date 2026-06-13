@@ -389,7 +389,7 @@ class TetrisApp:
         5. 绘制左侧面板（游戏名称、版本、音频状态）
         6. 绘制右侧侧边栏（等级、分数、预览、统计信息）
         7. 根据状态覆盖弹窗（Game Over / Pause / Confirm Quit）
-        8. 将逻辑表面显示到物理窗口（黑边填充）
+        8. 将逻辑表面显示到物理窗口（背景色填充）
         """
         scale = min(
             self.window_width / SCREEN_WIDTH,
@@ -679,10 +679,30 @@ class TetrisApp:
                  start_y + title_h + gap + small_h + gap),
             )
 
-        # 4. 将逻辑表面显示到窗口（居中，黑边填充）
+        # 4. 将逻辑表面显示到窗口（居中，背景色填充）
         x_off = (self.window_width - logical_w) // 2
         y_off = (self.window_height - logical_h) // 2
-        self.screen.fill((0, 0, 0))
+
+        # 用棋盘背景色填充整个屏幕
+        self.screen.fill(COLORS["BACKGROUND"])
+
+        # 如果左右有黑边，用侧边栏背景色覆盖左右区域
+        if x_off > 0:
+            # 左侧黑边区域
+            pygame.draw.rect(
+                self.screen,
+                self.sidebar_bg,
+                (0, 0, x_off, self.window_height),
+            )
+            # 右侧黑边区域
+            right_start = x_off + logical_w
+            right_width = self.window_width - right_start
+            pygame.draw.rect(
+                self.screen,
+                self.sidebar_bg,
+                (right_start, 0, right_width, self.window_height),
+            )
+
         self.screen.blit(self._logical, (x_off, y_off))
 
         pygame.display.flip()
