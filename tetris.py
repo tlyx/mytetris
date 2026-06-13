@@ -98,10 +98,8 @@ class TetrisApp:
         self._init_game_state()
         self._init_sidebar_style()
         self._enforce_min_size()
-        # 先为音频变量赋予默认值，确保类型检查器满意
-        self.audio_enabled = False
-        self.sounds = {}
-        self._init_audio_and_icon()
+        self._init_icon()
+        self._init_audio()
         pygame.mouse.set_visible(False)
 
     # ------------------------------------------------------------------
@@ -171,9 +169,8 @@ class TetrisApp:
         """设置侧边栏背景色（灰蓝色调）。"""
         self.sidebar_bg = (40, 45, 55)
 
-    def _init_audio_and_icon(self) -> None:
-        """初始化音频模块并设置窗口图标。"""
-        self._init_audio()
+    def _init_icon(self) -> None:
+        """设置窗口图标。"""
         # ---- 设置 Dock 栏图标 ----
         if os.path.isfile(LOGO_FILE):
             try:
