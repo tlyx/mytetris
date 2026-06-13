@@ -1,3 +1,6 @@
+# tetris.py — 俄罗斯方块专业版（macOS Lab）
+# 主窗口渲染、事件处理、音频控制
+
 from typing import final
 import os
 import sys
@@ -39,6 +42,7 @@ def _highscore_file() -> str:
 
 
 def load_high_score() -> int:
+    """从文件读取最高分，若文件不存在或格式错误则返回 0。"""
     try:
         with open(_highscore_file(), "r") as f:
             return int(f.read().strip())
@@ -47,12 +51,14 @@ def load_high_score() -> int:
 
 
 def save_high_score(value: int) -> None:
+    """将最高分写入文件。"""
     with open(_highscore_file(), "w") as f:
         f.write(str(value))
 
 
 @final
 class TetrisApp:
+    """俄罗斯方块主应用程序类，负责窗口管理、事件循环和渲染。"""
     screen: pygame.Surface
     font: pygame.font.Font
     small_font: pygame.font.Font
@@ -77,6 +83,7 @@ class TetrisApp:
     _music_paused_for_gamepause: bool
 
     def __init__(self) -> None:
+        """初始化 Pygame、窗口、字体、游戏引擎、音频等。"""
         pygame.init()
         display_info = pygame.display.Info()
         screen_w = display_info.current_w
@@ -173,6 +180,7 @@ class TetrisApp:
         self.sfx_enabled = not self.sfx_enabled
 
     def _play_sound(self, name: str) -> None:
+        """播放指定音效（若已启用且资源存在）。"""
         if self.audio_enabled and name in self.sounds and self.sfx_enabled:
             self.sounds[name].play()
 
@@ -203,6 +211,7 @@ class TetrisApp:
             self.high_score = self.game.score
 
     def run(self) -> None:
+        """主循环：保持窗口尺寸、处理事件、渲染场景"""
         while True:
             self._enforce_min_size()
             self._process_events()

@@ -1,3 +1,6 @@
+# engine.py — 俄罗斯方块核心引擎
+# 负责网格、方块生成、移动、旋转、消行、计分等逻辑
+
 from typing import final
 from random import choice
 
@@ -29,6 +32,8 @@ SHAPES_DATA: dict[str, list[tuple[int, int]]] = {
 
 @final
 class TetrisEngine:
+    """游戏逻辑引擎，不依赖任何图形库。"""
+
     grid: list[list[tuple[int, int, int] | None]]
     score: int
     level: int
@@ -41,6 +46,7 @@ class TetrisEngine:
     y: int
 
     def __init__(self) -> None:
+        """初始化网格与属性，并立即调用 reset 开始第一局。"""
         self.grid = []
         self.score = 0
         self.level = 1
@@ -54,6 +60,7 @@ class TetrisEngine:
         self.reset()
 
     def reset(self) -> None:
+        """重置游戏：清空网格、重置分数/等级、生成第一个方块。"""
         self.grid = [[None for _ in range(GRID_WIDTH)] for _ in range(GRID_HEIGHT)]
         self.score = 0
         self.level = 1
@@ -63,6 +70,7 @@ class TetrisEngine:
         self._spawn_piece()
 
     def move(self, dx: int, dy: int) -> bool:
+        """尝试移动当前方块，返回是否成功移动。"""
         if not self._check_collision(self.x + dx, self.y + dy):
             self.x += dx
             self.y += dy
@@ -70,6 +78,7 @@ class TetrisEngine:
         return False
 
     def rotate(self) -> None:
+        """尝试旋转当前方块（O 型不旋转），支持 Wall Kick。"""
         if self.current_type == "O":
             return
         new_shape: list[tuple[int, int]] = [(-dy, dx) for dx, dy in self.current_shape]
@@ -85,6 +94,7 @@ class TetrisEngine:
                 return
 
     def lock_and_clear_lines(self) -> None:
+        """锁定当前方块到网格，然后检测并消除满行，更新分数、等级，生成下一个方块。"""
         lock_color = COLORS[self.current_type]
         for dx, dy in self.current_shape:
             if 0 <= self.y + dy < GRID_HEIGHT:
@@ -107,6 +117,7 @@ class TetrisEngine:
         self._spawn_piece()
 
     def _spawn_piece(self) -> None:
+        """生成下一个方块到顶部，若碰撞则标记游戏结束。"""
         self.current_type = self.next_type
         self.current_shape = SHAPES_DATA[self.current_type]
         self.next_type = choice(list(SHAPES_DATA.keys()))
@@ -119,6 +130,7 @@ class TetrisEngine:
     def _check_collision(
         self, nx: int, ny: int, shape: list[tuple[int, int]] | None = None
     ) -> bool:
+        """检查方块在给定位置是否与墙壁或已有块碰撞。"""
         shape = shape or self.current_shape
         for dx, dy in shape:
             tx, ty = nx + dx, ny + dy
