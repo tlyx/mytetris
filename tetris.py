@@ -696,25 +696,8 @@ class TetrisApp:
         x_off = (self.window_width - logical_w) // 2
         y_off = (self.window_height - logical_h) // 2
 
-        # 用棋盘背景色填充整个屏幕
-        self.screen.fill(COLORS["BACKGROUND"])
-
-        # 如果左右有黑边，用侧边栏背景色覆盖左右区域
-        if x_off > 0:
-            # 左侧黑边区域
-            pygame.draw.rect(
-                self.screen,
-                self.sidebar_bg,
-                (0, 0, x_off, self.window_height),
-            )
-            # 右侧黑边区域
-            right_start = x_off + logical_w
-            right_width = self.window_width - right_start
-            pygame.draw.rect(
-                self.screen,
-                self.sidebar_bg,
-                (right_start, 0, right_width, self.window_height),
-            )
+        # 用侧边栏背景色填充整个屏幕，这样左右两侧未覆盖区域都与侧边栏颜色一致
+        self.screen.fill(self.sidebar_bg)
 
         self.screen.blit(self._logical, (x_off, y_off))
 
