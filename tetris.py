@@ -382,15 +382,15 @@ class TetrisApp:
         根据窗口大小动态缩放逻辑表面，确保文字在高分屏下清晰。
 
         绘制顺序：
-        1. 填充背景
-        2. 绘制主棋盘（包括网格和已锁定方块）
-        3. 绘制当前操控块
-        4. 绘制游戏区域外框（只保留左、上边，右边界在右侧面板之上绘制）
+        1. 填充背景（GRID_LINE 色，防止取整露出纯黑）
+        2. 绘制游戏区域背景（覆盖整个左‑右边界之间的高度）
+        3. 绘制主棋盘（包括网格和已锁定方块）
+        4. 绘制当前操控块
         5. 绘制左侧面板（游戏名称、版本、音频状态）
-        6. 绘制右侧侧边栏（等级、分数、预览、统计信息）
-        7. 在右侧面板之上绘制右边分隔线（确保可见）
+        6. 绘制右侧侧边栏，并拉伸至逻辑表面右边界（消除可能出现的黑色缝隙）
+        7. 在右侧面板左边缘绘制分隔线
         8. 根据状态覆盖弹窗（Game Over / Pause / Confirm Quit）
-        9. 将逻辑表面显示到物理窗口（背景色填充）
+        9. 将逻辑表面显示到物理窗口（侧边栏背景色填充）
         """
         scale = min(
             self.window_width / SCREEN_WIDTH,
@@ -416,10 +416,21 @@ class TetrisApp:
 
         # 开始绘制
         ds = ls
-        ds.fill(COLORS["BACKGROUND"])
+        # 用棋盘网格颜色填充底漆，避免任何未覆盖区域暴露黑色
+        ds.fill(COLORS["GRID_LINE"])
+
+        # 常量
+        board_left = left_width_px
+        board_w = GRID_WIDTH * bs
+        board_h = GRID_HEIGHT * bs
+        sidebar_left = board_left + board_w     # 右侧面板左边缘
+
+        # ---- 游戏区域背景（覆盖至逻辑表面右边界之前） ----
+        game_area_width = sidebar_left - board_left
+        pygame.draw.rect(ds, COLORS["GRID_LINE"],
+                         (board_left, 0, game_area_width, logical_h))
 
         # A. 绘制主棋盘（10×20 网格）
-        board_left = left_width_px
         for r in range(GRID_HEIGHT):
             for c in range(GRID_WIDTH):
                 color: tuple[int, int, int] = (
@@ -439,18 +450,16 @@ class TetrisApp:
                 )
                 pygame.draw.rect(ds, COLORS[self.game.current_type], rect)
 
-        # C. 游戏区域外框（只保留左、上边，右边将在右侧面板之上绘制）
-        board_w = GRID_WIDTH * bs
-        board_h = GRID_HEIGHT * bs
+        # C. 游戏区域外框（只保留左、上边）
         border_color = (80, 85, 95)
         # 上边
-        pygame.draw.line(ds, border_color, (board_left, 0), (board_left + board_w, 0), 2)
+        pygame.draw.line(ds, border_color, (board_left, 0),
+                         (board_left + board_w, 0), 2)
         # 左边
-        pygame.draw.line(ds, border_color, (board_left, 0), (board_left, board_h), 2)
-        # 右边不画，等待右侧面板绘制后再画
+        pygame.draw.line(ds, border_color, (board_left, 0),
+                         (board_left, board_h), 2)
 
         # D. 左侧面板（游戏名称、版本、音频状态）
-        #     面板背景、文字均按比例缩放，确保始终清晰
         if left_width_px > 0:
             left_panel_rect = pygame.Rect(0, 0, left_width_px, logical_h)
             pygame.draw.rect(ds, self.sidebar_bg, left_panel_rect)
@@ -494,15 +503,16 @@ class TetrisApp:
             ds.blit(sfx_surf, (left_content_x, sfx_y))
 
         # E. 绘制右侧侧边栏 -------------------------------------------------
-        sidebar_left = board_left + board_w
+        # 面板背景从 sidebar_left 扩充到逻辑表面右边界（消除取整缝隙）
+        panel_rect = pygame.Rect(sidebar_left, 0,
+                                 logical_w - sidebar_left, logical_h)
+        pygame.draw.rect(ds, self.sidebar_bg, panel_rect)
+
         content_padding = int(20 * scale)
         sidebar_content_left = sidebar_left + content_padding
+        # 保持右侧内容区域右端点基于预期宽度（多余部分留给背景）
         sidebar_content_right = sidebar_left + right_width_px - content_padding
         sidebar_content_width = sidebar_content_right - sidebar_content_left
-
-        # 面板背景
-        panel_rect = pygame.Rect(sidebar_left, 0, right_width_px, logical_h)
-        pygame.draw.rect(ds, self.sidebar_bg, panel_rect)
 
         # ---- 侧边栏内容 ----
         lv_label = font_small.render("LV", True, (150, 150, 160))
@@ -532,13 +542,12 @@ class TetrisApp:
             1,
         )
 
-        # 预览框（下一个方块，显示在深色矩形内）
+        # 预览框（下一个方块）
         preview_size = 4 * bs
         preview_x = sidebar_content_left + (sidebar_content_width - preview_size) // 2
         preview_y = int(130 * scale)
 
         preview_rect_inner = pygame.Rect(preview_x, preview_y, preview_size, preview_size)
-        # 使用与右侧面板相同的背景色，使其更协调
         pygame.draw.rect(ds, self.sidebar_bg, preview_rect_inner)
 
         next_shape: list[tuple[int, int]] = SHAPES_DATA[self.game.next_type]
@@ -561,7 +570,7 @@ class TetrisApp:
                 (px, py, bs - 1, bs - 1),
             )
 
-        # 底部统计信息：Lines, High, Time（与左侧音乐/音效下对齐）
+        # 底部统计信息：Lines, High, Time
         elapsed_sec = (pygame.time.get_ticks() - self.game_start_ticks) // 1000
         mins = elapsed_sec // 60
         secs = elapsed_sec % 60
@@ -573,16 +582,13 @@ class TetrisApp:
             ("Time", time_str),
         ]
 
-        # 使用与左侧相同的底部边距
         right_bottom_margin = int(60 * scale)
         right_gap = int(10 * scale)
 
-        # 测量行高
         temp_label = font_small.render("Lines: ", True, (200, 200, 200))
         temp_val = font_small.render("000", True, (255, 255, 255))
         row_height = max(temp_label.get_height(), temp_val.get_height())
 
-        # 从下向上计算 y 坐标，使 Time 行底部 = logical_h - right_bottom_margin
         time_y = logical_h - right_bottom_margin - row_height
         high_y = time_y - row_height - right_gap
         lines_y = high_y - row_height - right_gap
@@ -602,15 +608,15 @@ class TetrisApp:
                 (sidebar_content_left + label_surf.get_width(), y),
             )
 
-        # 在右侧面板之上绘制右边分隔线（确保可见）
+        # 画右边分隔线（在侧边栏左边缘）
         pygame.draw.line(
             ds, border_color,
-            (board_left + board_w, 0),
-            (board_left + board_w, board_h),
+            (sidebar_left, 0),
+            (sidebar_left, board_h),
             2,
         )
 
-        # F. 绘制 Game Over 弹窗（半透明黑色背景 + 红色文字 + 提示）
+        # F. 绘制 Game Over 弹窗
         if self.game.game_over:
             overlay = pygame.Surface((logical_w, logical_h))
             overlay.set_alpha(180)
@@ -633,7 +639,7 @@ class TetrisApp:
                 ),
             )
 
-        # G. 绘制暂停弹窗（黄色文字 + 提示）
+        # G. 绘制暂停弹窗
         elif self.paused:
             overlay = pygame.Surface((logical_w, logical_h))
             overlay.set_alpha(180)
@@ -656,7 +662,7 @@ class TetrisApp:
                 ),
             )
 
-        # H. 确认退出弹窗（使用动态间隔避免重叠）
+        # H. 确认退出弹窗
         if self.confirm_quit:
             overlay = pygame.Surface((logical_w, logical_h))
             overlay.set_alpha(200)
@@ -692,13 +698,11 @@ class TetrisApp:
                  start_y + title_h + gap + small_h + gap),
             )
 
-        # 4. 将逻辑表面显示到窗口（居中，背景色填充）
+        # 4. 将逻辑表面显示到物理窗口（居中，侧边栏背景色填充）
         x_off = (self.window_width - logical_w) // 2
         y_off = (self.window_height - logical_h) // 2
 
-        # 用侧边栏背景色填充整个屏幕，这样左右两侧未覆盖区域都与侧边栏颜色一致
         self.screen.fill(self.sidebar_bg)
-
         self.screen.blit(self._logical, (x_off, y_off))
 
         pygame.display.flip()
