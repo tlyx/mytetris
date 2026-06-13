@@ -75,9 +75,16 @@ class TetrisApp:
 
     def __init__(self) -> None:
         pygame.init()
-        # 使用 RESIZABLE 标志允许用户改变窗口大小
+        # 获取屏幕可用尺寸，自动适配更大的窗口
+        display_info = pygame.display.Info()
+        screen_w = display_info.current_w
+        screen_h = display_info.current_h
+        # 窗口大小为屏幕的 80%，但不小于最小尺寸
+        init_w = max(int(screen_w * 0.8), MIN_WINDOW_WIDTH)
+        init_h = max(int(screen_h * 0.8), MIN_WINDOW_HEIGHT)
+
         self.screen = pygame.display.set_mode(
-            (SCREEN_WIDTH, SCREEN_HEIGHT), pygame.RESIZABLE
+            (init_w, init_h), pygame.RESIZABLE
         )
         pygame.display.set_caption("Tetris Professional - macOS Lab")
         # 原始字体尺寸（实际缩放时动态创建，此处仅用于类型提示）
@@ -97,9 +104,9 @@ class TetrisApp:
         self.game_start_ticks = pygame.time.get_ticks()
         self.sidebar_bg = (20, 22, 28)
 
-        # 保存当前窗口实际尺寸，用于缩放
-        self.window_width = SCREEN_WIDTH
-        self.window_height = SCREEN_HEIGHT
+        # 保存当前窗口实际尺寸
+        self.window_width = init_w
+        self.window_height = init_h
         self._logical = None  # 延迟创建
 
         # 隐藏鼠标指针，避免遮挡游戏画面
