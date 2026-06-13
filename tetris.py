@@ -533,7 +533,7 @@ class TetrisApp:
                 (px, py, bs - 1, bs - 1),
             )
 
-        # 底部统计信息：Lines, High, Time
+        # 底部统计信息：Lines, High, Time（与左侧音乐/音效下对齐）
         elapsed_sec = (pygame.time.get_ticks() - self.game_start_ticks) // 1000
         mins = elapsed_sec // 60
         secs = elapsed_sec % 60
@@ -545,17 +545,33 @@ class TetrisApp:
             ("Time", time_str),
         ]
 
-        info_y = preview_y + preview_size + int(90 * scale)
-        line_spacing = int(35 * scale)
+        # 使用与左侧相同的底部边距
+        right_bottom_margin = int(60 * scale)
+        right_gap = int(10 * scale)
+
+        # 测量行高
+        temp_label = font_small.render("Lines: ", True, (200, 200, 200))
+        temp_val = font_small.render("000", True, (255, 255, 255))
+        row_height = max(temp_label.get_height(), temp_val.get_height())
+
+        # 从下向上计算 y 坐标，使 Time 行底部 = logical_h - right_bottom_margin
+        time_y = logical_h - right_bottom_margin - row_height
+        high_y = time_y - row_height - right_gap
+        lines_y = high_y - row_height - right_gap
 
         for i, (label_text, value_text) in enumerate(bottom_lines):
+            if i == 0:
+                y = lines_y
+            elif i == 1:
+                y = high_y
+            else:
+                y = time_y
             label_surf = font_small.render(label_text + ": ", True, (200, 200, 200))
             val_surf = font_small.render(value_text, True, (255, 255, 255))
-            ds.blit(label_surf, (sidebar_content_left, info_y + i * line_spacing))
+            ds.blit(label_surf, (sidebar_content_left, y))
             ds.blit(
                 val_surf,
-                (sidebar_content_left + label_surf.get_width(),
-                 info_y + i * line_spacing),
+                (sidebar_content_left + label_surf.get_width(), y),
             )
 
         # F. 绘制 Game Over 弹窗（半透明黑色背景 + 红色文字 + 提示）
