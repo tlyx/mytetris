@@ -4,7 +4,6 @@
 from typing import final
 from random import choice
 
-BLOCK_SIZE = 30
 GRID_WIDTH, GRID_HEIGHT = 10, 20
 
 COLORS: dict[str, tuple[int, int, int]] = {

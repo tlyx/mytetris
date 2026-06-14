@@ -13,7 +13,10 @@ import sys
 import pygame
 import platformdirs
 
-from engine import TetrisEngine, BLOCK_SIZE, GRID_WIDTH, GRID_HEIGHT, COLORS, SHAPES_DATA
+from engine import TetrisEngine, GRID_WIDTH, GRID_HEIGHT, COLORS, SHAPES_DATA
+
+# 方块大小（逻辑像素）
+BLOCK_SIZE = 30
 
 # 左右两侧边栏宽度（逻辑像素）
 LEFT_WIDTH = 160
