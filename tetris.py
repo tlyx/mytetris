@@ -329,8 +329,8 @@ class TetrisApp:
                 self.confirm_quit = True
                 continue
 
-            # --- 暂停 / 恢复（仅在游戏未结束时有效）---
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
+            # --- 暂停 / 恢复（使用 P 键）---
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_p:
                 if not self.game.game_over:
                     self.paused = not self.paused
                     if self.paused:
@@ -381,7 +381,7 @@ class TetrisApp:
                     self._update_high_score()
                     self._check_level_upgrade()
 
-            # --- 方向键操作 ---
+            # --- 方向键操作 & 硬降（空格键） ---
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_UP:
                     self.game.rotate()
@@ -391,6 +391,11 @@ class TetrisApp:
                     self.game.move(1, 0)
                 elif event.key == pygame.K_DOWN:
                     self.game.move(0, 1)
+                elif event.key == pygame.K_SPACE:
+                    # 硬降：方块直接落到底部
+                    self.game.hard_drop()
+                    self._update_high_score()
+                    self._check_level_upgrade()
 
     def _render_game_scene(self) -> None:
         """极致渲染：主场 + 左侧面板 + 美观侧边栏 + Game Over / Pause / Confirm Quit 弹窗
@@ -668,7 +673,7 @@ class TetrisApp:
 
             paused_text = font_big.render("PAUSED", True, (255, 255, 0))
             resume_text = font_small.render(
-                "Press SPACE to resume", True, (255, 255, 255)
+                "Press P to resume", True, (255, 255, 255)
             )
             ds.blit(
                 paused_text,

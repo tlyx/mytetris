@@ -93,6 +93,13 @@ class TetrisEngine:
                 self.current_shape = new_shape
                 return
 
+    def hard_drop(self) -> None:
+        """将当前方块直接落到底部并锁定，然后消除满行。"""
+        while self.move(0, 1):
+            pass
+        # 无法再下落，立即锁定并消行
+        self.lock_and_clear_lines()
+
     def lock_and_clear_lines(self) -> None:
         """锁定当前方块到网格，然后检测并消除满行，更新分数、等级，生成下一个方块。"""
         lock_color = COLORS[self.current_type]

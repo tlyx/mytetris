@@ -52,7 +52,8 @@ uv run main.py
 | ← / →            | Move piece left / right       |
 | ↓                | Soft drop (accelerate)        |
 | ↑                | Rotate piece                  |
-| Space            | Pause / Resume                |
+| P                | Pause / Resume                |
+| Space            | Hard drop(instantly to bottom)|
 | Esc              | Toggle quit confirmation      |
 | Return (Enter)   | Restart game (on Game Over)   |
 | M                | Toggle background music       |
