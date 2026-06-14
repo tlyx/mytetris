@@ -406,7 +406,11 @@ class TetrisApp:
         elif key == pygame.K_DOWN:
             self.game.move(0, 1)
         elif key == pygame.K_SPACE:
+            # MODIFIED: 记录消行前的行数，硬降后若行数增加则播放 clear 音效
+            prev_lines = self.game.total_lines
             self.game.hard_drop()
+            if self.game.total_lines > prev_lines:
+                self._play_sound("clear")
             self._update_high_score()
             self._check_level_upgrade()
 
