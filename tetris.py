@@ -15,6 +15,19 @@ import platformdirs
 
 from engine import TetrisEngine, GRID_WIDTH, GRID_HEIGHT, COLORS, SHAPES_DATA
 
+# ---------- 资源路径辅助函数（支持开发环境和 PyInstaller 打包） ----------
+def _resource_path(relative_path: str) -> str:
+    """获取资源文件的绝对路径，同时兼容 PyInstaller 打包后的 sys._MEIPASS。
+
+    打包后资源位于 _MEIPASS/Resources/ 下，开发时位于脚本同级目录。
+    """
+    base = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+    if getattr(sys, 'frozen', False):          # 打包状态
+        return os.path.join(base, "Resources", relative_path)
+    else:                                       # 开发状态
+        return os.path.join(base, relative_path)
+# -------------------------------------------------------------------------
+
 # 方块大小（逻辑像素）
 BLOCK_SIZE = 30
 
@@ -33,14 +46,14 @@ HIGH_SCORE_FILE = "highscore.txt"
 MIN_WINDOW_WIDTH = max(400, LEFT_WIDTH + GRID_WIDTH * BLOCK_SIZE + RIGHT_WIDTH + 50)
 MIN_WINDOW_HEIGHT = 400
 
-# ---- 音频文件路径 ----
-BG_MUSIC_FILE = "assets/bg_music.mp3"
-CLEAR_SOUND_FILE = "assets/clear.wav"
-GAME_OVER_SOUND_FILE = "assets/game_over.mp3"
-# -----------------------
+# ---- 音频文件路径（使用 _resource_path 以适应打包环境） ----
+BG_MUSIC_FILE = _resource_path("assets/bg_music.mp3")
+CLEAR_SOUND_FILE = _resource_path("assets/clear.wav")
+GAME_OVER_SOUND_FILE = _resource_path("assets/game_over.mp3")
+# ------------------------------------------------------------
 
 # ---- 应用图标路径 ----
-LOGO_FILE = "assets/logo.png"
+LOGO_FILE = _resource_path("assets/logo.png")
 # -----------------------
 
 
