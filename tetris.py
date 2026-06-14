@@ -274,131 +274,143 @@ class TetrisApp:
             self._render_game_scene()
             self.clock.tick(60)
 
-    def _process_events(self) -> None:
-        """处理所有事件（瞬时/持续）
+    # ---------- 重构：事件处理（拆分） ----------
 
-           设计说明：
-           - 使用独立的事件处理，避免在弹窗状态下误触游戏操作。
-           - M / S 在暂停和游戏结束状态下也可切换音频。
-           - 暂停和确认退出状态会覆盖其他按键。
-        """
+    def _process_events(self) -> None:
+        """处理所有事件（按优先级和状态分发）"""
         # 游戏结束时（刚进入此帧）播放一次结束音效
         if self.game.game_over and not self._game_over_sound_played:
             self._play_sound("game_over")
             self._game_over_sound_played = True
 
         for event in pygame.event.get():
-            # --- 音频开关（高优先级，任何时候都能响应）---
+            # --- 全局高优先级事件（任何时候都能响应）---
             if event.type == pygame.KEYDOWN and event.key == pygame.K_m:
                 self._toggle_music()
                 continue
-
             if event.type == pygame.KEYDOWN and event.key == pygame.K_s:
                 self._toggle_sfx()
                 continue
-
-            # --- 退出 ---
             if event.type == pygame.QUIT:
-                save_high_score(self.high_score)
-                pygame.mouse.set_visible(True)
-                pygame.quit()
-                sys.exit()
-
-            # --- 窗口大小改变 ---
+                self._handle_quit()
+                return  # 直接退出循环
             if event.type == pygame.VIDEORESIZE:
-                new_w = max(event.w, MIN_WINDOW_WIDTH)
-                new_h = max(event.h, MIN_WINDOW_HEIGHT)
-                self.window_width = new_w
-                self.window_height = new_h
-                self.screen = pygame.display.set_mode(
-                    (new_w, new_h), pygame.RESIZABLE
-                )
+                self._handle_resize(event)
                 continue
 
-            # --- 退出确认弹窗（覆盖其他所有按键）---
+            # --- 根据当前状态路由 ---
             if self.confirm_quit:
+                self._handle_confirm_quit_event(event)
+            elif self.game.game_over:
+                self._handle_game_over_event(event)
+            elif self.paused:
+                # 暂停状态下只处理 P 键恢复 和 ESC 键进入退出确认
                 if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_ESCAPE:
-                        save_high_score(self.high_score)
-                        pygame.mouse.set_visible(True)
-                        pygame.quit()
-                        sys.exit()
-                    else:
-                        self.confirm_quit = False
-                continue
+                    if event.key == pygame.K_p:
+                        self._toggle_pause()
+                    elif event.key == pygame.K_ESCAPE:
+                        self.confirm_quit = True
+                # 忽略其他事件
+            else:
+                self._handle_playing_event(event)
 
-            # --- 首次按下 ESC 进入退出确认 ---
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-                self.confirm_quit = True
-                continue
+    def _handle_quit(self) -> None:
+        """处理退出事件（保存高分、关闭窗口、退出进程）。"""
+        save_high_score(self.high_score)
+        pygame.mouse.set_visible(True)
+        pygame.quit()
+        sys.exit()
 
-            # --- 暂停 / 恢复（使用 P 键）---
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_p:
-                if not self.game.game_over:
-                    self.paused = not self.paused
-                    if self.paused:
-                        # 暂停：停止自动下落，暂停背景音乐
-                        pygame.time.set_timer(self.fall_event, 0)
-                        if self.music_enabled and pygame.mixer.music.get_busy():
-                            pygame.mixer.music.pause()
-                            self._music_paused_for_gamepause = True
-                    else:
-                        self._update_speed()
-                        # 恢复时，若音乐曾因暂停而被暂停，则恢复
-                        if self.music_enabled and self._music_paused_for_gamepause:
-                            try:
-                                pygame.mixer.music.unpause()
-                            except pygame.error:
-                                pass
-                            if not pygame.mixer.music.get_busy():
-                                try:
-                                    pygame.mixer.music.play(-1)
-                                except pygame.error:
-                                    pass
-                            self._music_paused_for_gamepause = False
-                continue
+    def _handle_resize(self, event: pygame.event.Event) -> None:
+        """处理窗口大小改变事件。"""
+        new_w = max(event.w, MIN_WINDOW_WIDTH)
+        new_h = max(event.h, MIN_WINDOW_HEIGHT)
+        self.window_width = new_w
+        self.window_height = new_h
+        self.screen = pygame.display.set_mode((new_w, new_h), pygame.RESIZABLE)
 
-            # --- 游戏结束时的重置处理 ---
-            if self.game.game_over:
-                if event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN:
-                    self.game.reset()
-                    self.current_level = 1
-                    self._update_speed()
-                    self.paused = False
-                    self.game_start_ticks = pygame.time.get_ticks()
-                    self._game_over_sound_played = False
-                    self._music_paused_for_gamepause = False
-                continue
+    def _handle_confirm_quit_event(self, event: pygame.event.Event) -> None:
+        """处理确认退出状态下的按键事件。"""
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                self._handle_quit()
+            else:
+                self.confirm_quit = False
 
-            # --- 暂停状态下忽略其他操作 ---
-            if self.paused:
-                continue
+    def _handle_game_over_event(self, event: pygame.event.Event) -> None:
+        """处理游戏结束状态下的按键事件（仅响应回车以重新开始）。"""
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN:
+            self.game.reset()
+            self.current_level = 1
+            self._update_speed()
+            self.paused = False
+            self.game_start_ticks = pygame.time.get_ticks()
+            self._game_over_sound_played = False
+            self._music_paused_for_gamepause = False
 
-            # --- 下落定时器 ---
-            if event.type == self.fall_event:
-                if not self.game.move(0, 1):
-                    prev_lines = self.game.total_lines
-                    self.game.lock_and_clear_lines()
-                    if self.game.total_lines > prev_lines:
-                        self._play_sound("clear")
-                    self._update_high_score()
-                    self._check_level_upgrade()
+    def _handle_playing_event(self, event: pygame.event.Event) -> None:
+        """处理正常游戏进行中的事件（包括 ESC 进入退出确认、P 暂停、下落定时器、方向键等）。"""
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+            self.confirm_quit = True
+        elif event.type == pygame.KEYDOWN and event.key == pygame.K_p:
+            self._toggle_pause()
+        elif event.type == self.fall_event:
+            self._handle_fall_timer()
+        elif event.type == pygame.KEYDOWN:
+            self._handle_movement_key(event.key)
 
-            # --- 方向键操作 & 硬降（空格键） ---
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_UP:
-                    self.game.rotate()
-                elif event.key == pygame.K_LEFT:
-                    self.game.move(-1, 0)
-                elif event.key == pygame.K_RIGHT:
-                    self.game.move(1, 0)
-                elif event.key == pygame.K_DOWN:
-                    self.game.move(0, 1)
-                elif event.key == pygame.K_SPACE:
-                    # 硬降：方块直接落到底部
-                    self.game.hard_drop()
-                    self._update_high_score()
-                    self._check_level_upgrade()
+    def _toggle_pause(self) -> None:
+        """切换暂停状态（仅在游戏未结束时有效）。"""
+        if self.game.game_over:
+            return
+        self.paused = not self.paused
+        if self.paused:
+            # 暂停：停止自动下落，暂停背景音乐
+            pygame.time.set_timer(self.fall_event, 0)
+            if self.music_enabled and pygame.mixer.music.get_busy():
+                pygame.mixer.music.pause()
+                self._music_paused_for_gamepause = True
+        else:
+            self._update_speed()
+            # 恢复时，若音乐曾因暂停而被暂停，则恢复
+            if self.music_enabled and self._music_paused_for_gamepause:
+                try:
+                    pygame.mixer.music.unpause()
+                except pygame.error:
+                    pass
+                if not pygame.mixer.music.get_busy():
+                    try:
+                        pygame.mixer.music.play(-1)
+                    except pygame.error:
+                        pass
+                self._music_paused_for_gamepause = False
+
+    def _handle_fall_timer(self) -> None:
+        """处理下落定时器事件：尝试下落一格，若无法下落则锁定并进行消行检测。"""
+        if not self.game.move(0, 1):
+            prev_lines = self.game.total_lines
+            self.game.lock_and_clear_lines()
+            if self.game.total_lines > prev_lines:
+                self._play_sound("clear")
+            self._update_high_score()
+            self._check_level_upgrade()
+
+    def _handle_movement_key(self, key: int) -> None:
+        """处理方向键和空格键（硬降）。"""
+        if key == pygame.K_UP:
+            self.game.rotate()
+        elif key == pygame.K_LEFT:
+            self.game.move(-1, 0)
+        elif key == pygame.K_RIGHT:
+            self.game.move(1, 0)
+        elif key == pygame.K_DOWN:
+            self.game.move(0, 1)
+        elif key == pygame.K_SPACE:
+            self.game.hard_drop()
+            self._update_high_score()
+            self._check_level_upgrade()
+
+    # ---------- 渲染方法（保持不变） ----------
 
     def _render_game_scene(self) -> None:
         """极致渲染：主场 + 左侧面板 + 美观侧边栏 + Game Over / Pause / Confirm Quit 弹窗
