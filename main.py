@@ -1,6 +1,6 @@
 from tetris import TetrisApp
 
-__version__ = "0.8.1"
+__version__ = "0.8.2"
 
 def main() -> None:
     # 启动时在控制台显示版本号
