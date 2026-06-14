@@ -29,7 +29,7 @@ A clean, object-oriented implementation of the classic Tetris game, built with P
 
 1.  Clone the repository:
     ```bash
-    git clone <repository-url>
+    git clone https://github.com/tlyx/mytetris.git
     cd mytetris
     ```
 
