@@ -266,6 +266,18 @@ class TetrisApp:
         if self.game.score > self.high_score:
             self.high_score = self.game.score
 
+    # ---------- 新增统一锁定 + 更新方法 ----------
+    def _lock_and_update(self) -> None:
+        """锁定当前方块，清除满行，更新分数、等级、音效。"""
+        if self.game.game_over:
+            return
+        prev_lines = self.game.total_lines
+        self.game.lock_and_clear_lines()
+        if self.game.total_lines > prev_lines:
+            self._play_sound("clear")
+        self._update_high_score()
+        self._check_level_upgrade()
+
     def run(self) -> None:
         """主循环：保持窗口尺寸、处理事件、渲染场景"""
         while True:
@@ -388,12 +400,7 @@ class TetrisApp:
     def _handle_fall_timer(self) -> None:
         """处理下落定时器事件：尝试下落一格，若无法下落则锁定并进行消行检测。"""
         if not self.game.move(0, 1):
-            prev_lines = self.game.total_lines
-            self.game.lock_and_clear_lines()
-            if self.game.total_lines > prev_lines:
-                self._play_sound("clear")
-            self._update_high_score()
-            self._check_level_upgrade()
+            self._lock_and_update()
 
     def _handle_movement_key(self, key: int) -> None:
         """处理方向键和空格键（硬降）。"""
@@ -404,15 +411,14 @@ class TetrisApp:
         elif key == pygame.K_RIGHT:
             self.game.move(1, 0)
         elif key == pygame.K_DOWN:
-            self.game.move(0, 1)
+            # 尝试下落一格；若无法下落立即锁定
+            if not self.game.move(0, 1):
+                self._lock_and_update()
         elif key == pygame.K_SPACE:
-            # MODIFIED: 记录消行前的行数，硬降后若行数增加则播放 clear 音效
-            prev_lines = self.game.total_lines
-            self.game.hard_drop()
-            if self.game.total_lines > prev_lines:
-                self._play_sound("clear")
-            self._update_high_score()
-            self._check_level_upgrade()
+            # 硬下降到底然后锁定
+            while self.game.move(0, 1):
+                pass
+            self._lock_and_update()
 
     # ---------- 渲染方法（重构） ----------
 
