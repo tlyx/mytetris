@@ -278,6 +278,17 @@ class TetrisApp:
         self._update_high_score()
         self._check_level_upgrade()
 
+    # ---------- 新增重置游戏方法 ----------
+    def _restart_game(self) -> None:
+        """重置游戏所有状态，回到新游戏初始状态。"""
+        self.game.reset()
+        self.current_level = 1
+        self._update_speed()
+        self.paused = False
+        self.game_start_ticks = pygame.time.get_ticks()
+        self._game_over_sound_played = False
+        self._music_paused_for_gamepause = False
+
     def run(self) -> None:
         """主循环：保持窗口尺寸、处理事件、渲染场景"""
         while True:
@@ -346,19 +357,16 @@ class TetrisApp:
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
                 self._handle_quit()
+            elif event.key == pygame.K_r:
+                self._restart_game()
+                self.confirm_quit = False
             else:
                 self.confirm_quit = False
 
     def _handle_game_over_event(self, event: pygame.event.Event) -> None:
         """处理游戏结束状态下的按键事件（仅响应回车以重新开始）。"""
         if event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN:
-            self.game.reset()
-            self.current_level = 1
-            self._update_speed()
-            self.paused = False
-            self.game_start_ticks = pygame.time.get_ticks()
-            self._game_over_sound_played = False
-            self._music_paused_for_gamepause = False
+            self._restart_game()
 
     def _handle_playing_event(self, event: pygame.event.Event) -> None:
         """处理正常游戏进行中的事件（包括 ESC 进入退出确认、P 暂停、下落定时器、方向键等）。"""
@@ -762,6 +770,9 @@ class TetrisApp:
             line_esc = font_small.render(
                 "Press ESC to confirm", True, (255, 255, 255)
             )
+            line_restart = font_small.render(
+                "Press R to restart", True, (255, 255, 255)
+            )
             line_cancel = font_small.render(
                 "Any other key to cancel", True, (255, 255, 255)
             )
@@ -770,7 +781,7 @@ class TetrisApp:
             small_h = line_esc.get_height()
             gap = int(15 * scale)
 
-            total_h = title_h + gap + small_h + gap + small_h
+            total_h = title_h + gap + small_h + gap + small_h + gap + small_h
             start_y = (logical_h - total_h) // 2
 
             ds.blit(
@@ -779,10 +790,16 @@ class TetrisApp:
             )
             ds.blit(
                 line_esc,
-                (logical_w // 2 - line_esc.get_width() // 2, start_y + title_h + gap),
+                (logical_w // 2 - line_esc.get_width() // 2,
+                 start_y + title_h + gap),
+            )
+            ds.blit(
+                line_restart,
+                (logical_w // 2 - line_restart.get_width() // 2,
+                 start_y + title_h + gap + small_h + gap),
             )
             ds.blit(
                 line_cancel,
                 (logical_w // 2 - line_cancel.get_width() // 2,
-                 start_y + title_h + gap + small_h + gap),
+                 start_y + title_h + gap + small_h + gap + small_h + gap),
             )
