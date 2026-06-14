@@ -463,7 +463,7 @@ class TetrisApp:
         self._draw_left_panel(ls, scale, left_width_px, logical_h, font_big, font_small)
 
         # C. 绘制右侧侧边栏
-        self._draw_right_panel(ls, scale, board_left, board_w, board_h,
+        self._draw_right_panel(ls, scale, board_h,
                                sidebar_left, right_width_px, border_color,
                                font_big, font_small, logical_h)
 
@@ -566,7 +566,7 @@ class TetrisApp:
         ds.blit(sfx_surf, (left_content_x, sfx_y))
 
     def _draw_right_panel(self, ls: pygame.Surface, scale: float,
-                          board_left: int, board_w: int, board_h: int,
+                          board_h: int,
                           sidebar_left: int, right_width_px: int,
                           border_color: tuple[int, int, int],
                           font_big: pygame.font.Font,
