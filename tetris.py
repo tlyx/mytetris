@@ -99,6 +99,10 @@ class TetrisApp:
     sfx_enabled: bool
     _game_over_sound_played: bool
     _music_paused_for_gamepause: bool
+    # 字体缓存（基于 scale 懒加载）
+    _current_scale: float
+    _font_big: pygame.font.Font | None
+    _font_small: pygame.font.Font | None
 
     def __init__(self) -> None:
         """初始化 Pygame、窗口、字体、游戏引擎、音频等。"""
@@ -112,6 +116,10 @@ class TetrisApp:
         self._init_icon()
         self._init_audio()
         pygame.mouse.set_visible(False)
+        # 字体缓存初始化
+        self._current_scale = 0.0
+        self._font_big = None
+        self._font_small = None
 
     # ------------------------------------------------------------------
     # 初始化辅助方法 (将 __init__ 按功能拆分)
@@ -457,14 +465,20 @@ class TetrisApp:
             self._logical = pygame.Surface((logical_w, logical_h))
         ls = self._logical
 
+        # 字体懒加载缓存（仅在 scale 变化时重新创建）
+        if (self._font_big is None
+                or self._font_small is None
+                or abs(scale - self._current_scale) > 1e-9):
+            self._current_scale = scale
+            font_size = max(10, int(32 * scale))
+            small_font_size = max(8, int(20 * scale))
+            self._font_big = pygame.font.SysFont("Arial Black", font_size)
+            self._font_small = pygame.font.SysFont("Arial Black", small_font_size)
+
         # 计算缩放后的尺寸
         bs = int(BLOCK_SIZE * scale)               # 缩放后的方块大小
         left_width_px = int(LEFT_WIDTH * scale)    # 左侧面板像素宽
         right_width_px = int(RIGHT_WIDTH * scale)  # 右侧面板像素宽
-        font_size = max(10, int(32 * scale))
-        small_font_size = max(8, int(20 * scale))
-        font_big = pygame.font.SysFont("Arial Black", font_size)
-        font_small = pygame.font.SysFont("Arial Black", small_font_size)
 
         ds = ls
         # 用棋盘网格颜色填充底漆，避免任何未覆盖区域暴露黑色
@@ -486,15 +500,15 @@ class TetrisApp:
         self._draw_board(ls, bs, board_left, board_w, board_h, border_color)
 
         # B. 绘制左侧面板
-        self._draw_left_panel(ls, scale, left_width_px, logical_h, font_big, font_small)
+        self._draw_left_panel(ls, scale, left_width_px, logical_h, self._font_big, self._font_small)
 
         # C. 绘制右侧侧边栏
         self._draw_right_panel(ls, scale, board_h,
                                sidebar_left, right_width_px, border_color,
-                               font_big, font_small, logical_h)
+                               self._font_big, self._font_small, logical_h)
 
         # D. 绘制覆盖弹窗
-        self._draw_overlays(ls, scale, logical_w, logical_h, font_big, font_small)
+        self._draw_overlays(ls, scale, logical_w, logical_h, self._font_big, self._font_small)
 
         # 4. 将逻辑表面显示到物理窗口（居中，侧边栏背景色填充）
         x_off = (self.window_width - logical_w) // 2
