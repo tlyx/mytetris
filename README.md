@@ -50,15 +50,28 @@ uv run main.py
 
 ## macOS Gatekeeper Troubleshooting
 
-Since this application is not signed with an official Apple Developer account, macOS Gatekeeper will block it upon first launch from the downloaded `.dmg`, showing a warning that the developer cannot be verified.
+Since this application is bundled with an ad-hoc signature (not signed with a paid Apple Developer account), macOS Gatekeeper will block it upon first launch from the `.dmg`, showing a warning that the developer cannot be verified and only giving options to "Cancel" or "Move to Trash".
 
-### How to bypass:
+To bypass this restriction, close the warning dialog and choose **one** of the following methods:
 
-1. **GUI Method (Recommended)**: Drag `mytetris.app` to your `Applications` folder. Hold the **Control key** and **right-click** the app, then select **Open**. In the confirmation dialog that appears, click **Open**. You only need to do this once.
-2. **Terminal Method**: Open your terminal and run the following command to strip the quarantine flag completely:
-    ```bash
-    xattr -cr /Applications/mytetris.app
-    ```
+### Method 1: The Right-Click Shortcut (Admin Accounts)
+1. Drag `mytetris.app` into your `Applications` folder.
+2. Hold the **Control key**, **right-click** the app, and select **Open**.
+3. In the new confirmation dialog that appears, click **Open**. 
+   *(Note: This option might be hidden if you are currently logged into macOS as a standard/non-admin user).*
+
+### Method 2: System Settings Override (Standard & Admin Users)
+1. Double-click the app to let macOS trigger the initial block, then click **Cancel**.
+2. Open your Mac's **System Settings** and navigate to **Privacy & Security**.
+3. Scroll down to the **Security** section. You will see a note stating: *"mytetris.app" was blocked from opening because it is not from an identified developer.*
+4. Click the **Open Anyway** button next to it, authenticate with your password or Touch ID, and the game will launch normally from now on.
+
+### Method 3: The Terminal Way (For Geeks)
+If you prefer the command line, you can completely strip the macOS quarantine flag by running the following command in your terminal:
+```bash
+# Change path to ~/Applications/mytetris.app if installed locally
+xattr -cr /Applications/mytetris.app
+```
 
 ## Controls
 
