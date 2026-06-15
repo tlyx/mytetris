@@ -8,12 +8,40 @@ ensuring clean separation between application-level assets and system-level loca
 """
 
 import os
+import subprocess
+
+# =========================================================================
+# 0. DYNAMIC GIT VERSIONING ENGINE (Git 动态版本注入与代码生成)
+# =========================================================================
+def get_git_version(base_version="0.8.5"):
+    try:
+        # 获取当前提交的 7 位短哈希 (例如: f918cde)
+        short_sha = subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"], 
+            stderr=subprocess.DEVNULL
+        ).decode("utf-8").strip()
+        return f"{base_version}-{short_sha}"
+    except Exception:
+        return base_version
+
+# 执行版本捕获
+APP_VERSION = get_git_version("0.8.5")
+print(f"📦 [BUILD LOG] Successfully fetched Dynamic Git Version: {APP_VERSION}")
+
+# 将生成的动态版本号写入 build 缓存目录，避免污染项目根目录
+BUILD_DIR = "build"
+os.makedirs(BUILD_DIR, exist_ok=True)
+VERSION_FILE = os.path.join(BUILD_DIR, "_version.py")
+
+with open(VERSION_FILE, "w", encoding="utf-8") as f:
+    f.write(f'__version__ = "{APP_VERSION}"\n')
+
 
 # =========================================================================
 # 1. LOCALIZATION PREPARATION LAYER (构建本地化缓存层)
 # =========================================================================
 # 将临时资源目录定向至 build 缓存目录，避免污染项目根目录及 Git 工作树。
-LOCALES_DIR = os.path.join("build", "locales")
+LOCALES_DIR = os.path.join(BUILD_DIR, "locales")
 os.makedirs(LOCALES_DIR, exist_ok=True)
 
 EN_LPROJ = os.path.join(LOCALES_DIR, "en.lproj")
@@ -34,11 +62,10 @@ with open(os.path.join(ZH_LPROJ, "InfoPlist.strings"), "w", encoding="utf-8") as
 # =========================================================================
 a = Analysis(
     ['main.py'],
-    pathex=[],
+    pathex=[BUILD_DIR],      # 🎯 将 build 目录加入搜索路径，让 PyInstaller 顺利打包 _version.py
     binaries=[],
     datas=[
-        # 🎯 全部直接释放到 .app/Contents/Resources/ 正下方
-        # 此时 assets 的物理路径为 Resources/assets/，与 tetris.py 的新路径完美重合
+        # 全部直接释放到 .app/Contents/Resources/ 正下方
         ('assets', 'assets'),
         (EN_LPROJ, 'en.lproj'),
         (ZH_LPROJ, 'zh_CN.lproj'),
@@ -90,9 +117,9 @@ app = BUNDLE(
     icon='assets/logo.png',
     bundle_identifier='org.tlyx.tetris',
     info_plist={
-        'CFBundleShortVersionString': '0.8.5',
-        'CFBundleVersion': '0.8.5',
-        'NSHighResolutionCapable': True,       # 显式声明启用 Retina 高分辨率自适应支持
+        'CFBundleShortVersionString': APP_VERSION,  # 🎯 动态同步系统显示版本号
+        'CFBundleVersion': APP_VERSION,             # 🎯 动态同步内部构建版本号
+        'NSHighResolutionCapable': True,            # 显式声明启用 Retina 高分辨率自适应支持
         'CFBundleDevelopmentRegion': 'en',
         'CFBundleLocalizations': ['en', 'zh_CN'],
         'CFBundleDisplayName': 'Tetris',
