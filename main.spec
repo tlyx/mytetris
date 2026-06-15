@@ -11,22 +11,37 @@ import os
 import subprocess
 
 # =========================================================================
-# 0. DYNAMIC GIT VERSIONING ENGINE (Git 动态版本注入与代码生成)
+# 0. HYBRID TOML & GIT VERSIONING ENGINE (TOML基础版本 + Git哈希动态染色)
 # =========================================================================
-def get_git_version(base_version="0.8.5"):
+def get_combined_version(default_base="0.0.0-unknown"):
+    # 1. 优先获取 pyproject.toml 里的基础版本号
+    base_version = default_base
     try:
-        # 获取当前提交的 7 位短哈希 (例如: f918cde)
+        toml_path = os.path.join(os.getcwd(), 'pyproject.toml')
+        if os.path.exists(toml_path):
+            import tomllib
+            with open(toml_path, 'rb') as f:
+                data = tomllib.load(f)
+                extracted = data.get('project', {}).get('version')
+                if extracted:
+                    base_version = extracted
+    except Exception as e:
+        print(f"⚠️ [BUILD WARNING] Failed to read pyproject.toml: {e}")
+
+    # 2. 尝试追加当前的 Git 短哈希作为动态后缀
+    try:
         short_sha = subprocess.check_output(
             ["git", "rev-parse", "--short", "HEAD"], 
             stderr=subprocess.DEVNULL
         ).decode("utf-8").strip()
         return f"{base_version}-{short_sha}"
     except Exception:
+        # 如果没有 Git 环境（比如脱离仓库打包），则直接返回基础版本号
         return base_version
 
-# 执行版本捕获
-APP_VERSION = get_git_version("0.8.5")
-print(f"📦 [BUILD LOG] Successfully fetched Dynamic Git Version: {APP_VERSION}")
+# 执行版本捕获（完美融合：基础版本号-Git短哈希）
+APP_VERSION = get_combined_version()
+print(f"📦 [BUILD LOG] Successfully fetched Hybrid Version: {APP_VERSION}")
 
 # 将生成的动态版本号写入 build 缓存目录，避免污染项目根目录
 BUILD_DIR = "build"
@@ -35,7 +50,6 @@ VERSION_FILE = os.path.join(BUILD_DIR, "_version.py")
 
 with open(VERSION_FILE, "w", encoding="utf-8") as f:
     f.write(f'__version__ = "{APP_VERSION}"\n')
-
 
 # =========================================================================
 # 1. LOCALIZATION PREPARATION LAYER (构建本地化缓存层)
@@ -96,7 +110,7 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=False,          # 隐藏终端黑窗口
+    console=False,      # 隐藏终端黑窗口
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,

@@ -4,7 +4,7 @@ from tetris import TetrisApp
 try:
     from _version import __version__
 except ImportError:
-    __version__ = "0.8.5"
+    __version__ = "0-dev"
 
 def main() -> None:
     # 启动时在控制台显示版本号
