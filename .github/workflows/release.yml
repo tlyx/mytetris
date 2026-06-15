@@ -6,13 +6,16 @@ on:
       - 'v*'     # 🎯 只有当打下形如 v0.9.1 这样的正式版 Tag 时，才会唤醒此发布流水线
 
 jobs:
-  publish-release:
-    name: Production Release Deployment
+  # ==========================================
+  # 第一步：只读环境下的打包 Job
+  # ==========================================
+  build-app:
+    name: Build and Package
     runs-on: macos-latest
 
-    # 🔒 最小权限精细化控制：只在这个需要往 Releases 页面上传编译果实的 Job 中临时开启写权限
+    # 🔒 严防死守：整个编译和打包环境只给读权限，防止第三方依赖或工具在构建时恶意篡改代码
     permissions:
-      contents: write
+      contents: read
 
     steps:
       # 1. 签出代码仓库（保持深度为 0，确保能抓到当前 Tag 对应的短哈希）
@@ -44,7 +47,6 @@ jobs:
           SHORT_SHA=$(git rev-parse --short HEAD)
 
           # 从当前的 Git Tag 中提取纯版本号（例如：把 v0.9.1 变成 0.9.1）
-          # ${{ github.ref_name }} 会直接拿到触发当前流程的 tag 名，比如 v0.9.1
           RAW_TAG="${{ github.ref_name }}"
           VERSION="${RAW_TAG#v}" # 截取掉开头的小写 v
 
@@ -60,7 +62,39 @@ jobs:
             "mytetris-${VERSION}-${SHORT_SHA}.dmg" \
             "mytetris.app"
 
-      # 6. 核心动作：借助临时开启的 write 权限，自动在 GitHub 创建发布页面并挂载 mytetris-X.X.X-hhhhhhh.dmg
+      # 📦 将生成的 dmg 作为临时的 artifacts 暂存（默认保留 90 天，这里只做中转）
+      - name: Upload DMG Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dmg-artifact
+          path: dist/*.dmg
+          retention-days: 1
+
+  # ==========================================
+  # 第二步：获取写权限、纯粹的发布 Job
+  # ==========================================
+  publish-release:
+    name: Production Release Deployment
+    runs-on: ubuntu-latest # ✨ 纯发布不需要 macOS 昂贵的算力，用便宜的 Linux 主机顺便省个电
+    needs: build-app       # ⏳ 必须等打包 Job 成功完工才能唤醒我
+
+    # 🔒 最小权限精细化控制：只在这个需要往 Releases 页面上传编译果实的 Job 中临时开启写权限
+    permissions:
+      contents: write
+
+    steps:
+      # 1. 签出代码（让 Release Action 能正确认出当前的 Tag 运行上下文）
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # 2. 挂载上一步打包好的二进制果实
+      - name: Download DMG Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dmg-artifact
+          path: dist
+
+      # 3. 核心动作：借助临时开启的 write 权限，自动在 GitHub 创建发布页面并挂载 mytetris-X.X.X-hhhhhhh.dmg
       - name: Deploy Official Release
         uses: softprops/action-gh-release@v2
         with:
