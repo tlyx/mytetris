@@ -1,71 +1,61 @@
-name: CI/CD Packaging Pipeline
+name: Build
 
 on:
   push:
     branches:
-      - main     # 🎯 每次向 main 分支提交代码，触发 Nightly 编译
-    tags:
-      - 'v*'     # 🎯 每次打形如 v0.8.5 的 Tag，触发正式 Release 编译
+      - main     # 🎯 仅在 main 分支有代码推送时触发日常的增量集成与测试
 
+# 🔒 严格遵循“最小权限原则”：全局不赋予任何写权限，默认全只读。
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build-macos:
-    runs-on: macos-latest  # 使用 GitHub 官方最新的 macOS 干净环境
+    name: Core Package (macOS Artifact)
+    runs-on: macos-latest
 
     steps:
-      # 1. 签出代码（必须带上完整 Git 历史，否则你的 spec 读不到哈希）
+      # 1. 签出代码仓库（保持深度为 0，防止 spec 内部读 Git 哈希崩溃）
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # 2. 安装现代 Python 包管理工具 uv
+      # 2. 初始化现代 Python 包管理器 uv
       - name: Set up uv
         uses: astral-sh/setup-uv@v5
         with:
-          enable-cache: true
+          enable-cache: true  # 开启全局缓存，缩短编译时间
 
-      # 3. 同步依赖（包括你的 --dev 打包依赖）
+      # 3. 基于 uv.lock 像素级还原依赖环境
       - name: Install Dependencies
         run: uv sync
 
-      # 4. 执行 PyInstaller 编译生成 Tetris.app
+      # 4. 调用 PyInstaller 编译生成标准的 macOS .app 目录结构
       - name: Build macOS App Bundle
         run: uv run pyinstaller main.spec
 
-      # 5. 安装 create-dmg 并一键合成 .dmg 挂载盘
+      # 5. 安装 macOS 官方打包工具并一键合成 mytetris.dmg 挂载盘
       - name: Create DMG Installer
         run: |
-          brew install create-dmg
-          # 获取当前提交短哈希，用于临时命名 Nightly 产物
+          brew install create-dmg --quiet
+          # 获取当前提交的 7 位短哈希，用于日常开发版的独立区分命名
           SHORT_SHA=$(git rev-parse --short HEAD)
           cd dist
           create-dmg \
-            --volname "Tetris Installer" \
+            --volname "mytetris Installer" \
             --volicon "../assets/logo.png" \
             --window-pos 200 120 \
             --window-size 600 400 \
             --icon-size 100 \
-            --icon "Tetris.app" 175 190 \
+            --icon "mytetris.app" 175 190 \
             --app-drop-link 425 190 \
-            "Tetris-${SHORT_SHA}.dmg" \
-            "Tetris.app"
+            "mytetris-${SHORT_SHA}.dmg" \
+            "mytetris.app"
 
-      # 6. 分流打包产物：如果是普通 commit (Nightly)，将其作为 Action Artifacts 上传
-      - name: Upload Nightly Artifact (On Commit)
-        if: startsWith(github.ref, 'refs/tags/') == false
+      # 6. 将生成的日常开发版 .dmg 作为 Actions 附件上传
+      - name: Upload Nightly Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: tetris-macOS-nightly
+          name: mytetris-macOS-nightly
           path: dist/*.dmg
-
-      # 7. 分流打包产物：如果是打了 Tag (Release)，直接发布到 GitHub Releases 页面
-      - name: Deploy Official Release (On Tag)
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: dist/*.dmg
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -2,7 +2,8 @@
 
 A clean, object-oriented implementation of the classic Tetris game, built with Python and `pygame`.
 
-[![MacBuild](https://github.com/tlyx/mytetris/actions/workflows/build.yml/badge.svg)](https://github.com/tlyx/mytetris/actions/workflows/build.yml)
+[![Build status](https://github.com/tlyx/mytetris/actions/workflows/build.yml/badge.svg)](https://github.com/tlyx/mytetris/actions)
+[![GitHub Release](https://img.shields.io/github/v/release/tlyx/mytetris)](https://github.com/tlyx/mytetris/releases/latest)
 
 ## Features
 

@@ -58,15 +58,10 @@ with open(VERSION_FILE, "w", encoding="utf-8") as f:
 LOCALES_DIR = os.path.join(BUILD_DIR, "locales")
 os.makedirs(LOCALES_DIR, exist_ok=True)
 
-EN_LPROJ = os.path.join(LOCALES_DIR, "en.lproj")
 ZH_LPROJ = os.path.join(LOCALES_DIR, "zh_CN.lproj")
-os.makedirs(EN_LPROJ, exist_ok=True)
 os.makedirs(ZH_LPROJ, exist_ok=True)
 
 # 动态生成符合 CoreFoundation 规范的本地化字符串文件
-with open(os.path.join(EN_LPROJ, "InfoPlist.strings"), "w", encoding="utf-8") as f:
-    f.write('CFBundleDisplayName = "Tetris";\n')
-
 with open(os.path.join(ZH_LPROJ, "InfoPlist.strings"), "w", encoding="utf-8") as f:
     f.write('CFBundleDisplayName = "俄罗斯方块";\n')
 
@@ -81,7 +76,6 @@ a = Analysis(
     datas=[
         # 全部直接释放到 .app/Contents/Resources/ 正下方
         ('assets', 'assets'),
-        (EN_LPROJ, 'en.lproj'),
         (ZH_LPROJ, 'zh_CN.lproj'),
     ],
     hiddenimports=[
@@ -105,7 +99,7 @@ exe = EXE(
     pyz,
     a.scripts,
     exclude_binaries=True,
-    name='Tetris',
+    name='mytetris',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -122,12 +116,12 @@ exe = EXE(
 # =========================================================================
 # 4. APPLICATION BUNDLE LAYER (苹果沙盒应用封装层)
 # =========================================================================
-# 在此处完成二进制、依赖库和多层级资源向标准的 Tetris.app/ 目录的组装。
+# 在此处完成二进制、依赖库和多层级资源向标准的 mytetris.app/ 目录的组装。
 app = BUNDLE(
     exe,
     a.binaries,
     a.datas,
-    name='Tetris.app',
+    name='mytetris.app',
     icon='assets/logo.png',
     bundle_identifier='org.tlyx.tetris',
     info_plist={
@@ -136,6 +130,6 @@ app = BUNDLE(
         'NSHighResolutionCapable': True,            # 显式声明启用 Retina 高分辨率自适应支持
         'CFBundleDevelopmentRegion': 'en',
         'CFBundleLocalizations': ['en', 'zh_CN'],
-        'CFBundleDisplayName': 'Tetris',
+        'CFBundleDisplayName': 'mytetris',
     },
 )
