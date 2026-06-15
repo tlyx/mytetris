@@ -73,3 +73,7 @@ Since this application is not signed with an official Apple Developer account, m
 | Return (Enter)   | Restart game (on Game Over)   |
 | M                | Toggle background music       |
 | S                | Toggle sound effects          |
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
