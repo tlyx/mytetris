@@ -17,15 +17,10 @@ from engine import TetrisEngine, GRID_WIDTH, GRID_HEIGHT, COLORS, SHAPES_DATA
 
 # ---------- 资源路径辅助函数（支持开发环境和 PyInstaller 打包） ----------
 def _resource_path(relative_path: str) -> str:
-    """获取资源文件的绝对路径，同时兼容 PyInstaller 打包后的 sys._MEIPASS。
-
-    打包后资源位于 _MEIPASS/Resources/ 下，开发时位于脚本同级目录。
-    """
+    """获取资源文件的绝对路径，同时兼容 PyInstaller 打包后的路径。"""
+    # 在 macOS BUNDLE + onedir 模式下，sys._MEIPASS 运行时直接指向 .app/Contents/Resources/
     base = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
-    if getattr(sys, 'frozen', False):          # 打包状态
-        return os.path.join(base, "Resources", relative_path)
-    else:                                       # 开发状态
-        return os.path.join(base, relative_path)
+    return os.path.join(base, relative_path)
 # -------------------------------------------------------------------------
 
 # 方块大小（逻辑像素）
