@@ -714,6 +714,41 @@ class TetrisApp:
             2,
         )
 
+    # ---------- 新增通用覆盖层绘制方法 ----------
+    def _draw_overlay_text(self, surface: pygame.Surface,
+                           logical_w: int, logical_h: int,
+                           font_big: pygame.font.Font,
+                           font_small: pygame.font.Font,
+                           scale: float,
+                           title: str,
+                           title_color: tuple[int, int, int],
+                           lines: list[tuple[str, tuple[int, int, int]]],
+                           alpha: int = 180) -> None:
+        """绘制半透明覆盖层以及居中的标题和说明行。"""
+        overlay = pygame.Surface((logical_w, logical_h))
+        overlay.set_alpha(alpha)
+        overlay.fill((0, 0, 0))
+        surface.blit(overlay, (0, 0))
+
+        gap = int(15 * scale)
+        title_surf = font_big.render(title, True, title_color)
+        line_surfs = [font_small.render(text, True, color) for text, color in lines]
+
+        total_h = (title_surf.get_height()
+                   + sum(s.get_height() for s in line_surfs)
+                   + len(lines) * gap)
+        start_y = (logical_h - total_h) // 2
+
+        tx = (logical_w - title_surf.get_width()) // 2
+        surface.blit(title_surf, (tx, start_y))
+        y = start_y + title_surf.get_height() + gap
+
+        for line_surf in line_surfs:
+            lx = (logical_w - line_surf.get_width()) // 2
+            surface.blit(line_surf, (lx, y))
+            y += line_surf.get_height() + gap
+
+    # ---------- 重构后的覆盖层绘制方法 ----------
     def _draw_overlays(self, ls: pygame.Surface, scale: float,
                        logical_w: int, logical_h: int,
                        font_big: pygame.font.Font,
@@ -723,91 +758,31 @@ class TetrisApp:
 
         # F. Game Over 弹窗
         if self.game.game_over:
-            overlay = pygame.Surface((logical_w, logical_h))
-            overlay.set_alpha(180)
-            overlay.fill((0, 0, 0))
-            ds.blit(overlay, (0, 0))
-
-            go_text = font_big.render("GAME OVER", True, (255, 0, 0))
-            restart_text = font_small.render(
-                "Press RETURN to restart", True, (255, 255, 255)
-            )
-            ds.blit(
-                go_text,
-                (logical_w // 2 - go_text.get_width() // 2, logical_h // 2 - 40),
-            )
-            ds.blit(
-                restart_text,
-                (
-                    logical_w // 2 - restart_text.get_width() // 2,
-                    logical_h // 2 + 20,
-                ),
+            self._draw_overlay_text(
+                ds, logical_w, logical_h, font_big, font_small, scale,
+                "GAME OVER", (255, 0, 0),
+                [("Press RETURN to restart", (255, 255, 255))],
+                alpha=180,
             )
 
         # G. Pause 弹窗
         elif self.paused:
-            overlay = pygame.Surface((logical_w, logical_h))
-            overlay.set_alpha(180)
-            overlay.fill((0, 0, 0))
-            ds.blit(overlay, (0, 0))
-
-            paused_text = font_big.render("PAUSED", True, (255, 255, 0))
-            resume_text = font_small.render(
-                "Press P to resume", True, (255, 255, 255)
-            )
-            ds.blit(
-                paused_text,
-                (logical_w // 2 - paused_text.get_width() // 2, logical_h // 2 - 40),
-            )
-            ds.blit(
-                resume_text,
-                (
-                    logical_w // 2 - resume_text.get_width() // 2,
-                    logical_h // 2 + 20,
-                ),
+            self._draw_overlay_text(
+                ds, logical_w, logical_h, font_big, font_small, scale,
+                "PAUSED", (255, 255, 0),
+                [("Press P to resume", (255, 255, 255))],
+                alpha=180,
             )
 
-        # H. Confirm Quit 弹窗
+        # H. Confirm Quit 弹窗（独立 if，可与上面叠加）
         if self.confirm_quit:
-            overlay = pygame.Surface((logical_w, logical_h))
-            overlay.set_alpha(200)
-            overlay.fill((0, 0, 0))
-            ds.blit(overlay, (0, 0))
-
-            quit_title = font_big.render("QUIT ?", True, (255, 100, 100))
-            line_esc = font_small.render(
-                "Press ESC to confirm", True, (255, 255, 255)
-            )
-            line_restart = font_small.render(
-                "Press R to restart", True, (255, 255, 255)
-            )
-            line_cancel = font_small.render(
-                "Any other key to cancel", True, (255, 255, 255)
-            )
-
-            title_h = quit_title.get_height()
-            small_h = line_esc.get_height()
-            gap = int(15 * scale)
-
-            total_h = title_h + gap + small_h + gap + small_h + gap + small_h
-            start_y = (logical_h - total_h) // 2
-
-            ds.blit(
-                quit_title,
-                (logical_w // 2 - quit_title.get_width() // 2, start_y),
-            )
-            ds.blit(
-                line_esc,
-                (logical_w // 2 - line_esc.get_width() // 2,
-                 start_y + title_h + gap),
-            )
-            ds.blit(
-                line_restart,
-                (logical_w // 2 - line_restart.get_width() // 2,
-                 start_y + title_h + gap + small_h + gap),
-            )
-            ds.blit(
-                line_cancel,
-                (logical_w // 2 - line_cancel.get_width() // 2,
-                 start_y + title_h + gap + small_h + gap + small_h + gap),
+            self._draw_overlay_text(
+                ds, logical_w, logical_h, font_big, font_small, scale,
+                "QUIT ?", (255, 100, 100),
+                [
+                    ("Press ESC to confirm", (255, 255, 255)),
+                    ("Press R to restart", (255, 255, 255)),
+                    ("Any other key to cancel", (255, 255, 255)),
+                ],
+                alpha=200,
             )
