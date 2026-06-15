@@ -48,6 +48,18 @@ Run the game using:
 uv run main.py
 ```
 
+## macOS Gatekeeper Troubleshooting
+
+Since this application is not signed with an official Apple Developer account, macOS Gatekeeper will block it upon first launch from the downloaded `.dmg`, showing a warning that the developer cannot be verified.
+
+### How to bypass:
+
+1. **GUI Method (Recommended)**: Drag `mytetris.app` to your `Applications` folder. Hold the **Control key** and **right-click** the app, then select **Open**. In the confirmation dialog that appears, click **Open**. You only need to do this once.
+2. **Terminal Method**: Open your terminal and run the following command to strip the quarantine flag completely:
+    ```bash
+    xattr -cr /Applications/mytetris.app
+    ```
+
 ## Controls
 
 | Key              | Action                        |
