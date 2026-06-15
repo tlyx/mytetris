@@ -2,6 +2,8 @@
 
 A clean, object-oriented implementation of the classic Tetris game, built with Python and `pygame`.
 
+[![MacBuild](https://github.com/tlyx/mytetris/actions/workflows/build.yml/badge.svg)](https://github.com/tlyx/mytetris/actions/workflows/build.yml)
+
 ## Features
 
 *   **Classic Gameplay**: Includes all 7 standard tetrominoes with rotation, wall‑kick, and collision detection.
