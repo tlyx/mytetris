@@ -1,0 +1,71 @@
+name: CI/CD Packaging Pipeline
+
+on:
+  push:
+    branches:
+      - main     # 🎯 每次向 main 分支提交代码，触发 Nightly 编译
+    tags:
+      - 'v*'     # 🎯 每次打形如 v0.8.5 的 Tag，触发正式 Release 编译
+
+permissions:
+  contents: write
+
+jobs:
+  build-macos:
+    runs-on: macos-latest  # 使用 GitHub 官方最新的 macOS 干净环境
+
+    steps:
+      # 1. 签出代码（必须带上完整 Git 历史，否则你的 spec 读不到哈希）
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 2. 安装现代 Python 包管理工具 uv
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      # 3. 同步依赖（包括你的 --dev 打包依赖）
+      - name: Install Dependencies
+        run: uv sync
+
+      # 4. 执行 PyInstaller 编译生成 Tetris.app
+      - name: Build macOS App Bundle
+        run: uv run pyinstaller main.spec
+
+      # 5. 安装 create-dmg 并一键合成 .dmg 挂载盘
+      - name: Create DMG Installer
+        run: |
+          brew install create-dmg
+          # 获取当前提交短哈希，用于临时命名 Nightly 产物
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          cd dist
+          create-dmg \
+            --volname "Tetris Installer" \
+            --volicon "../assets/logo.png" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --icon "Tetris.app" 175 190 \
+            --app-drop-link 425 190 \
+            "Tetris-${SHORT_SHA}.dmg" \
+            "Tetris.app"
+
+      # 6. 分流打包产物：如果是普通 commit (Nightly)，将其作为 Action Artifacts 上传
+      - name: Upload Nightly Artifact (On Commit)
+        if: startsWith(github.ref, 'refs/tags/') == false
+        uses: actions/upload-artifact@v4
+        with:
+          name: tetris-macOS-nightly
+          path: dist/*.dmg
+
+      # 7. 分流打包产物：如果是打了 Tag (Release)，直接发布到 GitHub Releases 页面
+      - name: Deploy Official Release (On Tag)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.dmg
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
