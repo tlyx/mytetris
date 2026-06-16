@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main     # 🎯 仅在 main 分支有代码推送时触发日常的增量集成与测试
+    paths-ignore:
+      - 'README.md'
+      - 'LICENSE'
 
 # 🔒 严格遵循“最小权限原则”：全局不赋予任何写权限，默认全只读。
 permissions:
