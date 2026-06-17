@@ -847,7 +847,7 @@ class TetrisApp:
                            align_left: bool = False) -> None:
         """绘制半透明覆盖层以及居中的标题和左对齐/居中的说明行。
 
-        align_left: 如果为 True，则 lines 居左显示（加缩进）；否则居中。
+        align_left: 如果为 True，则 lines 居左显示（与棋盘左边缘对齐+空一格）；否则居中。
         """
         overlay = pygame.Surface((logical_w, logical_h))
         overlay.set_alpha(alpha)
@@ -868,8 +868,13 @@ class TetrisApp:
         surface.blit(title_surf, (tx, start_y))
         y = start_y + title_surf.get_height() + gap
 
-        # 缩进左对齐的起点
-        indent = int(30 * scale) if align_left else 0
+        # 左对齐的缩进：棋盘左边缘 + 一个方块大小（空一格）
+        # board_left = LEFT_WIDTH * scale (缩放后)
+        # bs = BLOCK_SIZE * scale
+        if align_left:
+            indent = int(LEFT_WIDTH * scale) + int(BLOCK_SIZE * scale)
+        else:
+            indent = 0
 
         for line_surf in line_surfs:
             if align_left:
@@ -886,7 +891,7 @@ class TetrisApp:
                            scale: float) -> None:
         """绘制半透明背景，居中显示帮助文字。
 
-        标题（第一行）居中并使用金色，其余行左对齐并带有缩进。
+        标题（第一行）居中并使用金色，其余行左对齐并带有缩进（与棋盘左边缘+空一格）。
         """
         overlay = pygame.Surface((logical_w, logical_h))
         overlay.set_alpha(200)
@@ -916,8 +921,8 @@ class TetrisApp:
         surface.blit(title_surf, (tx, start_y))
         y = start_y + title_surf.get_height() + gap
 
-        # 正文左对齐，缩进
-        indent = int(25 * scale)
+        # 正文左对齐，缩进为棋盘左边缘 + 一个方块大小（空一格）
+        indent = int(LEFT_WIDTH * scale) + int(BLOCK_SIZE * scale)
         for body_surf in body_surfaces:
             surface.blit(body_surf, (indent, y))
             y += body_surf.get_height() + gap
