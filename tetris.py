@@ -52,7 +52,7 @@ LOGO_FILE = _resource_path("assets/logo.png")
 
 # ---- 字体文件路径（使用统一常量便于替换） ----
 FONT_FILE = _resource_path("assets/fonts/DejaVuSans-Bold.ttf")
-HELP_FONT_FILE = _resource_path("assets/fonts/DejaVuSans.ttf")
+HELP_FONT_FILE = _resource_path("assets/fonts/DejaVuSansMono.ttf")
 # ---------------------------------------------
 
 # ---- 帮助文本（为避免重复创建，定义为常量） ----
