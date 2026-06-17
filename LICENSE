@@ -19,3 +19,15 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+========================================================================
+Third-Party Licenses
+========================================================================
+
+This project bundle includes the DejaVu Font software family (*.ttf),
+which is licensed under a permissive variant of the Bitstream Vera License
+and is partially in the public domain.
+
+For the full copyright notices and licensing terms of the DejaVu Fonts,
+please refer to the official license document:
+https://github.com/dejavu-fonts/dejavu-fonts/blob/master/LICENSE
