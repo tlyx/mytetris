@@ -50,13 +50,14 @@ GAME_OVER_SOUND_FILE = _resource_path("assets/game_over.mp3")
 LOGO_FILE = _resource_path("assets/logo.png")
 # -----------------------
 
+# ---- 字体文件路径（使用统一常量便于替换） ----
+FONT_FILE = _resource_path("assets/fonts/DejaVuSans-Bold.ttf")
+# ---------------------------------------------
 
 @final
 class TetrisApp:
     """俄罗斯方块主应用程序类，负责窗口管理、事件循环和渲染。"""
     screen: pygame.Surface
-    font: pygame.font.Font
-    small_font: pygame.font.Font
     game: TetrisEngine
     fall_event: int
     current_level: int
@@ -141,8 +142,6 @@ class TetrisApp:
             (self.window_width, self.window_height), pygame.RESIZABLE
         )
         pygame.display.set_caption("Tetris Professional - macOS Lab")
-        self.font = pygame.font.SysFont("Arial Black", 32)
-        self.small_font = pygame.font.SysFont("Arial Black", 20)
         self._logical = None   # 逻辑表面，渲染时按比例缩放
 
     def _init_input(self) -> None:
@@ -511,8 +510,9 @@ class TetrisApp:
             self._current_scale = scale
             font_size = max(10, int(32 * scale))
             small_font_size = max(8, int(20 * scale))
-            self._font_big = pygame.font.SysFont("Arial Black", font_size)
-            self._font_small = pygame.font.SysFont("Arial Black", small_font_size)
+            # 使用统一字体的 .ttf 文件
+            self._font_big = pygame.font.Font(FONT_FILE, font_size)
+            self._font_small = pygame.font.Font(FONT_FILE, small_font_size)
 
         # 计算缩放后的尺寸
         bs = int(BLOCK_SIZE * scale)               # 缩放后的方块大小
