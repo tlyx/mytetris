@@ -89,6 +89,7 @@ xattr -cr /Applications/mytetris.app
 | Return (Enter)   | Restart game (on Game Over)   |
 | M                | Toggle background music       |
 | S                | Toggle sound effects          |
+| F1 / ?           | Toggle help                   |
 
 ## License
 
