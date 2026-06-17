@@ -4,7 +4,9 @@
 
 [![Build status](https://github.com/tlyx/mytetris/actions/workflows/build.yml/badge.svg)](https://github.com/tlyx/mytetris/actions)
 [![GitHub Release](https://img.shields.io/badge/release-0.9-orange)](https://github.com/tlyx/mytetris/releases/latest)
-![Platform](https://img.shields.io/badge/platform-macOS%20Apple%20Silicon-blue?logo=apple)
+[![macOS](https://img.shields.io/badge/macOS-blue?logo=apple)](#macos-gatekeeper-troubleshooting)
+[![Linux](https://img.shields.io/badge/Linux-blue?logo=linux)](#prerequisites)
+[![Windows](https://img.shields.io/badge/Windows-blue)](#prerequisites)
 
 ---
 
@@ -59,6 +61,8 @@ uv run main.py
 
 ## macOS Gatekeeper Troubleshooting
 
+To try the pre-compiled version on your Apple Silicon Mac, you can [Download the Latest Release](https://github.com/tlyx/mytetris/releases/latest). If you prefer to run it from source, please refer to the same instructions as Linux and Windows in the [Setup](#setup) and [Usage](#usage) sections.
+
 Since this application is bundled with an ad-hoc signature (not signed with a paid Apple Developer account), macOS Gatekeeper will block it upon first launch from the `.dmg`, showing a warning that the developer cannot be verified and only giving options to "Cancel" or "Move to Trash".
 
 To bypass this restriction, close the warning dialog and choose **one** of the following methods:
@@ -66,7 +70,7 @@ To bypass this restriction, close the warning dialog and choose **one** of the f
 ### Method 1: The Right-Click Shortcut (Admin Accounts)
 1. Drag `mytetris.app` into your `Applications` folder.
 2. Hold the **Control key**, **right-click** the app, and select **Open**.
-3. In the new confirmation dialog that appears, click **Open**. 
+3. In the new confirmation dialog that appears, click **Open**.
    *(Note: This option might be hidden if you are currently logged into macOS as a standard/non-admin user).*
 
 ### Method 2: System Settings Override (Standard & Admin Users)
