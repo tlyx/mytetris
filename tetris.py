@@ -64,10 +64,10 @@ HELP_LINES = [
     "↑      Rotate",
     "Space  Hard drop",
     "",
-    "P      Pause / Resume",
+    "P      Pause/Resume",
     "M      Toggle music",
     "S      Toggle sound effects",
-    "F1 / ? Show / Hide this help",
+    "F1/?   Show/Hide this help",
     "",
     "Press any key to close.",
 ]
