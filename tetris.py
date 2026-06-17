@@ -119,7 +119,8 @@ class TetrisApp:
         self._enforce_min_size()
         self._init_icon()
         self._init_audio()
-        pygame.mouse.set_visible(False)
+        # 初始时鼠标可见（不再全局隐藏）
+        pygame.mouse.set_visible(True)
         # 字体缓存初始化
         self._current_scale = 0.0
         self._font_big = None
@@ -619,6 +620,23 @@ class TetrisApp:
 
         self.screen.fill(self.sidebar_bg)
         self.screen.blit(self._logical, (x_off, y_off))
+
+        # ---- 动态鼠标可见性（根据是否在棋盘区域） ----
+        mx, my = pygame.mouse.get_pos()
+        board_phys_left = x_off + board_left
+        board_phys_top = y_off
+        board_phys_right = board_phys_left + board_w
+        board_phys_bottom = board_phys_top + board_h
+        in_board = (board_phys_left <= mx <= board_phys_right and
+                    board_phys_top <= my <= board_phys_bottom)
+
+        if in_board:
+            if pygame.mouse.get_visible():
+                pygame.mouse.set_visible(False)
+        else:
+            if not pygame.mouse.get_visible():
+                pygame.mouse.set_visible(True)
+        # ------------------------------------------------
 
         pygame.display.flip()
 
