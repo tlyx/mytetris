@@ -67,7 +67,7 @@ HELP_LINES = [
     "P      Pause/Resume",
     "M      Toggle music",
     "S      Toggle sound effects",
-    "F1/?   Show/Hide this help",
+    "F1/?   Show this help",
     "",
     "Press any key to close.",
 ]
@@ -608,8 +608,10 @@ class TetrisApp:
                                sidebar_left, right_width_px, border_color,
                                self._font_big, self._font_small, logical_h)
 
-        # D. 绘制覆盖弹窗
-        self._draw_overlays(ls, scale, logical_w, logical_h, self._font_big, self._font_small, self._help_font)
+        # D. 绘制覆盖弹窗（传入棋盘区域坐标以定位遮罩）
+        self._draw_overlays(ls, scale, logical_w, logical_h,
+                            self._font_big, self._font_small, self._help_font,
+                            board_left, board_w, board_h)
 
         # 4. 将逻辑表面显示到物理窗口（居中，侧边栏背景色填充）
         x_off = (self.window_width - logical_w) // 2
@@ -839,14 +841,22 @@ class TetrisApp:
                            title_color: tuple[int, int, int],
                            lines: list[tuple[str, tuple[int, int, int]]],
                            alpha: int = 180,
-                           align_left: bool = False) -> None:
+                           align_left: bool = False,
+                           overlay_rect: pygame.Rect | None = None) -> None:
         """绘制半透明覆盖层以及居中的标题和左对齐/居中的说明行。
 
         align_left: 如果为 True，则 lines 居左显示（与棋盘左边缘对齐）；否则居中。
+        overlay_rect: 如果提供，遮罩只覆盖该矩形区域（棋盘区域），否则全屏。
         """
-        overlay = pygame.Surface((logical_w, logical_h))
-        overlay.set_alpha(alpha)
-        overlay.fill((0, 0, 0))
+        if overlay_rect:
+            # 局部遮罩：使用带 alpha 通道的表面，只填充指定矩形
+            overlay = pygame.Surface((logical_w, logical_h), pygame.SRCALPHA)
+            overlay.fill((0, 0, 0, alpha), overlay_rect)
+        else:
+            # 全屏遮罩（原有逻辑）
+            overlay = pygame.Surface((logical_w, logical_h))
+            overlay.set_alpha(alpha)
+            overlay.fill((0, 0, 0))
         surface.blit(overlay, (0, 0))
 
         gap = int(15 * scale)
@@ -927,7 +937,8 @@ class TetrisApp:
                        logical_w: int, logical_h: int,
                        font_big: pygame.font.Font,
                        font_small: pygame.font.Font,
-                       help_font: pygame.font.Font) -> None:
+                       help_font: pygame.font.Font,
+                       board_left: int, board_w: int, board_h: int) -> None:
         """绘制 Game Over / Pause / Confirm Quit / Help 弹窗。"""
         ds = ls
 
@@ -936,6 +947,9 @@ class TetrisApp:
             self._draw_help_overlay(ds, logical_w, logical_h,
                                     help_font, scale)
             return
+
+        # 棋盘区域矩形（遮罩只覆盖此处）
+        board_rect = pygame.Rect(board_left, 0, board_w, board_h)
 
         # F. Game Over 弹窗（多行文字居中）
         if self.game.game_over:
@@ -948,6 +962,7 @@ class TetrisApp:
                 ],
                 alpha=180,
                 align_left=False,
+                overlay_rect=board_rect,
             )
 
         # G. Pause 弹窗（单行文字居中）
@@ -958,6 +973,7 @@ class TetrisApp:
                 [("Press P to resume", (255, 255, 255))],
                 alpha=180,
                 align_left=False,   # 只有一行，居中显示
+                overlay_rect=board_rect,
             )
 
         # H. Confirm Quit 弹窗（多行，左对齐）
@@ -972,4 +988,5 @@ class TetrisApp:
                 ],
                 alpha=200,
                 align_left=True,    # 多行，左对齐
+                overlay_rect=board_rect,
             )
