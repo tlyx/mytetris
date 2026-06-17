@@ -834,7 +834,7 @@ class TetrisApp:
             2,
         )
 
-    # ---------- 新增通用覆盖层绘制方法 ----------
+    # ---------- 新增通用覆盖层绘制方法（支持左对齐选项） ----------
     def _draw_overlay_text(self, surface: pygame.Surface,
                            logical_w: int, logical_h: int,
                            font_big: pygame.font.Font,
@@ -843,8 +843,12 @@ class TetrisApp:
                            title: str,
                            title_color: tuple[int, int, int],
                            lines: list[tuple[str, tuple[int, int, int]]],
-                           alpha: int = 180) -> None:
-        """绘制半透明覆盖层以及居中的标题和说明行。"""
+                           alpha: int = 180,
+                           align_left: bool = False) -> None:
+        """绘制半透明覆盖层以及居中的标题和左对齐/居中的说明行。
+
+        align_left: 如果为 True，则 lines 居左显示（加缩进）；否则居中。
+        """
         overlay = pygame.Surface((logical_w, logical_h))
         overlay.set_alpha(alpha)
         overlay.fill((0, 0, 0))
@@ -859,12 +863,19 @@ class TetrisApp:
                    + len(lines) * gap)
         start_y = (logical_h - total_h) // 2
 
+        # 标题始终居中
         tx = (logical_w - title_surf.get_width()) // 2
         surface.blit(title_surf, (tx, start_y))
         y = start_y + title_surf.get_height() + gap
 
+        # 缩进左对齐的起点
+        indent = int(30 * scale) if align_left else 0
+
         for line_surf in line_surfs:
-            lx = (logical_w - line_surf.get_width()) // 2
+            if align_left:
+                lx = indent
+            else:
+                lx = (logical_w - line_surf.get_width()) // 2
             surface.blit(line_surf, (lx, y))
             y += line_surf.get_height() + gap
 
@@ -873,25 +884,43 @@ class TetrisApp:
                            logical_w: int, logical_h: int,
                            help_font: pygame.font.Font,
                            scale: float) -> None:
-        """绘制半透明背景，居中显示帮助文字。"""
+        """绘制半透明背景，居中显示帮助文字。
+
+        标题（第一行）居中并使用金色，其余行左对齐并带有缩进。
+        """
         overlay = pygame.Surface((logical_w, logical_h))
         overlay.set_alpha(200)
         overlay.fill((0, 0, 0))
         surface.blit(overlay, (0, 0))
 
-        # 将所有行渲染为 Surfaces
-        line_surfaces = [
-            help_font.render(line, True, (255, 255, 255)) for line in HELP_LINES
-        ]
+        # 第一行为标题
+        title_line = HELP_LINES[0] if HELP_LINES else ""
+        body_lines = HELP_LINES[1:] if len(HELP_LINES) > 1 else []
+
+        # 标题颜色使用金色，其余行白色
+        title_color = (255, 200, 0)   # 金色
+        body_color = (255, 255, 255)
+
+        # 渲染标题（居中）
+        title_surf = help_font.render(title_line, True, title_color)
+        tx = (logical_w - title_surf.get_width()) // 2
+        # 计算垂直位置
         gap = int(12 * scale)
-        total_height = sum(s.get_height() for s in line_surfaces) + \
-                       (len(line_surfaces) - 1) * gap
-        y_start = (logical_h - total_height) // 2
-        y = y_start
-        for surf in line_surfaces:
-            x = (logical_w - surf.get_width()) // 2
-            surface.blit(surf, (x, y))
-            y += surf.get_height() + gap
+        # 先计算所有行总高度（标题 + 正文）
+        body_surfaces = [help_font.render(line, True, body_color) for line in body_lines]
+        total_body_h = sum(s.get_height() for s in body_surfaces) + \
+                       (len(body_surfaces) - 1) * gap
+        total_h = title_surf.get_height() + gap + total_body_h
+        start_y = (logical_h - total_h) // 2
+
+        surface.blit(title_surf, (tx, start_y))
+        y = start_y + title_surf.get_height() + gap
+
+        # 正文左对齐，缩进
+        indent = int(25 * scale)
+        for body_surf in body_surfaces:
+            surface.blit(body_surf, (indent, y))
+            y += body_surf.get_height() + gap
     # --------------------------------------------
 
     # ---------- 重构后的覆盖层绘制方法 ----------
@@ -916,6 +945,7 @@ class TetrisApp:
                 "GAME OVER", (255, 0, 0),
                 [("Press RETURN to restart", (255, 255, 255))],
                 alpha=180,
+                align_left=True,
             )
 
         # G. Pause 弹窗
@@ -925,6 +955,7 @@ class TetrisApp:
                 "PAUSED", (255, 255, 0),
                 [("Press P to resume", (255, 255, 255))],
                 alpha=180,
+                align_left=True,
             )
 
         # H. Confirm Quit 弹窗（独立 if，可与上面叠加）
@@ -938,4 +969,5 @@ class TetrisApp:
                     ("Any other key to cancel", (255, 255, 255)),
                 ],
                 alpha=200,
+                align_left=True,
             )
