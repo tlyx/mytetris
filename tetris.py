@@ -69,7 +69,7 @@ HELP_LINES = [
     "S      Toggle sound effects",
     "F1 / ? Show / Hide this help",
     "",
-    "Press F1 or ? again to close.",
+    "Press any key to close.",
 ]
 # -------------------------------------------------
 
@@ -415,19 +415,11 @@ class TetrisApp:
                 self._handle_resize(event)
                 continue
 
-            # --- 帮助激活时只处理关闭帮助的按键 ---
+            # --- 帮助激活时，任意按键关闭帮助 ---
             if self._help_active:
                 if event.type == pygame.KEYDOWN:
-                    key = event.key
-                    # F1 或 ? 键关闭帮助
-                    if key == pygame.K_F1 or (key == pygame.K_SLASH and
-                                               (pygame.key.get_mods() & pygame.KMOD_SHIFT)):
-                        self._toggle_help()
-                        continue
-                    # ESC 也关闭帮助
-                    if key == pygame.K_ESCAPE:
-                        self._toggle_help()
-                        continue
+                    self._toggle_help()
+                    continue
                 # 其他事件忽略
                 continue
 
