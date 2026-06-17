@@ -6,6 +6,11 @@ from random import choice
 
 GRID_WIDTH, GRID_HEIGHT = 10, 20
 
+# ---------- 上限常量 ----------
+MAX_SCORE = 999999
+MAX_TOTAL_LINES = 999999
+# -----------------------------
+
 COLORS: dict[str, tuple[int, int, int]] = {
     "BACKGROUND": (10, 12, 15),
     "GRID_LINE": (30, 33, 40),
@@ -104,9 +109,13 @@ class TetrisEngine:
         ]
         lines_cleared: int = GRID_HEIGHT - len(new_grid)
         self.total_lines += lines_cleared
+        if self.total_lines > MAX_TOTAL_LINES:
+            self.total_lines = MAX_TOTAL_LINES
 
         score_table: dict[int, int] = {0: 0, 1: 100, 2: 300, 3: 500, 4: 800}
         self.score += score_table.get(lines_cleared, 800) * self.level
+        if self.score > MAX_SCORE:
+            self.score = MAX_SCORE
 
         self.level = (self.total_lines // 10) + 1
 

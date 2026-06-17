@@ -14,7 +14,7 @@ import json
 import pygame
 import platformdirs
 
-from engine import TetrisEngine, GRID_WIDTH, GRID_HEIGHT, COLORS, SHAPES_DATA
+from engine import TetrisEngine, GRID_WIDTH, GRID_HEIGHT, COLORS, SHAPES_DATA, MAX_SCORE
 
 # ---------- 资源路径辅助函数（支持开发环境和 PyInstaller 打包） ----------
 def _resource_path(relative_path: str) -> str:
@@ -187,14 +187,21 @@ class TetrisApp:
                 cfg = json.load(f)
             self.music_enabled = bool(cfg.get("music_enabled", True))
             self.sfx_enabled = bool(cfg.get("sfx_enabled", True))
-            self.high_score = int(cfg.get("high_score", 0))
+            raw_high_score = int(cfg.get("high_score", 0))
+            # 如果读取的分值超过上限，运行时卡在 MAX_SCORE，但影子值保留原始值
+            if raw_high_score > MAX_SCORE:
+                self._initial_high_score = raw_high_score
+                self.high_score = MAX_SCORE
+            else:
+                self._initial_high_score = raw_high_score
+                self.high_score = raw_high_score
         except (FileNotFoundError, json.JSONDecodeError, ValueError):
             # 配置文件不存在或格式错误，保留当前默认值
             pass
         # 记录当前值作为影子值（之后比较变化时使用）
         self._initial_music_enabled = self.music_enabled
         self._initial_sfx_enabled = self.sfx_enabled
-        self._initial_high_score = self.high_score
+        # 注意 _initial_high_score 已在上面设置完毕
 
     def _save_config(self) -> None:
         """将音乐开关、音效开关和最高分写入配置文件（只在有变化时写入）。"""
@@ -344,7 +351,8 @@ class TetrisApp:
     def _update_high_score(self) -> None:
         """实时更新最高分（内存中）。退出时统一保存配置。"""
         if self.game.score > self.high_score:
-            self.high_score = self.game.score
+            # 限制最高分不超过 MAX_SCORE
+            self.high_score = min(self.game.score, MAX_SCORE)
 
     # ---------- 新增统一锁定 + 更新方法 ----------
     def _lock_and_update(self) -> None:
