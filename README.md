@@ -8,6 +8,12 @@
 
 ---
 
+## 🎮 Preview
+
+| Main Game Stage | How to Play Menu |
+| :---: | :---: |
+| <img src="screenshots/game_main.png" width="400"> | <img src="screenshots/game_help.png" width="400"> |
+
 ## Features
 
 *   **Classic Gameplay**: Includes all 7 standard tetrominoes with rotation, wall‑kick, and collision detection.
