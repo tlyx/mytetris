@@ -11,3 +11,10 @@ wheels/
 # Virtual environments
 .venv
 .aider*
+
+.DS_Store
+Thumbs.db*
+ehthumbs.db
+Desktop.ini
+.directory
+
