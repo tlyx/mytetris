@@ -943,27 +943,27 @@ class TetrisApp:
                                     help_font, scale)
             return
 
-        # F. Game Over 弹窗
+        # F. Game Over 弹窗（单行文字居中）
         if self.game.game_over:
             self._draw_overlay_text(
                 ds, logical_w, logical_h, font_big, font_small, scale,
                 "GAME OVER", (255, 0, 0),
                 [("Press RETURN to restart", (255, 255, 255))],
                 alpha=180,
-                align_left=True,
+                align_left=False,   # 只有一行，居中显示
             )
 
-        # G. Pause 弹窗
+        # G. Pause 弹窗（单行文字居中）
         elif self.paused:
             self._draw_overlay_text(
                 ds, logical_w, logical_h, font_big, font_small, scale,
                 "PAUSED", (255, 255, 0),
                 [("Press P to resume", (255, 255, 255))],
                 alpha=180,
-                align_left=True,
+                align_left=False,   # 只有一行，居中显示
             )
 
-        # H. Confirm Quit 弹窗（独立 if，可与上面叠加）
+        # H. Confirm Quit 弹窗（多行，左对齐）
         if self.confirm_quit:
             self._draw_overlay_text(
                 ds, logical_w, logical_h, font_big, font_small, scale,
@@ -974,5 +974,5 @@ class TetrisApp:
                     ("Any other key to cancel", (255, 255, 255)),
                 ],
                 alpha=200,
-                align_left=True,
+                align_left=True,    # 多行，左对齐
             )
