@@ -466,9 +466,12 @@ class TetrisApp:
                 self.confirm_quit = False
 
     def _handle_game_over_event(self, event: pygame.event.Event) -> None:
-        """处理游戏结束状态下的按键事件（仅响应回车以重新开始）。"""
-        if event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN:
-            self._restart_game()
+        """处理游戏结束状态下的按键事件（支持回车重新开始和 ESC 退出游戏）。"""
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_RETURN:
+                self._restart_game()
+            elif event.key == pygame.K_ESCAPE:
+                self._handle_quit()
 
     def _handle_playing_event(self, event: pygame.event.Event) -> None:
         """处理正常游戏进行中的事件（包括 ESC 进入退出确认、P 暂停、下落定时器、方向键等）。"""
@@ -934,14 +937,17 @@ class TetrisApp:
                                     help_font, scale)
             return
 
-        # F. Game Over 弹窗（单行文字居中）
+        # F. Game Over 弹窗（多行文字居中）
         if self.game.game_over:
             self._draw_overlay_text(
                 ds, logical_w, logical_h, font_big, font_small, scale,
                 "GAME OVER", (255, 0, 0),
-                [("Press RETURN to restart", (255, 255, 255))],
+                [
+                    ("Press RETURN to restart", (255, 255, 255)),
+                    ("Press ESC to quit", (255, 255, 255)),
+                ],
                 alpha=180,
-                align_left=False,   # 只有一行，居中显示
+                align_left=False,
             )
 
         # G. Pause 弹窗（单行文字居中）
