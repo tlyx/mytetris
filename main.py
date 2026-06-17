@@ -8,7 +8,7 @@ except ImportError:
 
 def main() -> None:
     # 启动时在控制台显示版本号
-    print(f"Tetris v{__version__} (macOS Lab)")
+    print(f"MyTetris v{__version__} (macOS Lab)")
     app = TetrisApp()
     app.run()
 

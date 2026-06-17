@@ -1,6 +1,6 @@
 # MyTetris
 
-<img height="96" alt="MyTetris Icon" src="assets/logo.png" align="left"> A clean, object-oriented implementation of the classic Tetris game, built with Python and `pygame`.
+<img height="96" alt="MyTetris Icon" src="assets/logo.png" align="left"> A clean, object-oriented implementation of the classic falling block game, built with Python and `pygame`.
 
 [![Build status](https://github.com/tlyx/mytetris/actions/workflows/build.yml/badge.svg)](https://github.com/tlyx/mytetris/actions)
 [![GitHub Release](https://img.shields.io/badge/release-0.9-orange)](https://github.com/tlyx/mytetris/releases/latest)

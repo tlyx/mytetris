@@ -1,7 +1,7 @@
 [project]
 name = "mytetris"
 version = "0.9.5"
-description = "Homemade Tetris with AI"
+description = "Homemade MyTetris with AI"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [

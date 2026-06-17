@@ -1,6 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 """
-PyInstaller Specification File for Tetris Professional (macOS Application)
+PyInstaller Specification File for MyTetris Professional (macOS Application)
 Architecture: macOS Standard Bundle (onedir mode for compliant sandboxing)
 
 This configuration handles the multi-layered bundle structure required by macOS,
@@ -63,7 +63,7 @@ os.makedirs(ZH_LPROJ, exist_ok=True)
 
 # 动态生成符合 CoreFoundation 规范的本地化字符串文件
 with open(os.path.join(ZH_LPROJ, "InfoPlist.strings"), "w", encoding="utf-8") as f:
-    f.write('CFBundleDisplayName = "俄罗斯方块";\n')
+    f.write('CFBundleDisplayName = "我的方块";\n')
 
 
 # =========================================================================

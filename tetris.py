@@ -1,4 +1,4 @@
-# tetris.py — 俄罗斯方块专业版（macOS Lab）
+# tetris.py — 我的方块专业版（macOS Lab）
 # 主窗口渲染、事件处理、音频控制
 #
 # 设计目标：使用逻辑表面（_logical）独立于物理窗口尺寸，
@@ -75,7 +75,7 @@ HELP_LINES = [
 
 @final
 class TetrisApp:
-    """俄罗斯方块主应用程序类，负责窗口管理、事件循环和渲染。"""
+    """我的方块主应用程序类，负责窗口管理、事件循环和渲染。"""
     screen: pygame.Surface
     game: TetrisEngine
     fall_event: int
@@ -165,7 +165,7 @@ class TetrisApp:
         self.screen = pygame.display.set_mode(
             (self.window_width, self.window_height), pygame.RESIZABLE
         )
-        pygame.display.set_caption("Tetris Professional - macOS Lab")
+        pygame.display.set_caption("MyTetris Professional - macOS Lab")
         self._logical = None   # 逻辑表面，渲染时按比例缩放
 
     def _init_input(self) -> None:
@@ -701,7 +701,7 @@ class TetrisApp:
         left_content_width = left_width_px - 2 * left_padding
 
         # 游戏名称（居中）
-        title_str = "Tetris"
+        title_str = "MyTetris"
         title_surf = font_big.render(title_str, True, (255, 255, 255))
         title_x = left_content_x + (left_content_width - title_surf.get_width()) // 2
         ds.blit(title_surf, (title_x, int(20 * scale)))
