@@ -52,7 +52,26 @@ LOGO_FILE = _resource_path("assets/logo.png")
 
 # ---- 字体文件路径（使用统一常量便于替换） ----
 FONT_FILE = _resource_path("assets/fonts/DejaVuSans-Bold.ttf")
+HELP_FONT_FILE = _resource_path("assets/fonts/DejaVuSans.ttf")
 # ---------------------------------------------
+
+# ---- 帮助文本（为避免重复创建，定义为常量） ----
+HELP_LINES = [
+    "HOW TO PLAY",
+    "",
+    "← →    Move left/right",
+    "↓      Soft drop",
+    "↑      Rotate",
+    "Space  Hard drop",
+    "",
+    "P      Pause / Resume",
+    "M      Toggle music",
+    "S      Toggle sound effects",
+    "F1 / ? Show / Hide this help",
+    "",
+    "Press F1 or ? again to close.",
+]
+# -------------------------------------------------
 
 @final
 class TetrisApp:
@@ -81,10 +100,13 @@ class TetrisApp:
     _current_scale: float
     _font_big: pygame.font.Font | None
     _font_small: pygame.font.Font | None
+    _help_font: pygame.font.Font | None
     # 配置文件的影子值（从文件读取的原始值，用于判断是否有变化）
     _initial_music_enabled: bool
     _initial_sfx_enabled: bool
     _initial_high_score: int
+    # HELP 相关
+    _help_active: bool
 
     def __init__(self) -> None:
         """初始化 Pygame、窗口、字体、游戏引擎、音频等。"""
@@ -102,6 +124,7 @@ class TetrisApp:
         self._current_scale = 0.0
         self._font_big = None
         self._font_small = None
+        self._help_font = None
 
     # ------------------------------------------------------------------
     # 初始化辅助方法 (将 __init__ 按功能拆分)
@@ -216,6 +239,8 @@ class TetrisApp:
         self._initial_high_score = 0
         self._game_over_sound_played = False
         self._music_paused_for_gamepause = False
+        # HELP 相关
+        self._help_active = False
         # 从配置文件覆盖上面默认值
         self._load_config()
 
@@ -342,6 +367,21 @@ class TetrisApp:
         self.game_start_ticks = pygame.time.get_ticks()
         self._game_over_sound_played = False
         self._music_paused_for_gamepause = False
+        self._help_active = False
+
+    # ---------- 新增帮助切换方法 ----------
+    def _toggle_help(self) -> None:
+        """切换帮助界面的显示/隐藏。"""
+        if self._help_active:
+            self._help_active = False
+            # 恢复下落定时器（仅当游戏未结束、未暂停时）
+            if not self.game.game_over and not self.paused:
+                self._update_speed()
+        else:
+            self._help_active = True
+            # 停止下落定时器
+            pygame.time.set_timer(self.fall_event, 0)
+    # ---------------------------------------
 
     def run(self) -> None:
         """主循环：保持窗口尺寸、处理事件、渲染场景"""
@@ -373,6 +413,22 @@ class TetrisApp:
                 return  # 直接退出循环
             if event.type == pygame.VIDEORESIZE:
                 self._handle_resize(event)
+                continue
+
+            # --- 帮助激活时只处理关闭帮助的按键 ---
+            if self._help_active:
+                if event.type == pygame.KEYDOWN:
+                    key = event.key
+                    # F1 或 ? 键关闭帮助
+                    if key == pygame.K_F1 or (key == pygame.K_SLASH and
+                                               (pygame.key.get_mods() & pygame.KMOD_SHIFT)):
+                        self._toggle_help()
+                        continue
+                    # ESC 也关闭帮助
+                    if key == pygame.K_ESCAPE:
+                        self._toggle_help()
+                        continue
+                # 其他事件忽略
                 continue
 
             # --- 根据当前状态路由 ---
@@ -431,7 +487,15 @@ class TetrisApp:
         elif event.type == self.fall_event:
             self._handle_fall_timer()
         elif event.type == pygame.KEYDOWN:
-            self._handle_movement_key(event.key)
+            # 检查 F1 和 ? 键
+            key = event.key
+            mods = pygame.key.get_mods()
+            if key == pygame.K_F1:
+                self._toggle_help()
+            elif key == pygame.K_SLASH and (mods & pygame.KMOD_SHIFT):
+                self._toggle_help()
+            else:
+                self._handle_movement_key(event.key)
 
     def _toggle_pause(self) -> None:
         """切换暂停状态（仅在游戏未结束时有效）。"""
@@ -506,13 +570,16 @@ class TetrisApp:
         # 字体懒加载缓存（仅在 scale 变化时重新创建）
         if (self._font_big is None
                 or self._font_small is None
+                or self._help_font is None
                 or abs(scale - self._current_scale) > 1e-9):
             self._current_scale = scale
             font_size = max(10, int(32 * scale))
             small_font_size = max(8, int(20 * scale))
+            help_font_size = max(8, int(20 * scale))
             # 使用统一字体的 .ttf 文件
             self._font_big = pygame.font.Font(FONT_FILE, font_size)
             self._font_small = pygame.font.Font(FONT_FILE, small_font_size)
+            self._help_font = pygame.font.Font(HELP_FONT_FILE, help_font_size)
 
         # 计算缩放后的尺寸
         bs = int(BLOCK_SIZE * scale)               # 缩放后的方块大小
@@ -547,7 +614,7 @@ class TetrisApp:
                                self._font_big, self._font_small, logical_h)
 
         # D. 绘制覆盖弹窗
-        self._draw_overlays(ls, scale, logical_w, logical_h, self._font_big, self._font_small)
+        self._draw_overlays(ls, scale, logical_w, logical_h, self._font_big, self._font_small, self._help_font)
 
         # 4. 将逻辑表面显示到物理窗口（居中，侧边栏背景色填充）
         x_off = (self.window_width - logical_w) // 2
@@ -801,13 +868,46 @@ class TetrisApp:
             surface.blit(line_surf, (lx, y))
             y += line_surf.get_height() + gap
 
+    # ---------- 新增帮助覆盖层绘制方法 ----------
+    def _draw_help_overlay(self, surface: pygame.Surface,
+                           logical_w: int, logical_h: int,
+                           help_font: pygame.font.Font,
+                           scale: float) -> None:
+        """绘制半透明背景，居中显示帮助文字。"""
+        overlay = pygame.Surface((logical_w, logical_h))
+        overlay.set_alpha(200)
+        overlay.fill((0, 0, 0))
+        surface.blit(overlay, (0, 0))
+
+        # 将所有行渲染为 Surfaces
+        line_surfaces = [
+            help_font.render(line, True, (255, 255, 255)) for line in HELP_LINES
+        ]
+        gap = int(12 * scale)
+        total_height = sum(s.get_height() for s in line_surfaces) + \
+                       (len(line_surfaces) - 1) * gap
+        y_start = (logical_h - total_height) // 2
+        y = y_start
+        for surf in line_surfaces:
+            x = (logical_w - surf.get_width()) // 2
+            surface.blit(surf, (x, y))
+            y += surf.get_height() + gap
+    # --------------------------------------------
+
     # ---------- 重构后的覆盖层绘制方法 ----------
     def _draw_overlays(self, ls: pygame.Surface, scale: float,
                        logical_w: int, logical_h: int,
                        font_big: pygame.font.Font,
-                       font_small: pygame.font.Font) -> None:
-        """绘制 Game Over / Pause / Confirm Quit 弹窗。"""
+                       font_small: pygame.font.Font,
+                       help_font: pygame.font.Font) -> None:
+        """绘制 Game Over / Pause / Confirm Quit / Help 弹窗。"""
         ds = ls
+
+        # ---- 帮助覆盖层优先级最高 ----
+        if self._help_active:
+            self._draw_help_overlay(ds, logical_w, logical_h,
+                                    help_font, scale)
+            return
 
         # F. Game Over 弹窗
         if self.game.game_over:
