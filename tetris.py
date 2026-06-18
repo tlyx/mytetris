@@ -14,9 +14,9 @@
 #  - 创建 GameState 快照传递给 Renderer
 
 from typing import final
-import os
 import sys
 import json
+from pathlib import Path
 
 import pygame  # via pygame-ce
 import platformdirs
@@ -29,8 +29,8 @@ from game_state import GameState
 def _resource_path(relative_path: str) -> str:
     """获取资源文件的绝对路径，同时兼容 PyInstaller 打包后的路径。"""
     # 在 macOS BUNDLE + onedir 模式下，sys._MEIPASS 运行时直接指向 .app/Contents/Resources/
-    base = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
-    return os.path.join(base, relative_path)
+    base = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
+    return str(base / relative_path)
 # -------------------------------------------------------------------------
 
 # 方块大小（逻辑像素）
@@ -172,11 +172,11 @@ class TetrisApp:
         pygame.key.set_repeat(0)
 
     # ---------- 配置文件辅助 ----------
-    def _config_file(self) -> str:
+    def _config_file(self) -> Path:
         """返回配置文件 config.json 的路径，并确保目录存在。"""
-        data_dir = platformdirs.user_data_dir("mytetris")
-        os.makedirs(data_dir, exist_ok=True)
-        return os.path.join(data_dir, "config.json")
+        data_dir = Path(platformdirs.user_data_dir("mytetris"))
+        data_dir.mkdir(parents=True, exist_ok=True)
+        return data_dir / "config.json"
 
     def _load_config(self) -> None:
         """从配置文件读取音乐开关、音效开关和最高分。"""
@@ -248,7 +248,7 @@ class TetrisApp:
 
     def _init_icon(self) -> None:
         """设置窗口图标。"""
-        if os.path.isfile(LOGO_FILE):
+        if Path(LOGO_FILE).is_file():
             try:
                 icon_surf = pygame.image.load(LOGO_FILE).convert_alpha()
                 pygame.display.set_icon(icon_surf)
@@ -263,19 +263,19 @@ class TetrisApp:
             if not pygame.mixer.get_init():
                 pygame.mixer.init()
 
-            if os.path.isfile(BG_MUSIC_FILE):
+            if Path(BG_MUSIC_FILE).is_file():
                 pygame.mixer.music.load(BG_MUSIC_FILE)
 
-            if os.path.isfile(CLEAR_SOUND_FILE):
+            if Path(CLEAR_SOUND_FILE).is_file():
                 self.sounds["clear"] = pygame.mixer.Sound(CLEAR_SOUND_FILE)
 
-            if os.path.isfile(GAME_OVER_SOUND_FILE):
+            if Path(GAME_OVER_SOUND_FILE).is_file():
                 self.sounds["game_over"] = pygame.mixer.Sound(GAME_OVER_SOUND_FILE)
 
-            if os.path.isfile(BG_MUSIC_FILE) or self.sounds:
+            if Path(BG_MUSIC_FILE).is_file() or self.sounds:
                 self.audio_enabled = True
 
-            if self.music_enabled and os.path.isfile(BG_MUSIC_FILE):
+            if self.music_enabled and Path(BG_MUSIC_FILE).is_file():
                 pygame.mixer.music.play(-1)
 
         except Exception:
