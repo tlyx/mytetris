@@ -385,6 +385,7 @@ class TetrisApp:
             help_active=self._help_active,
             music_enabled=self.music_enabled,
             sfx_enabled=self.sfx_enabled,
+            ghost_y=self.game.get_ghost_y(),
         )
 
     def run(self) -> None:

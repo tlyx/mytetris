@@ -285,7 +285,8 @@ class Renderer:
         bs: int, board_left: int,
         _board_w: int, _board_h: int, _border_color: tuple[int, int, int],
     ) -> None:
-        """绘制 10×20 棋盘、当前操控块（不绘制边框，已在静态背景中完成）。"""
+        """绘制 10×20 棋盘、当前操控块（不绘制边框，已在静态背景中完成）。
+           同时绘制 ghost piece（落点影子）。"""
         # A. 绘制主棋盘（已锁定的方块）
         for r in range(GRID_HEIGHT):
             for c in range(GRID_WIDTH):
@@ -295,7 +296,22 @@ class Renderer:
                 rect = (board_left + c * bs, r * bs, bs - 1, bs - 1)
                 pygame.draw.rect(ds, color, rect)
 
-        # B. 绘制当前操控块（仅在游戏进行时）
+        # B. 绘制 Ghost piece（半透明影子）
+        if not state.game_over:
+            ghost_y = state.ghost_y
+            # 当前方块的实际 y 坐标可能高于 ghost_y，但只绘制影子位置
+            if ghost_y != state.current_y:
+                ghost_color = COLORS[state.current_type]
+                for dx, dy in state.current_shape:
+                    tx = board_left + (state.current_x + dx) * bs
+                    ty = ghost_y + dy
+                    if ty >= 0:
+                        # 创建一个带 alpha 的表面
+                        ghost_surf = pygame.Surface((bs - 1, bs - 1), pygame.SRCALPHA)
+                        ghost_surf.fill((*ghost_color, 80))  # alpha = 80
+                        ds.blit(ghost_surf, (tx, ty * bs))
+
+        # C. 绘制当前操控块（在 ghost piece 之上，覆盖它）
         if not state.game_over:
             for dx, dy in state.current_shape:
                 rect = (

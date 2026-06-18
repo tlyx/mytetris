@@ -172,3 +172,11 @@ class TetrisEngine:
         if not self._bag:
             self._refill_bag()
         return self._bag.pop()
+
+    # ---------- Ghost piece ----------
+    def get_ghost_y(self) -> int:
+        """返回当前方块垂直落到底部后的 y 坐标。"""
+        ghost_y = self.y
+        while not self._check_collision(self.x, ghost_y + 1):
+            ghost_y += 1
+        return ghost_y

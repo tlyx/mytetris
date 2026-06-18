@@ -39,3 +39,6 @@ class GameState:
     # 音频开关（仅用于左侧面板显示文字）
     music_enabled: bool
     sfx_enabled: bool
+
+    # Ghost piece（落点影子）的 y 坐标
+    ghost_y: int
