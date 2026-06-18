@@ -21,7 +21,7 @@ import json
 import pygame
 import platformdirs
 
-from engine import TetrisEngine, GRID_WIDTH, GRID_HEIGHT, COLORS, SHAPES_DATA, MAX_SCORE
+from engine import TetrisEngine, GRID_WIDTH, GRID_HEIGHT, MAX_SCORE
 from renderer import Renderer, SCREEN_WIDTH, SCREEN_HEIGHT
 from game_state import GameState
 

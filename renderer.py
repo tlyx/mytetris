@@ -15,7 +15,7 @@ from engine import (
     GRID_WIDTH,
     GRID_HEIGHT,
     SHAPES_DATA,
-    MAX_SCORE,
+    # MAX_SCORE 未使用，移除
 )
 from game_state import GameState
 
@@ -96,6 +96,11 @@ class Renderer:
         scale: float,
     ) -> None:
         """将游戏状态绘制到 logical 表面上。"""
+        # 确保字体已经设置（update_fonts 必须在第一次 render 前调用）
+        assert self.font_big is not None
+        assert self.font_small is not None
+        assert self.help_font is not None
+
         ds = logical
 
         # 1. 贴静态背景（如果缓存有效）
@@ -141,6 +146,9 @@ class Renderer:
     # ------------------------------------------------------------------
     def _build_static_bg(self, scale: float) -> pygame.Surface:
         """预渲染所有不随游戏状态变化的部分（棋盘背景、面板背景、标签、分隔线等）。"""
+        assert self.font_big is not None
+        assert self.font_small is not None
+
         logical_w = int(SCREEN_WIDTH * scale)
         logical_h = int(SCREEN_HEIGHT * scale)
         bg = pygame.Surface((logical_w, logical_h))
@@ -222,8 +230,8 @@ class Renderer:
 
     def _draw_board(
         self, ds: pygame.Surface, state: GameState,
-        bs: int, board_left: int, board_w: int, board_h: int,
-        border_color: tuple[int, int, int],
+        bs: int, board_left: int,
+        _board_w: int, _board_h: int, _border_color: tuple[int, int, int],
     ) -> None:
         """绘制 10×20 棋盘、当前操控块（不绘制边框，已在静态背景中完成）。"""
         # A. 绘制主棋盘（已锁定的方块）
@@ -251,6 +259,8 @@ class Renderer:
         scale: float, left_width_px: int, logical_h: int,
     ) -> None:
         """绘制左侧面板（音乐/音效状态）。静态背景已包含背景和标题。"""
+        assert self.font_small is not None
+
         if left_width_px <= 0:
             return
         left_padding = int(10 * scale)
@@ -279,13 +289,15 @@ class Renderer:
 
     def _draw_right_panel(
         self, ds: pygame.Surface, state: GameState,
-        scale: float, board_h: int,
+        scale: float, _board_h: int,
         sidebar_left: int, right_width_px: int,
-        border_color: tuple[int, int, int],
-        logical_w: int, logical_h: int,
+        _border_color: tuple[int, int, int],
+        _logical_w: int, logical_h: int,
     ) -> None:
         """绘制右侧侧边栏（LV数值、SCORE数值、预览、底部统计）。"""
-        _ = border_color  # 边框已在静态背景中绘制
+        assert self.font_big is not None
+        assert self.font_small is not None
+
         content_padding = int(20 * scale)
         sidebar_content_left = sidebar_left + content_padding
         sidebar_content_right = sidebar_left + right_width_px - content_padding
@@ -382,6 +394,9 @@ class Renderer:
         overlay_rect: pygame.Rect | None = None,
     ) -> None:
         """绘制半透明覆盖层以及居中的标题和左对齐/居中的说明行。"""
+        assert self.font_big is not None
+        assert self.font_small is not None
+
         if overlay_rect:
             overlay = pygame.Surface((logical_w, logical_h), pygame.SRCALPHA)
             overlay.fill((0, 0, 0, alpha), overlay_rect)
@@ -425,6 +440,8 @@ class Renderer:
         scale: float,
     ) -> None:
         """绘制半透明背景，居中显示帮助文字。"""
+        assert self.help_font is not None
+
         overlay = pygame.Surface((logical_w, logical_h))
         overlay.set_alpha(200)
         overlay.fill((0, 0, 0))
@@ -457,7 +474,7 @@ class Renderer:
     def _draw_overlays(
         self, ds: pygame.Surface, state: GameState,
         scale: float, logical_w: int, logical_h: int,
-        board_left: int, board_w: int, board_h: int,
+        board_left: int, _board_w: int, _board_h: int,
     ) -> None:
         """绘制 Game Over / Pause / Confirm Quit / Help 弹窗。"""
         # 帮助覆盖层优先级最高
@@ -465,7 +482,7 @@ class Renderer:
             self._draw_help_overlay(ds, logical_w, logical_h, scale)
             return
 
-        board_rect = pygame.Rect(board_left, 0, board_w, board_h)
+        board_rect = pygame.Rect(board_left, 0, _board_w, _board_h)
 
         # Game Over
         if state.game_over:

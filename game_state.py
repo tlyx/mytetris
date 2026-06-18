@@ -3,16 +3,6 @@
 
 from dataclasses import dataclass
 
-from engine import (
-    TetrisEngine,
-    COLORS,
-    GRID_WIDTH,
-    GRID_HEIGHT,
-    SHAPES_DATA,
-    MAX_SCORE,
-)
-
-
 @dataclass(frozen=True)
 class GameState:
     """某一时刻游戏的所有渲染所需状态（只读快照）"""
