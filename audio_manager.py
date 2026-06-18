@@ -57,8 +57,16 @@ class AudioManager:
             if self.music_enabled and Path(BG_MUSIC_FILE).is_file():
                 pygame.mixer.music.play(-1)
 
-        except Exception:
+        except Exception as exc:
+            print(f"WARNING: Failed to load audio files: {exc}")
             self.audio_enabled = False
+
+        # 如果最终没有任何音频文件加载成功，打印一条警告
+        if not self.audio_enabled:
+            print(
+                "WARNING: No audio files found (bg_music.mp3, clear.wav, game_over.mp3). "
+                + "Game will run without sound."
+            )
 
     # ---------- 音乐控制 ----------
     def play_music(self) -> None:
@@ -67,8 +75,8 @@ class AudioManager:
             return
         try:
             pygame.mixer.music.play(-1)
-        except pygame.error:
-            pass
+        except pygame.error as exc:
+            print(f"WARNING: Failed to play music: {exc}")
 
     def stop_music(self) -> None:
         """停止背景音乐。"""
@@ -91,14 +99,14 @@ class AudioManager:
         if self._music_paused_by_pause:
             try:
                 pygame.mixer.music.unpause()
-            except pygame.error:
-                pass
+            except pygame.error as exc:
+                print(f"WARNING: Failed to unpause music: {exc}")
             # 如果音乐已停止（例如用户手动停止），则重新播放
             if not pygame.mixer.music.get_busy():
                 try:
                     pygame.mixer.music.play(-1)
-                except pygame.error:
-                    pass
+                except pygame.error as exc:
+                    print(f"WARNING: Failed to replay music: {exc}")
             self._music_paused_by_pause = False
 
     def toggle_music(self) -> None:

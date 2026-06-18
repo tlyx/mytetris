@@ -205,8 +205,10 @@ class TetrisApp:
             try:
                 icon_surf = pygame.image.load(LOGO_FILE).convert_alpha()
                 pygame.display.set_icon(icon_surf)
-            except pygame.error:
-                pass
+            except pygame.error as exc:
+                print(f"WARNING: Failed to set window icon: {exc}")
+        else:
+            print(f"WARNING: Icon file not found, skipping: {LOGO_FILE}")
 
     def _init_config(self) -> None:
         """加载配置管理器并覆盖默认设置（音乐、音效、消行动画、最高分）。"""
@@ -452,10 +454,19 @@ class TetrisApp:
                 or self._logical.get_height() != logical_h):
             self._logical = pygame.Surface((logical_w, logical_h))
 
+        # 首次访问或 scale 变化时重新加载字体，并检查字体文件是否存在
         if (self._font_big is None
                 or self._font_small is None
                 or self._help_font is None
                 or abs(scale - self._current_scale) > 1e-9):
+            # 检查必选字体文件是否存在
+            if not Path(FONT_FILE).is_file():
+                print(f"FATAL: Required font file not found: {FONT_FILE}")
+                sys.exit(1)
+            if not Path(HELP_FONT_FILE).is_file():
+                print(f"FATAL: Required font file not found: {HELP_FONT_FILE}")
+                sys.exit(1)
+
             self._current_scale = scale
             font_size = max(10, int(32 * scale))
             small_font_size = max(8, int(20 * scale))
