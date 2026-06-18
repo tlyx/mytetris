@@ -57,10 +57,12 @@ class ConfigManager:
             for key in ConfigManager._defaults:
                 if key in cfg:
                     value = cfg[key]
-                    # 对最高分进行上限检查
+                    # 对最高分进行上限和下限检查
                     if key == "high_score":
                         value = int(value)
-                        if value > MAX_SCORE:
+                        if value < 0:
+                            value = 0
+                        elif value > MAX_SCORE:
                             value = MAX_SCORE
                     # 其他字段转为布尔值
                     elif key in ("music_enabled", "sfx_enabled", "clear_anim_enabled"):
@@ -136,6 +138,8 @@ class ConfigManager:
 
     @high_score.setter
     def high_score(self, value: int) -> None:
-        if value > MAX_SCORE:
+        if value < 0:
+            value = 0
+        elif value > MAX_SCORE:
             value = MAX_SCORE
         self._data["high_score"] = value
