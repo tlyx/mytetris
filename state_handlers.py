@@ -98,6 +98,10 @@ class PausedState(StateHandler):
                 return ConfirmQuitState()
         return None
 
+    @override
+    def on_exit(self, _app: AppInterface) -> None:
+        """退出暂停状态时无需额外清理。"""
+
 
 class GameOverState(StateHandler):
     """游戏结束状态。"""
@@ -114,6 +118,10 @@ class GameOverState(StateHandler):
                 app.handle_quit()          # 直接退出，不经过确认
                 return None                 # 退出整个应用，不再处理事件
         return None
+
+    @override
+    def on_exit(self, _app: AppInterface) -> None:
+        """退出游戏结束状态时无需额外清理。"""
 
 
 class ConfirmQuitState(StateHandler):

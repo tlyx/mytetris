@@ -137,3 +137,4 @@ class AudioManager:
         if self.audio_enabled:
             pygame.mixer.music.stop()
         self.sounds.clear()
+        self._music_paused_by_pause = False
