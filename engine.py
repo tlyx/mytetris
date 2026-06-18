@@ -120,17 +120,14 @@ class TetrisEngine:
             if 0 <= self.y + dy < GRID_HEIGHT:
                 self.grid[self.y + dy][self.x + dx] = lock_color
 
-        # 记录即将被消除的行（扫描所有行）
+        # 记录所有满行的行号
         cleared_rows: list[int] = []
         for row in range(GRID_HEIGHT):
             if all(cell is not None for cell in self.grid[row]):
                 cleared_rows.append(row)
         self._last_cleared_rows = cleared_rows
 
-        new_grid: list[list[tuple[int, int, int] | None]] = [
-            row for row in self.grid if any(cell is None for cell in row)
-        ]
-        lines_cleared: int = GRID_HEIGHT - len(new_grid)
+        lines_cleared = len(cleared_rows)
         self.total_lines += lines_cleared
         if self.total_lines > MAX_TOTAL_LINES:
             self.total_lines = MAX_TOTAL_LINES
@@ -142,9 +139,13 @@ class TetrisEngine:
 
         self.level = (self.total_lines // 10) + 1
 
-        while len(new_grid) < GRID_HEIGHT:
-            new_grid.insert(0, [None for _ in range(GRID_WIDTH)])
-        self.grid = new_grid
+        # 从网格中删除满行（从后往前删，避免索引错乱），再在顶部插入空行
+        if lines_cleared > 0:
+            for row in reversed(cleared_rows):
+                del self.grid[row]
+            for _ in range(lines_cleared):
+                self.grid.insert(0, [None for _ in range(GRID_WIDTH)])
+
         self._spawn_piece()
 
     def _spawn_piece(self) -> None:
