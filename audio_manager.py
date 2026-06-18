@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import final
 
 import pygame  # via pygame-ce
 
@@ -17,6 +18,7 @@ CLEAR_SOUND_FILE = resource_path("assets/clear.wav")
 GAME_OVER_SOUND_FILE = resource_path("assets/game_over.mp3")
 
 
+@final
 class AudioManager:
     """管理背景音乐与音效的加载、播放、暂停及切换。"""
 
