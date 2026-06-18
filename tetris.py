@@ -470,7 +470,9 @@ class TetrisApp:
 
         state = self._build_game_state()
 
-        self.renderer.render(state, self._logical, scale)
+        # 传入当前时间（秒级毫秒）
+        now = pygame.time.get_ticks()
+        self.renderer.render(state, self._logical, scale, now)
 
         x_off = (self.window_width - logical_w) // 2
         y_off = (self.window_height - logical_h) // 2

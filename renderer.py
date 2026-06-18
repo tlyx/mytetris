@@ -156,8 +156,15 @@ class Renderer:
         state: GameState,
         logical: pygame.Surface,
         scale: float,
+        now: int,  # 当前时间（毫秒），用于消行动画和底部时间统计
     ) -> None:
-        """将游戏状态绘制到 logical 表面上。"""
+        """将游戏状态绘制到 logical 表面上。
+
+        :param state: 游戏状态快照
+        :param logical: 逻辑表面
+        :param scale: 缩放比例
+        :param now: 当前时间（毫秒），由外部传入（如 pygame.time.get_ticks()）
+        """
         # 确保字体已经设置（update_fonts 必须在第一次 render 前调用）
         assert self.font_big is not None
         assert self.font_small is not None
@@ -183,18 +190,18 @@ class Renderer:
         board_h = GRID_HEIGHT * bs
         sidebar_left = board_left + board_w
 
-        # 3. 绘制主棋盘、当前块、边框
-        self._draw_board(ds, state, bs, board_left, board_w, board_h, border_color)
+        # 3. 绘制主棋盘、当前块、边框（传入 now）
+        self._draw_board(ds, state, bs, board_left, board_w, board_h, border_color, now)
 
         # 4. 绘制左侧面板
         self._draw_left_panel(
             ds, state, scale, left_width_px, logical.get_height(),
         )
 
-        # 5. 绘制右侧侧边栏
+        # 5. 绘制右侧侧边栏（传入 now）
         self._draw_right_panel(
             ds, state, scale, board_h, sidebar_left, right_width_px,
-            border_color, logical.get_width(), logical.get_height(),
+            border_color, logical.get_width(), logical.get_height(), now,
         )
 
         # 6. 绘制覆盖弹窗
@@ -294,6 +301,7 @@ class Renderer:
         self, ds: pygame.Surface, state: GameState,
         bs: int, board_left: int,
         _board_w: int, _board_h: int, _border_color: tuple[int, int, int],
+        now: int,  # 当前时间（毫秒），用于消行动画
     ) -> None:
         """绘制 10×20 棋盘、当前操控块（不绘制边框，已在静态背景中完成）。
            同时绘制 ghost piece（落点影子）和消行动画闪烁。"""
@@ -337,11 +345,11 @@ class Renderer:
             # 检查是否有新的消除行需要启动动画
             if state.clearing_rows and state.clearing_rows != self._anim_clearing_rows:
                 self._anim_clearing_rows = state.clearing_rows[:]
-                self._anim_start_ticks = pygame.time.get_ticks()
+                self._anim_start_ticks = now  # 使用传入的 now
 
             # 如果当前有动画进行中
             if self._anim_clearing_rows:
-                elapsed = pygame.time.get_ticks() - self._anim_start_ticks
+                elapsed = now - self._anim_start_ticks
                 if elapsed >= CLEAR_ANIM_DURATION:
                     # 动画结束
                     self._anim_clearing_rows = []
@@ -398,8 +406,11 @@ class Renderer:
         sidebar_left: int, right_width_px: int,
         _border_color: tuple[int, int, int],
         _logical_w: int, logical_h: int,
+        now: int,  # 当前时间（毫秒），用于时间统计
     ) -> None:
-        """绘制右侧侧边栏（LV数值、SCORE数值、预览、底部统计）。"""
+        """绘制右侧侧边栏（LV数值、SCORE数值、预览、底部统计）。
+           底部时间统计使用外部传入的 now 计算。
+        """
         assert self.font_big is not None
         assert self.font_small is not None
 
@@ -450,7 +461,8 @@ class Renderer:
                              (px, py, bs - 1, bs - 1))
 
         # 底部统计信息：Lines, High, Time
-        elapsed_sec = (pygame.time.get_ticks() - state.game_start_ticks) // 1000
+        # 使用传入的 now 代替 pygame.time.get_ticks()
+        elapsed_sec = (now - state.game_start_ticks) // 1000
         mins = elapsed_sec // 60
         secs = elapsed_sec % 60
 
