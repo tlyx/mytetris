@@ -263,6 +263,7 @@ class TetrisApp:
             self.game.rotate()
 
     # -------------------- 公开方法（供状态处理器调用） --------------------
+    # 这些方法必须与 AppInterface 协议中的签名一致
     def toggle_pause(self) -> None:
         """切换暂停状态（被状态类调用）。"""
         if self.game.game_over:

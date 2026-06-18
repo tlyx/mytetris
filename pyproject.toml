@@ -12,7 +12,6 @@ dependencies = [
 [tool.basedpyright]
 reportUnusedCallResult = false  # 关闭未使用返回值警告
 reportAny = false
-reportImportCycles = false      # 接受可管理的循环导入
 
 [dependency-groups]
 dev = [

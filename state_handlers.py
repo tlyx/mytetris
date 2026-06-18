@@ -4,25 +4,42 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, override
+from typing import override, Protocol
 
 import pygame
 
-if TYPE_CHECKING:
-    from tetris import TetrisApp
+from engine import TetrisEngine  # 仅用于类型注解（不会引起循环导入）
+from input_handler import InputHandler
+from config_manager import ConfigManager
+
+
+class AppInterface(Protocol):
+    """TetrisApp 对外暴露的接口（供状态处理器调用）。"""
+    game: TetrisEngine
+    input_handler: InputHandler
+    config: ConfigManager
+    paused: bool
+    confirm_quit: bool
+    fall_event: int
+
+    def toggle_pause(self) -> None: ...
+    def handle_fall_timer(self) -> None: ...
+    def toggle_help(self) -> None: ...
+    def restart_game(self) -> None: ...
+    def handle_quit(self) -> None: ...
 
 
 class StateHandler:
     """状态处理器基类。"""
 
-    def on_enter(self, _app: TetrisApp) -> None:
+    def on_enter(self, _app: AppInterface) -> None:
         """进入该状态时调用。"""
 
-    def on_exit(self, _app: TetrisApp) -> None:
+    def on_exit(self, _app: AppInterface) -> None:
         """离开该状态时调用。"""
 
     def handle_event(
-        self, _app: TetrisApp, _event: pygame.event.Event
+        self, _app: AppInterface, _event: pygame.event.Event
     ) -> StateHandler | None:
         """处理事件，返回新的状态处理器（如果状态改变），否则返回 None。"""
         raise NotImplementedError
@@ -33,7 +50,7 @@ class PlayingState(StateHandler):
 
     @override
     def handle_event(
-        self, app: TetrisApp, event: pygame.event.Event
+        self, app: AppInterface, event: pygame.event.Event
     ) -> StateHandler | None:
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             # 第一次 ESC：设置确认标志并进入确认退出状态
@@ -63,7 +80,7 @@ class PausedState(StateHandler):
 
     @override
     def handle_event(
-        self, app: TetrisApp, event: pygame.event.Event
+        self, app: AppInterface, event: pygame.event.Event
     ) -> StateHandler | None:
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_p:
@@ -81,7 +98,7 @@ class GameOverState(StateHandler):
 
     @override
     def handle_event(
-        self, app: TetrisApp, event: pygame.event.Event
+        self, app: AppInterface, event: pygame.event.Event
     ) -> StateHandler | None:
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_RETURN:
@@ -98,7 +115,7 @@ class ConfirmQuitState(StateHandler):
 
     @override
     def handle_event(
-        self, app: TetrisApp, event: pygame.event.Event
+        self, app: AppInterface, event: pygame.event.Event
     ) -> StateHandler | None:
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
@@ -122,7 +139,7 @@ class ConfirmQuitState(StateHandler):
         return None
 
     @override
-    def on_exit(self, app: TetrisApp) -> None:
+    def on_exit(self, app: AppInterface) -> None:
         """离开确认退出状态时确保标志关闭。"""
         app.confirm_quit = False
 
@@ -132,7 +149,7 @@ class HelpState(StateHandler):
 
     @override
     def handle_event(
-        self, app: TetrisApp, event: pygame.event.Event
+        self, app: AppInterface, event: pygame.event.Event
     ) -> StateHandler | None:
         if event.type == pygame.KEYDOWN:
             app.toggle_help()              # 关闭帮助
