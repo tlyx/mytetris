@@ -92,7 +92,7 @@ class Renderer:
     _bg_scale: float  # 上一次构建静态背景时的 scale
 
     # 文字表面缓存（避免每帧重新渲染）
-    _text_cache: dict[str, tuple[str, pygame.Surface]]
+    _text_cache: dict[tuple[str, int], tuple[str, pygame.Surface]]
 
     # 消行动画相关
     _anim_clearing_rows: list[int]  # 当前正在闪烁的行
@@ -140,16 +140,16 @@ class Renderer:
             self._static_bg = self._build_static_bg(scale)
 
     # ------------------------------------------------------------------
-    # 文字缓存辅助方法
+    # 文字缓存辅助方法（缓存键包含字体标识，避免不同字体误用）
     # ------------------------------------------------------------------
     def _get_cached_text(
         self,
-        key: str,
         text: str,
         font: pygame.font.Font,
         color: tuple[int, int, int],
     ) -> pygame.Surface:
         """返回缓存的文字表面，仅在字符串变化时重新渲染。"""
+        key = (text, id(font))
         cached = self._text_cache.get(key)
         if cached is not None and cached[0] == text:
             return cached[1]
@@ -394,14 +394,14 @@ class Renderer:
         music_str = "Music: " + ("ON" if state.music_enabled else "OFF")
         music_color = (0, 255, 0) if state.music_enabled else (200, 50, 50)
         music_surf = self._get_cached_text(
-            "music", music_str, self.font_small, music_color
+            music_str, self.font_small, music_color
         )
 
         # 音效状态（使用缓存）
         sfx_str = "SFX:    " + ("ON" if state.sfx_enabled else "OFF")
         sfx_color = (0, 255, 0) if state.sfx_enabled else (200, 50, 50)
         sfx_surf = self._get_cached_text(
-            "sfx", sfx_str, self.font_small, sfx_color
+            sfx_str, self.font_small, sfx_color
         )
 
         bottom_margin = int(BOTTOM_MARGIN * scale)
@@ -435,14 +435,14 @@ class Renderer:
         # LV 数值（使用缓存）
         lv_str = f"{state.level}"
         lv_surf = self._get_cached_text(
-            "lv", lv_str, self.font_big, (255, 255, 255)
+            lv_str, self.font_big, (255, 255, 255)
         )
         ds.blit(lv_surf, (sidebar_content_left, int(LV_VALUE_Y * scale)))
 
         # SCORE 数值（使用缓存）
         score_str = f"{state.score:6d}"
         score_surf = self._get_cached_text(
-            "score", score_str, self.font_big, COLORS["SCORE_GOLD"]
+            score_str, self.font_big, COLORS["SCORE_GOLD"]
         )
         ds.blit(score_surf,
                 (sidebar_content_right - score_surf.get_width(), int(SCORE_VALUE_Y * scale)))
@@ -485,20 +485,20 @@ class Renderer:
         time_str = f"{mins:02d}:{secs:02d}"
 
         lines_val_surf = self._get_cached_text(
-            "lines", lines_str, self.font_small, (255, 255, 255)
+            lines_str, self.font_small, (255, 255, 255)
         )
         high_val_surf = self._get_cached_text(
-            "high", high_str, self.font_small, (255, 255, 255)
+            high_str, self.font_small, (255, 255, 255)
         )
         time_val_surf = self._get_cached_text(
-            "time", time_str, self.font_small, (255, 255, 255)
+            time_str, self.font_small, (255, 255, 255)
         )
 
         # 使用实例变量 _label_strs（仅初始化一次）以避免每帧重建字典
         label_surfs: dict[str, pygame.Surface] = {}
         for key, (txt, clr) in self._label_strs.items():
             label_surfs[key] = self._get_cached_text(
-                key, txt, self.font_small, clr
+                txt, self.font_small, clr
             )
 
         right_bottom_margin = int(RIGHT_BOTTOM_MARGIN * scale)
@@ -558,12 +558,11 @@ class Renderer:
 
         gap = int(OVERLAY_GAP * scale)
         title_surf = self._get_cached_text(
-            f"overlay_title_{title}", title, self.font_big, title_color
+            title, self.font_big, title_color
         )
         line_surfs: list[pygame.Surface] = []
         for text, color in lines:
-            cache_key = f"overlay_line_{text}"
-            line_surf = self._get_cached_text(cache_key, text, self.font_small, color)
+            line_surf = self._get_cached_text(text, self.font_small, color)
             line_surfs.append(line_surf)
 
         total_h = (title_surf.get_height()
@@ -610,15 +609,14 @@ class Renderer:
 
         # 帮助文字也使用缓存
         title_surf = self._get_cached_text(
-            "help_title", title_line, self.help_font, title_color
+            title_line, self.help_font, title_color
         )
         tx = (logical_w - title_surf.get_width()) // 2
         gap = int(HELP_GAP * scale)
 
         body_surfaces: list[pygame.Surface] = []
-        for i, line in enumerate(body_lines):
-            cache_key = f"help_body_{i}"
-            surf = self._get_cached_text(cache_key, line, self.help_font, body_color)
+        for line in body_lines:
+            surf = self._get_cached_text(line, self.help_font, body_color)
             body_surfaces.append(surf)
 
         total_body_h = sum(s.get_height() for s in body_surfaces) + \
