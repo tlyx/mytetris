@@ -9,7 +9,7 @@
 # 此文件主要负责：
 #  - 窗口创建与尺寸缩放
 #  - 事件循环与状态转换
-#  - 音频控制
+#  - 音频控制（委托给 AudioManager）
 #  - 将渲染委托给 Renderer 类（renderer.py）
 #  - 创建 GameState 快照传递给 Renderer
 
@@ -23,11 +23,11 @@ from engine import TetrisEngine, GRID_WIDTH, GRID_HEIGHT, MAX_SCORE
 from renderer import Renderer, SCREEN_WIDTH, SCREEN_HEIGHT
 from game_state import GameState
 from config_manager import ConfigManager
+from audio_manager import AudioManager
 
 # ---------- 资源路径辅助函数（支持开发环境和 PyInstaller 打包） ----------
 def _resource_path(relative_path: str) -> str:
     """获取资源文件的绝对路径，同时兼容 PyInstaller 打包后的路径。"""
-    # 在 macOS BUNDLE + onedir 模式下，sys._MEIPASS 运行时直接指向 .app/Contents/Resources/
     base = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
     return str(base / relative_path)
 # -------------------------------------------------------------------------
@@ -39,12 +39,6 @@ BLOCK_SIZE = 30
 # 增加50像素避免黑边过窄
 MIN_WINDOW_WIDTH = max(400, 160 + GRID_WIDTH * BLOCK_SIZE + 200 + 50)
 MIN_WINDOW_HEIGHT = 400
-
-# ---- 音频文件路径（使用 _resource_path 以适应打包环境） ----
-BG_MUSIC_FILE = _resource_path("assets/bg_music.mp3")
-CLEAR_SOUND_FILE = _resource_path("assets/clear.wav")
-GAME_OVER_SOUND_FILE = _resource_path("assets/game_over.mp3")
-# ------------------------------------------------------------
 
 # ---- 应用图标路径 ----
 LOGO_FILE = _resource_path("assets/logo.png")
@@ -71,13 +65,9 @@ class TetrisApp:
     window_width: int
     window_height: int
     _logical: pygame.Surface | None
-    # 音频相关
-    audio_enabled: bool
-    sounds: dict[str, pygame.mixer.Sound]
-    music_enabled: bool
-    sfx_enabled: bool
+    # 音频相关（委托给 AudioManager）
+    audio: AudioManager
     _game_over_sound_played: bool
-    _music_paused_for_gamepause: bool
     # 字体缓存（基于 scale 懒加载）
     _current_scale: float
     _font_big: pygame.font.Font | None
@@ -119,7 +109,12 @@ class TetrisApp:
         # ---- 加载配置（优先于音频初始化） ----
         self._init_config()
 
-        self._init_audio()
+        # ---- 初始化音频（使用配置中的音乐/音效开关） ----
+        self.audio = AudioManager()
+        self.audio.music_enabled = self.music_enabled
+        self.audio.sfx_enabled = self.sfx_enabled
+        self.audio.load()
+
         # 初始时鼠标可见（不再全局隐藏）
         pygame.mouse.set_visible(True)
         # 字体缓存初始化
@@ -197,7 +192,6 @@ class TetrisApp:
         self.sfx_enabled = True
         self.clear_anim_enabled = True
         self._game_over_sound_played = False
-        self._music_paused_for_gamepause = False
         self._help_active = False
 
     def _init_sidebar_style(self) -> None:
@@ -222,64 +216,26 @@ class TetrisApp:
         self.clear_anim_enabled = self.config.clear_anim_enabled
         self.high_score = self.config.high_score
 
-    def _init_audio(self) -> None:
-        """尽量加载背景音乐与删除行音效，若缺少文件则静默运行。
-           音效/音乐开关状态已通过 self.music_enabled, self.sfx_enabled 提前设置。
-        """
-        self.audio_enabled = False
-        self.sounds = {}
-        try:
-            if not pygame.mixer.get_init():
-                pygame.mixer.init()
-
-            if Path(BG_MUSIC_FILE).is_file():
-                pygame.mixer.music.load(BG_MUSIC_FILE)
-
-            if Path(CLEAR_SOUND_FILE).is_file():
-                self.sounds["clear"] = pygame.mixer.Sound(CLEAR_SOUND_FILE)
-
-            if Path(GAME_OVER_SOUND_FILE).is_file():
-                self.sounds["game_over"] = pygame.mixer.Sound(GAME_OVER_SOUND_FILE)
-
-            if Path(BG_MUSIC_FILE).is_file() or self.sounds:
-                self.audio_enabled = True
-
-            # 仅当音乐开关打开时才播放背景音乐
-            if self.music_enabled and Path(BG_MUSIC_FILE).is_file():
-                pygame.mixer.music.play(-1)
-
-        except Exception:
-            self.audio_enabled = False
-
+    # ---- 音频控制（委托给 AudioManager） ----
     def _toggle_music(self) -> None:
         """切换背景音乐的开关（M键）。"""
-        if not self.audio_enabled:
-            return
-        self.music_enabled = not self.music_enabled
+        self.audio.toggle_music()
+        self.music_enabled = self.audio.music_enabled
         self.config.music_enabled = self.music_enabled
-        if self.music_enabled:
-            try:
-                pygame.mixer.music.play(-1)
-            except pygame.error:
-                pass
-        else:
-            pygame.mixer.music.stop()
 
     def _toggle_sfx(self) -> None:
         """切换音效的开关（S键）。"""
-        if not self.audio_enabled:
-            return
-        self.sfx_enabled = not self.sfx_enabled
+        self.audio.toggle_sfx()
+        self.sfx_enabled = self.audio.sfx_enabled
         self.config.sfx_enabled = self.sfx_enabled
+
+    def _play_sound(self, name: str) -> None:
+        """播放指定音效（若已启用且资源存在）。"""
+        self.audio.play_sfx(name)
 
     def _toggle_ghost(self) -> None:
         """切换 Ghost piece（落点影子）显示开关。"""
         self.ghost_enabled = not self.ghost_enabled
-
-    def _play_sound(self, name: str) -> None:
-        """播放指定音效（若已启用且资源存在）。"""
-        if self.audio_enabled and name in self.sounds and self.sfx_enabled:
-            self.sounds[name].play()
 
     def _enforce_min_size(self) -> None:
         """确保当前窗口不小于最小尺寸。"""
@@ -327,7 +283,6 @@ class TetrisApp:
         self.paused = False
         self.game_start_ticks = pygame.time.get_ticks()
         self._game_over_sound_played = False
-        self._music_paused_for_gamepause = False
         self._help_active = False
         self._key_pressed_time.clear()
         self._key_last_action_time.clear()
@@ -424,6 +379,7 @@ class TetrisApp:
     def _handle_quit(self) -> None:
         """处理退出事件（保存配置、关闭窗口、退出进程）。"""
         self.config.save()
+        self.audio.shutdown()
         pygame.mouse.set_visible(True)
         pygame.quit()
         sys.exit()
@@ -480,22 +436,10 @@ class TetrisApp:
         self.paused = not self.paused
         if self.paused:
             pygame.time.set_timer(self.fall_event, 0)
-            if self.music_enabled and pygame.mixer.music.get_busy():
-                pygame.mixer.music.pause()
-                self._music_paused_for_gamepause = True
+            self.audio.pause_music()
         else:
             self._update_speed()
-            if self.music_enabled and self._music_paused_for_gamepause:
-                try:
-                    pygame.mixer.music.unpause()
-                except pygame.error:
-                    pass
-                if not pygame.mixer.music.get_busy():
-                    try:
-                        pygame.mixer.music.play(-1)
-                    except pygame.error:
-                        pass
-                self._music_paused_for_gamepause = False
+            self.audio.resume_music()
 
     def _handle_fall_timer(self) -> None:
         """处理下落定时器事件。"""
