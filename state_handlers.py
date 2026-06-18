@@ -24,6 +24,9 @@ class AppInterface(Protocol):
     confirm_quit: bool
     fall_event: int
 
+    @property
+    def now(self) -> int: ...  # 当前时间（毫秒），由外部提供
+
     def toggle_pause(self) -> None: ...
     def handle_fall_timer(self) -> None: ...
     def toggle_help(self) -> None: ...
@@ -73,7 +76,8 @@ class PlayingState(StateHandler):
                 app.toggle_help()
                 return HelpState()
             else:
-                app.input_handler.handle_keydown(key)   # 方向键、旋转、硬降等
+                # 使用统一时间源 app.now
+                app.input_handler.handle_keydown(key, app.now)
         return None
 
 

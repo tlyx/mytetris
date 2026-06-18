@@ -95,6 +95,14 @@ class TetrisApp:
     # ---- 当前状态处理器（状态模式） ----
     _current_state: StateHandler
 
+    # ---- 统一时间源 ----
+    _now: int  # 每帧更新，存储当前时间戳
+
+    @property
+    def now(self) -> int:
+        """返回当前帧的时间戳（毫秒），供状态处理器和输入处理器使用。"""
+        return self._now
+
     def __init__(self) -> None:
         """初始化 Pygame、窗口、字体、游戏引擎、音频等。"""
         pygame.init()
@@ -134,6 +142,9 @@ class TetrisApp:
 
         # 创建渲染器实例
         self.renderer = Renderer()
+
+        # 初始化时间
+        self._now = 0
 
     # ------------------------------------------------------------------
     # 初始化辅助方法 (将 __init__ 按功能拆分)
@@ -383,11 +394,13 @@ class TetrisApp:
     def run(self) -> None:
         """主循环：保持窗口尺寸、处理事件、渲染场景"""
         while True:
+            # 更新统一时间源
+            self._now = pygame.time.get_ticks()
             self._enforce_min_size()
             self._process_events()
             # 只在游戏进行且非暂停/确认退出/帮助状态时处理自动重复
             if not (self.game.game_over or self.paused or self.confirm_quit or self._help_active):
-                self.input_handler.process_auto_repeat()
+                self.input_handler.process_auto_repeat(self._now)
             else:
                 self.input_handler.reset()
             self._render_game_scene()
@@ -481,9 +494,8 @@ class TetrisApp:
 
         state = self._build_game_state()
 
-        # 传入当前时间（秒级毫秒）
-        now = pygame.time.get_ticks()
-        self.renderer.render(state, self._logical, scale, now)
+        # 使用统一的当前时间
+        self.renderer.render(state, self._logical, scale, self._now)
 
         x_off = (self.window_width - logical_w) // 2
         y_off = (self.window_height - logical_h) // 2

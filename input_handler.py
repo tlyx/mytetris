@@ -38,9 +38,12 @@ class InputHandler:
         self._key_last_action_time: dict[int, int] = {}
 
     # ---------- 首次按键处理 ----------
-    def handle_keydown(self, key: int) -> None:
-        """处理第一次按下方向键或动作键。"""
-        now = pygame.time.get_ticks()
+    def handle_keydown(self, key: int, now: int) -> None:
+        """处理第一次按下方向键或动作键。
+
+        :param key: pygame 按键常量
+        :param now: 当前时间（毫秒），由外部传入
+        """
         if key == pygame.K_UP:
             self._callback(Action.ROTATE)
         elif key == pygame.K_LEFT:
@@ -59,9 +62,11 @@ class InputHandler:
             self._callback(Action.HARD_DROP)
 
     # ---------- 每帧自动重复检测 ----------
-    def process_auto_repeat(self) -> None:
-        """每帧调用，根据持续按下的键触发自动重复动作。"""
-        now = pygame.time.get_ticks()
+    def process_auto_repeat(self, now: int) -> None:
+        """每帧调用，根据持续按下的键触发自动重复动作。
+
+        :param now: 当前时间（毫秒），由外部传入
+        """
         keys = pygame.key.get_pressed()
 
         repeat_keys = {
