@@ -88,11 +88,15 @@ class TetrisApp:
     _initial_music_enabled: bool
     _initial_sfx_enabled: bool
     _initial_high_score: int
+    _initial_clear_anim_enabled: bool
     # HELP 相关
     _help_active: bool
 
     # Ghost piece 开关
     ghost_enabled: bool
+
+    # 消行动画开关
+    clear_anim_enabled: bool
 
     # ---------- 自动重复键状态 ----------
     _DAS_INITIAL = 200
@@ -185,13 +189,14 @@ class TetrisApp:
         return data_dir / "config.json"
 
     def _load_config(self) -> None:
-        """从配置文件读取音乐开关、音效开关和最高分。"""
+        """从配置文件读取音乐开关、音效开关、消行动画开关和最高分。"""
         path = self._config_file()
         try:
             with open(path, "r") as f:
                 cfg = json.load(f)
             self.music_enabled = bool(cfg.get("music_enabled", True))
             self.sfx_enabled = bool(cfg.get("sfx_enabled", True))
+            self.clear_anim_enabled = bool(cfg.get("clear_anim_enabled", True))
             raw_high_score = int(cfg.get("high_score", 0))
             # 如果读取的分值超过上限，运行时卡在 MAX_SCORE，但影子值保留原始值
             if raw_high_score > MAX_SCORE:
@@ -205,25 +210,30 @@ class TetrisApp:
         # 记录当前值作为影子值（之后比较变化时使用）
         self._initial_music_enabled = self.music_enabled
         self._initial_sfx_enabled = self.sfx_enabled
+        self._initial_clear_anim_enabled = self.clear_anim_enabled
 
     def _save_config(self) -> None:
-        """将音乐开关、音效开关和最高分写入配置文件（只在有变化时写入）。"""
+        """将音乐开关、音效开关、消行动画开关和最高分写入配置文件（只在有变化时写入）。
+           使用 indent=2 美化格式，方便手动编辑。"""
         if (self.music_enabled == self._initial_music_enabled
                 and self.sfx_enabled == self._initial_sfx_enabled
-                and self.high_score == self._initial_high_score):
+                and self.high_score == self._initial_high_score
+                and self.clear_anim_enabled == self._initial_clear_anim_enabled):
             return
         path = self._config_file()
         cfg = {
+            "clear_anim_enabled": self.clear_anim_enabled,
             "music_enabled": self.music_enabled,
             "sfx_enabled": self.sfx_enabled,
             "high_score": self.high_score,
         }
         try:
             with open(path, "w") as f:
-                json.dump(cfg, f)
+                json.dump(cfg, f, indent=2)
             self._initial_music_enabled = self.music_enabled
             self._initial_sfx_enabled = self.sfx_enabled
             self._initial_high_score = self.high_score
+            self._initial_clear_anim_enabled = self.clear_anim_enabled
         except Exception:
             pass
 
@@ -240,9 +250,11 @@ class TetrisApp:
         self.game_start_ticks = pygame.time.get_ticks()
         self.music_enabled = True
         self.sfx_enabled = True
+        self.clear_anim_enabled = True
         self._initial_music_enabled = True
         self._initial_sfx_enabled = True
         self._initial_high_score = 0
+        self._initial_clear_anim_enabled = True
         self._game_over_sound_played = False
         self._music_paused_for_gamepause = False
         self._help_active = False
@@ -398,6 +410,7 @@ class TetrisApp:
             ghost_y=self.game.get_ghost_y(),
             ghost_enabled=self.ghost_enabled,
             clearing_rows=self.game.poll_cleared_rows(),
+            clear_anim_enabled=self.clear_anim_enabled,
         )
 
     def run(self) -> None:

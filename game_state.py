@@ -44,5 +44,6 @@ class GameState:
     ghost_y: int
     ghost_enabled: bool
 
-    # 消行动画：当前正在闪烁的行（可能是空列表）
+    # 消行动画相关
     clearing_rows: list[int]
+    clear_anim_enabled: bool

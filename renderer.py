@@ -331,26 +331,30 @@ class Renderer:
                 )
                 pygame.draw.rect(ds, COLORS[state.current_type], rect)
 
-        # D. 消行动画闪烁（绘制半透明白色矩形覆盖正在消除的行）
-        # 检查是否有新的消除行需要启动动画
-        if state.clearing_rows and state.clearing_rows != self._anim_clearing_rows:
-            self._anim_clearing_rows = state.clearing_rows[:]
-            self._anim_start_ticks = pygame.time.get_ticks()
+        # D. 消行动画闪烁（仅在启用时绘制）
+        if state.clear_anim_enabled:
+            # 检查是否有新的消除行需要启动动画
+            if state.clearing_rows and state.clearing_rows != self._anim_clearing_rows:
+                self._anim_clearing_rows = state.clearing_rows[:]
+                self._anim_start_ticks = pygame.time.get_ticks()
 
-        # 如果当前有动画进行中
-        if self._anim_clearing_rows:
-            elapsed = pygame.time.get_ticks() - self._anim_start_ticks
-            if elapsed >= self._clear_anim_duration:
-                # 动画结束
-                self._anim_clearing_rows = []
-            else:
-                # 计算当前 alpha (从 255 渐变为 0)
-                alpha = int(255 * (1 - elapsed / self._clear_anim_duration))
-                for row in self._anim_clearing_rows:
-                    # 创建半透明白色矩形
-                    flash_surf = pygame.Surface((_board_w, bs), pygame.SRCALPHA)
-                    flash_surf.fill((255, 255, 255, alpha))
-                    ds.blit(flash_surf, (board_left, row * bs))
+            # 如果当前有动画进行中
+            if self._anim_clearing_rows:
+                elapsed = pygame.time.get_ticks() - self._anim_start_ticks
+                if elapsed >= self._clear_anim_duration:
+                    # 动画结束
+                    self._anim_clearing_rows = []
+                else:
+                    # 计算当前 alpha (从 255 渐变为 0)
+                    alpha = int(255 * (1 - elapsed / self._clear_anim_duration))
+                    for row in self._anim_clearing_rows:
+                        # 创建半透明白色矩形
+                        flash_surf = pygame.Surface((_board_w, bs), pygame.SRCALPHA)
+                        flash_surf.fill((255, 255, 255, alpha))
+                        ds.blit(flash_surf, (board_left, row * bs))
+        else:
+            # 动画禁用时，清空残留的动画状态
+            self._anim_clearing_rows = []
 
     def _draw_left_panel(
         self, ds: pygame.Surface, state: GameState,
