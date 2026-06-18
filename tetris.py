@@ -116,13 +116,8 @@ class TetrisApp:
         self._enforce_min_size()
         self._init_icon()
 
-        # ---- 加载配置（提前到音频初始化之前） ----
-        self.config = ConfigManager()
-        self.config.load()
-        self.music_enabled = self.config.music_enabled
-        self.sfx_enabled = self.config.sfx_enabled
-        self.clear_anim_enabled = self.config.clear_anim_enabled
-        self.high_score = self.config.high_score
+        # ---- 加载配置（优先于音频初始化） ----
+        self._init_config()
 
         self._init_audio()
         # 初始时鼠标可见（不再全局隐藏）
@@ -217,6 +212,15 @@ class TetrisApp:
                 pygame.display.set_icon(icon_surf)
             except pygame.error:
                 pass
+
+    def _init_config(self) -> None:
+        """加载配置管理器并覆盖默认设置（音乐、音效、消行动画、最高分）。"""
+        self.config = ConfigManager()
+        self.config.load()
+        self.music_enabled = self.config.music_enabled
+        self.sfx_enabled = self.config.sfx_enabled
+        self.clear_anim_enabled = self.config.clear_anim_enabled
+        self.high_score = self.config.high_score
 
     def _init_audio(self) -> None:
         """尽量加载背景音乐与删除行音效，若缺少文件则静默运行。
