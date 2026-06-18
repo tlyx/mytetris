@@ -43,6 +43,9 @@ ALL_PIECES: list[str] = ["I", "O", "T", "L", "J", "S", "Z"]
 class TetrisEngine:
     """游戏逻辑引擎，不依赖任何图形库。"""
 
+    # 消行得分表（类常量）
+    SCORE_TABLE: dict[int, int] = {0: 0, 1: 100, 2: 300, 3: 500, 4: 800}
+
     grid: list[list[tuple[int, int, int] | None]]
     score: int
     level: int
@@ -132,8 +135,8 @@ class TetrisEngine:
         if self.total_lines > MAX_TOTAL_LINES:
             self.total_lines = MAX_TOTAL_LINES
 
-        score_table: dict[int, int] = {0: 0, 1: 100, 2: 300, 3: 500, 4: 800}
-        self.score += score_table.get(lines_cleared, 800) * self.level
+        # 使用类常量 SCORE_TABLE
+        self.score += TetrisEngine.SCORE_TABLE.get(lines_cleared, 800) * self.level
         if self.score > MAX_SCORE:
             self.score = MAX_SCORE
 
