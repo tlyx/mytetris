@@ -56,6 +56,9 @@ class TetrisEngine:
     # 7-bag 相关
     _bag: list[str]
 
+    # 消行动画相关（记录最近一次消除的行号，供渲染器在下一帧使用）
+    _last_cleared_rows: list[int]
+
     def __init__(self) -> None:
         """初始化网格与属性，并立即调用 reset 开始第一局。"""
         self.grid = []
@@ -69,6 +72,7 @@ class TetrisEngine:
         self.x = 0
         self.y = 0
         self._bag = []
+        self._last_cleared_rows = []
         self.reset()
 
     def reset(self) -> None:
@@ -115,6 +119,13 @@ class TetrisEngine:
         for dx, dy in self.current_shape:
             if 0 <= self.y + dy < GRID_HEIGHT:
                 self.grid[self.y + dy][self.x + dx] = lock_color
+
+        # 记录即将被消除的行（扫描所有行）
+        cleared_rows: list[int] = []
+        for row in range(GRID_HEIGHT):
+            if all(cell is not None for cell in self.grid[row]):
+                cleared_rows.append(row)
+        self._last_cleared_rows = cleared_rows
 
         new_grid: list[list[tuple[int, int, int] | None]] = [
             row for row in self.grid if any(cell is None for cell in row)
@@ -180,3 +191,10 @@ class TetrisEngine:
         while not self._check_collision(self.x, ghost_y + 1):
             ghost_y += 1
         return ghost_y
+
+    # ---------- 消行动画轮询 ----------
+    def poll_cleared_rows(self) -> list[int]:
+        """返回最近一次消除的行号列表，并清空内部记录。"""
+        result = self._last_cleared_rows[:]
+        self._last_cleared_rows = []
+        return result

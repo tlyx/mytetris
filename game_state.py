@@ -42,3 +42,6 @@ class GameState:
 
     # Ghost piece（落点影子）的 y 坐标
     ghost_y: int
+
+    # 消行动画：当前正在闪烁的行（可能是空列表）
+    clearing_rows: list[int]

@@ -87,6 +87,11 @@ class Renderer:
     # 文字表面缓存（避免每帧重新渲染）
     _text_cache: dict[str, tuple[str, pygame.Surface]]
 
+    # 消行动画相关
+    _clear_anim_duration: int  # 动画持续时间（毫秒）
+    _anim_clearing_rows: list[int]  # 当前正在闪烁的行
+    _anim_start_ticks: int     # 动画起始 ticks
+
     def __init__(self) -> None:
         self.font_big = None
         self.font_small = None
@@ -94,6 +99,9 @@ class Renderer:
         self._static_bg = None
         self._bg_scale = 0.0
         self._text_cache = {}
+        self._clear_anim_duration = 200
+        self._anim_clearing_rows = []
+        self._anim_start_ticks = 0
 
     # ------------------------------------------------------------------
     # 字体更新接口（由外部在 scale 变化时调用）
@@ -286,7 +294,7 @@ class Renderer:
         _board_w: int, _board_h: int, _border_color: tuple[int, int, int],
     ) -> None:
         """绘制 10×20 棋盘、当前操控块（不绘制边框，已在静态背景中完成）。
-           同时绘制 ghost piece（落点影子）。"""
+           同时绘制 ghost piece（落点影子）和消行动画闪烁。"""
         # A. 绘制主棋盘（已锁定的方块）
         for r in range(GRID_HEIGHT):
             for c in range(GRID_WIDTH):
@@ -321,6 +329,27 @@ class Renderer:
                     bs - 1,
                 )
                 pygame.draw.rect(ds, COLORS[state.current_type], rect)
+
+        # D. 消行动画闪烁（绘制半透明白色矩形覆盖正在消除的行）
+        # 检查是否有新的消除行需要启动动画
+        if state.clearing_rows and state.clearing_rows != self._anim_clearing_rows:
+            self._anim_clearing_rows = state.clearing_rows[:]
+            self._anim_start_ticks = pygame.time.get_ticks()
+
+        # 如果当前有动画进行中
+        if self._anim_clearing_rows:
+            elapsed = pygame.time.get_ticks() - self._anim_start_ticks
+            if elapsed >= self._clear_anim_duration:
+                # 动画结束
+                self._anim_clearing_rows = []
+            else:
+                # 计算当前 alpha (从 255 渐变为 0)
+                alpha = int(255 * (1 - elapsed / self._clear_anim_duration))
+                for row in self._anim_clearing_rows:
+                    # 创建半透明白色矩形
+                    flash_surf = pygame.Surface((_board_w, bs), pygame.SRCALPHA)
+                    flash_surf.fill((255, 255, 255, alpha))
+                    ds.blit(flash_surf, (board_left, row * bs))
 
     def _draw_left_panel(
         self, ds: pygame.Surface, state: GameState,

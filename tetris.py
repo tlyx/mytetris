@@ -386,6 +386,7 @@ class TetrisApp:
             music_enabled=self.music_enabled,
             sfx_enabled=self.sfx_enabled,
             ghost_y=self.game.get_ghost_y(),
+            clearing_rows=self.game.poll_cleared_rows(),
         )
 
     def run(self) -> None:
