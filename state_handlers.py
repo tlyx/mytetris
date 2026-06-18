@@ -4,11 +4,13 @@
 
 from __future__ import annotations
 
-from typing import override, Protocol
+from typing import override, Protocol, TYPE_CHECKING
 
 import pygame
 
-from engine import TetrisEngine  # 仅用于类型注解（不会引起循环导入）
+if TYPE_CHECKING:
+    from engine import TetrisEngine
+
 from input_handler import InputHandler
 from config_manager import ConfigManager
 
