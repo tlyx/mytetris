@@ -15,15 +15,14 @@
 
 from typing import final
 import sys
-import json
 from pathlib import Path
 
 import pygame  # via pygame-ce
-import platformdirs
 
 from engine import TetrisEngine, GRID_WIDTH, GRID_HEIGHT, MAX_SCORE
 from renderer import Renderer, SCREEN_WIDTH, SCREEN_HEIGHT
 from game_state import GameState
+from config_manager import ConfigManager
 
 # ---------- 资源路径辅助函数（支持开发环境和 PyInstaller 打包） ----------
 def _resource_path(relative_path: str) -> str:
@@ -84,11 +83,6 @@ class TetrisApp:
     _font_big: pygame.font.Font | None
     _font_small: pygame.font.Font | None
     _help_font: pygame.font.Font | None
-    # 配置文件的影子值（从文件读取的原始值，用于判断是否有变化）
-    _initial_music_enabled: bool
-    _initial_sfx_enabled: bool
-    _initial_high_score: int
-    _initial_clear_anim_enabled: bool
     # HELP 相关
     _help_active: bool
 
@@ -108,6 +102,9 @@ class TetrisApp:
     # ---- 渲染器实例 ----
     renderer: Renderer
 
+    # ---- 配置管理器 ----
+    config: ConfigManager
+
     def __init__(self) -> None:
         """初始化 Pygame、窗口、字体、游戏引擎、音频等。"""
         pygame.init()
@@ -118,6 +115,15 @@ class TetrisApp:
         self._init_sidebar_style()
         self._enforce_min_size()
         self._init_icon()
+
+        # ---- 加载配置（提前到音频初始化之前） ----
+        self.config = ConfigManager()
+        self.config.load()
+        self.music_enabled = self.config.music_enabled
+        self.sfx_enabled = self.config.sfx_enabled
+        self.clear_anim_enabled = self.config.clear_anim_enabled
+        self.high_score = self.config.high_score
+
         self._init_audio()
         # 初始时鼠标可见（不再全局隐藏）
         pygame.mouse.set_visible(True)
@@ -181,62 +187,6 @@ class TetrisApp:
         # 关闭全局自动重复，所有方向键的自动重复由我们手动实现
         pygame.key.set_repeat(0)
 
-    # ---------- 配置文件辅助 ----------
-    def _config_file(self) -> Path:
-        """返回配置文件 config.json 的路径，并确保目录存在。"""
-        data_dir = Path(platformdirs.user_data_dir("mytetris"))
-        data_dir.mkdir(parents=True, exist_ok=True)
-        return data_dir / "config.json"
-
-    def _load_config(self) -> None:
-        """从配置文件读取音乐开关、音效开关、消行动画开关和最高分。"""
-        path = self._config_file()
-        try:
-            with open(path, "r") as f:
-                cfg = json.load(f)
-            self.music_enabled = bool(cfg.get("music_enabled", True))
-            self.sfx_enabled = bool(cfg.get("sfx_enabled", True))
-            self.clear_anim_enabled = bool(cfg.get("clear_anim_enabled", True))
-            raw_high_score = int(cfg.get("high_score", 0))
-            # 如果读取的分值超过上限，运行时卡在 MAX_SCORE，但影子值保留原始值
-            if raw_high_score > MAX_SCORE:
-                self._initial_high_score = raw_high_score
-                self.high_score = MAX_SCORE
-            else:
-                self._initial_high_score = raw_high_score
-                self.high_score = raw_high_score
-        except (FileNotFoundError, json.JSONDecodeError, ValueError):
-            pass
-        # 记录当前值作为影子值（之后比较变化时使用）
-        self._initial_music_enabled = self.music_enabled
-        self._initial_sfx_enabled = self.sfx_enabled
-        self._initial_clear_anim_enabled = self.clear_anim_enabled
-
-    def _save_config(self) -> None:
-        """将音乐开关、音效开关、消行动画开关和最高分写入配置文件（只在有变化时写入）。
-           使用 indent=2 美化格式，方便手动编辑。"""
-        if (self.music_enabled == self._initial_music_enabled
-                and self.sfx_enabled == self._initial_sfx_enabled
-                and self.high_score == self._initial_high_score
-                and self.clear_anim_enabled == self._initial_clear_anim_enabled):
-            return
-        path = self._config_file()
-        cfg = {
-            "clear_anim_enabled": self.clear_anim_enabled,
-            "music_enabled": self.music_enabled,
-            "sfx_enabled": self.sfx_enabled,
-            "high_score": self.high_score,
-        }
-        try:
-            with open(path, "w") as f:
-                json.dump(cfg, f, indent=2)
-            self._initial_music_enabled = self.music_enabled
-            self._initial_sfx_enabled = self.sfx_enabled
-            self._initial_high_score = self.high_score
-            self._initial_clear_anim_enabled = self.clear_anim_enabled
-        except Exception:
-            pass
-
     def _init_game_state(self) -> None:
         """初始化游戏引擎、定时器、等级、分数、暂停等状态。"""
         self.game = TetrisEngine()
@@ -251,14 +201,9 @@ class TetrisApp:
         self.music_enabled = True
         self.sfx_enabled = True
         self.clear_anim_enabled = True
-        self._initial_music_enabled = True
-        self._initial_sfx_enabled = True
-        self._initial_high_score = 0
-        self._initial_clear_anim_enabled = True
         self._game_over_sound_played = False
         self._music_paused_for_gamepause = False
         self._help_active = False
-        self._load_config()
 
     def _init_sidebar_style(self) -> None:
         """设置侧边栏背景色（灰蓝色调）。"""
@@ -274,7 +219,9 @@ class TetrisApp:
                 pass
 
     def _init_audio(self) -> None:
-        """尽量加载背景音乐与删除行音效，若缺少文件则静默运行。"""
+        """尽量加载背景音乐与删除行音效，若缺少文件则静默运行。
+           音效/音乐开关状态已通过 self.music_enabled, self.sfx_enabled 提前设置。
+        """
         self.audio_enabled = False
         self.sounds = {}
         try:
@@ -293,6 +240,7 @@ class TetrisApp:
             if Path(BG_MUSIC_FILE).is_file() or self.sounds:
                 self.audio_enabled = True
 
+            # 仅当音乐开关打开时才播放背景音乐
             if self.music_enabled and Path(BG_MUSIC_FILE).is_file():
                 pygame.mixer.music.play(-1)
 
@@ -304,6 +252,7 @@ class TetrisApp:
         if not self.audio_enabled:
             return
         self.music_enabled = not self.music_enabled
+        self.config.music_enabled = self.music_enabled
         if self.music_enabled:
             try:
                 pygame.mixer.music.play(-1)
@@ -317,6 +266,7 @@ class TetrisApp:
         if not self.audio_enabled:
             return
         self.sfx_enabled = not self.sfx_enabled
+        self.config.sfx_enabled = self.sfx_enabled
 
     def _toggle_ghost(self) -> None:
         """切换 Ghost piece（落点影子）显示开关。"""
@@ -352,6 +302,7 @@ class TetrisApp:
         """实时更新最高分（内存中）。退出时统一保存配置。"""
         if self.game.score > self.high_score:
             self.high_score = min(self.game.score, MAX_SCORE)
+            self.config.high_score = self.high_score
 
     def _lock_and_update(self) -> None:
         """锁定当前方块，清除满行，更新分数、等级、音效。"""
@@ -468,7 +419,7 @@ class TetrisApp:
 
     def _handle_quit(self) -> None:
         """处理退出事件（保存配置、关闭窗口、退出进程）。"""
-        self._save_config()
+        self.config.save()
         pygame.mouse.set_visible(True)
         pygame.quit()
         sys.exit()
