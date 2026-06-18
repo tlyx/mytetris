@@ -25,6 +25,7 @@
 *   **Intuitive UI**:
     *   Real‑time score, level, and lines cleared display.
     *   Next‑piece preview.
+    *   Ghost piece (landing preview) with toggle (G key).
     *   Game‑over overlay with restart prompt.
     *   Pause/Resume screen.
     *   Quit‑confirmation dialog.
@@ -95,6 +96,7 @@ xattr -cr /Applications/mytetris.app
 | ↑                | Rotate piece                  |
 | P                | Pause / Resume                |
 | Space            | Hard drop(instantly to bottom)|
+| G                | Toggle ghost piece            |
 | Esc              | Toggle quit confirmation      |
 | Return (Enter)   | Restart game (on Game Over)   |
 | M                | Toggle background music       |

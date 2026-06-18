@@ -91,6 +91,9 @@ class TetrisApp:
     # HELP 相关
     _help_active: bool
 
+    # Ghost piece 开关
+    ghost_enabled: bool
+
     # ---------- 自动重复键状态 ----------
     _DAS_INITIAL = 200
     _DAS_INTERVAL = 50
@@ -123,6 +126,9 @@ class TetrisApp:
         # 初始化 DAS 状态字典
         self._key_pressed_time = {}
         self._key_last_action_time = {}
+
+        # 默认关闭 ghost piece
+        self.ghost_enabled = False
 
         # 创建渲染器实例
         self.renderer = Renderer()
@@ -300,6 +306,10 @@ class TetrisApp:
             return
         self.sfx_enabled = not self.sfx_enabled
 
+    def _toggle_ghost(self) -> None:
+        """切换 Ghost piece（落点影子）显示开关。"""
+        self.ghost_enabled = not self.ghost_enabled
+
     def _play_sound(self, name: str) -> None:
         """播放指定音效（若已启用且资源存在）。"""
         if self.audio_enabled and name in self.sounds and self.sfx_enabled:
@@ -386,6 +396,7 @@ class TetrisApp:
             music_enabled=self.music_enabled,
             sfx_enabled=self.sfx_enabled,
             ghost_y=self.game.get_ghost_y(),
+            ghost_enabled=self.ghost_enabled,
             clearing_rows=self.game.poll_cleared_rows(),
         )
 
@@ -405,11 +416,16 @@ class TetrisApp:
             self._game_over_sound_played = True
 
         for event in pygame.event.get():
+            # --- 全局高优先级事件（任何时候都能响应）---
             if event.type == pygame.KEYDOWN and event.key == pygame.K_m:
                 self._toggle_music()
                 continue
             if event.type == pygame.KEYDOWN and event.key == pygame.K_s:
                 self._toggle_sfx()
+                continue
+            # Ghost piece 开关（G键）全局响应
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_g:
+                self._toggle_ghost()
                 continue
             if event.type == pygame.QUIT:
                 self._handle_quit()

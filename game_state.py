@@ -40,8 +40,9 @@ class GameState:
     music_enabled: bool
     sfx_enabled: bool
 
-    # Ghost piece（落点影子）的 y 坐标
+    # Ghost piece（落点影子）相关
     ghost_y: int
+    ghost_enabled: bool
 
     # 消行动画：当前正在闪烁的行（可能是空列表）
     clearing_rows: list[int]

@@ -65,6 +65,7 @@ HELP_LINES = [
     "P      Pause/Resume",
     "M      Toggle music",
     "S      Toggle sound effects",
+    "G      Toggle ghost piece",
     "F1/?   Show this help",
     "",
     "Press any key to close.",
@@ -304,8 +305,8 @@ class Renderer:
                 rect = (board_left + c * bs, r * bs, bs - 1, bs - 1)
                 pygame.draw.rect(ds, color, rect)
 
-        # B. 绘制 Ghost piece（半透明影子）
-        if not state.game_over:
+        # B. 绘制 Ghost piece（半透明影子，仅在启用时绘制）
+        if not state.game_over and state.ghost_enabled:
             ghost_y = state.ghost_y
             # 当前方块的实际 y 坐标可能高于 ghost_y，但只绘制影子位置
             if ghost_y != state.current_y:
