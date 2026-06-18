@@ -12,6 +12,17 @@ wheels/
 .venv
 .aider*
 
+### --- IDE 与编辑器 (所有项目通用) ---
+.idea/
+.vscode/
+*.code-workspace
+.*.swp
+*.swo
+*~
+\#*\#
+.\#*
+
+### --- 操作系统残留 (到哪都是垃圾) ---
 .DS_Store
 Thumbs.db*
 ehthumbs.db
