@@ -39,11 +39,11 @@ AUDIO_GAP = 10                          # 音乐行与音效行间距
 
 # 右侧面板
 CONTENT_PADDING = 20                    # 右侧文字距面板左/右内边距
-LV_LABEL_Y = 20                         # "LV" 标签 y 坐标
+LV_LABEL_Y = 20                         # "LEVEL" 标签 y 坐标
 LV_VALUE_Y = 45                         # 等级数值 y 坐标
 SCORE_LABEL_Y = 20                      # "SCORE" 标签 y 坐标（与 LV_Y 相同）
 SCORE_VALUE_Y = 45                      # 分数数值 y 坐标
-SEP_LINE_Y = 85                         # LV/SCORE 下方分隔线 y 坐标
+SEP_LINE_Y = 85                         # LEVEL/SCORE 下方分隔线 y 坐标
 PREVIEW_Y = 130                         # 预览框顶部 y 坐标
 RIGHT_BOTTOM_MARGIN = 60                # 底部统计信息距底部留白
 RIGHT_GAP = 10                          # 底部统计行间距
@@ -277,14 +277,8 @@ class Renderer:
         sidebar_content_left = sidebar_left + content_padding
         sidebar_content_right = sidebar_left + right_width_px - content_padding
 
-        # LV 与 SCORE 标签（静态文字）
-        lv_label = self.font_small.render("LV", True, (150, 150, 160))
-        score_label = self.font_small.render("SCORE", True, (150, 150, 160))
-        ds.blit(lv_label, (sidebar_content_left, int(LV_LABEL_Y * scale)))
-        ds.blit(score_label,
-                (sidebar_content_right - score_label.get_width(), int(SCORE_LABEL_Y * scale)))
-
-        # 分隔线（LV/SCORE 下方）
+        # LEVEL 与 SCORE 标签（静态文字）—— 已移至动态绘制，此处不再渲染
+        # 分隔线（LEVEL/SCORE 下方）
         sep_y1 = int(SEP_LINE_Y * scale)
         pygame.draw.line(ds, (60, 60, 70),
                          (sidebar_content_left, sep_y1),
@@ -421,8 +415,12 @@ class Renderer:
         _logical_w: int, logical_h: int,
         now: int,  # 当前时间（毫秒），用于时间统计
     ) -> None:
-        """绘制右侧侧边栏（LV数值、SCORE数值、预览、底部统计）。
-           底部时间统计使用外部传入的 now 计算。
+        """绘制右侧侧边栏（LEVEL/SCORE 区域、预览、底部统计）。
+           布局修改为：
+             Row1: "LEVEL" 标签 + 等级数值（标签颜色与 SCORE 相同，数值白色，
+                     标签左对齐，数值右对齐）
+             Row2: SCORE 标签（font_small，灰蓝色，左对齐）
+             Row3: 得分数值（font_big，金色，右对齐）
         """
         assert self.font_big is not None
         assert self.font_small is not None
@@ -432,22 +430,61 @@ class Renderer:
         sidebar_content_right = sidebar_left + right_width_px - content_padding
         sidebar_content_width = sidebar_content_right - sidebar_content_left
 
-        # LV 数值（使用缓存）
-        lv_str = f"{state.level}"
-        lv_surf = self._get_cached_text(
-            lv_str, self.font_big, (255, 255, 255)
-        )
-        ds.blit(lv_surf, (sidebar_content_left, int(LV_VALUE_Y * scale)))
+        # ---------- 新布局：三行文字 ----------
+        # 行间距（统一使用 RIGHT_GAP）
+        row_gap = int(RIGHT_GAP * scale)
 
-        # SCORE 数值（使用缓存）
+        # ---- Row1: "LEVEL" 标签 + 等级数值（标签左对齐，数值右对齐） ----
+        lv_label_color = (150, 150, 160)   # 与 SCORE 标签颜色相同
+        lv_val_color   = (255, 255, 255)   # 数值保持白色
+
+        lv_label_text = "LEVEL"
+        lv_val_text   = str(state.level)
+
+        lv_label_surf = self._get_cached_text(
+            lv_label_text, self.font_small, lv_label_color
+        )
+        lv_val_surf   = self._get_cached_text(
+            lv_val_text,   self.font_small, lv_val_color
+        )
+
+        row1_y = int(LV_LABEL_Y * scale)
+        ds.blit(lv_label_surf, (sidebar_content_left, row1_y))
+        # 数值右对齐
+        ds.blit(lv_val_surf,
+                (sidebar_content_right - lv_val_surf.get_width(), row1_y))
+
+        # 当前行的高度（用于后续偏移）
+        row1_height = max(lv_label_surf.get_height(), lv_val_surf.get_height())
+
+        # ---- 在 LEVEL 行与 SCORE 标签之间画分隔线 ----
+        sep_color = (60, 60, 70)   # 与静态背景分隔线颜色一致
+        sep_gap = int(6 * scale)   # 分隔线上下间距
+        sep_y = row1_y + row1_height + sep_gap
+        pygame.draw.line(ds, sep_color,
+                         (sidebar_content_left, sep_y),
+                         (sidebar_content_right, sep_y), 1)
+        # SCORE 标签放在分隔线下方，同样留出间距
+        sep_gap2 = int(6 * scale)
+        row2_y = sep_y + sep_gap2
+
+        # ---- Row2: SCORE 标签 ----
+        score_label_str = "SCORE"
+        score_label_surf = self._get_cached_text(
+            score_label_str, self.font_small, (150, 150, 160)
+        )
+        ds.blit(score_label_surf, (sidebar_content_left, row2_y))
+
+        # ---- Row3: 得分数值 ----
         score_str = f"{state.score:6d}"
-        score_surf = self._get_cached_text(
+        score_val_surf = self._get_cached_text(
             score_str, self.font_big, COLORS["SCORE_GOLD"]
         )
-        ds.blit(score_surf,
-                (sidebar_content_right - score_surf.get_width(), int(SCORE_VALUE_Y * scale)))
+        row3_y = row2_y + score_label_surf.get_height() + row_gap
+        ds.blit(score_val_surf,
+                (sidebar_content_right - score_val_surf.get_width(), row3_y))
 
-        # 预览框（下一个方块）—— 无法简单缓存图块，保留原样
+        # ---------- 预览框（下一个方块） ----------
         bs = int(BLOCK_SIZE * scale)
         preview_size = PREVIEW_SIZE * bs
         preview_x = sidebar_content_left + (sidebar_content_width - preview_size) // 2
@@ -473,13 +510,11 @@ class Renderer:
             pygame.draw.rect(ds, COLORS[state.next_type],
                              (px, py, bs - 1, bs - 1))
 
-        # 底部统计信息：Lines, High, Time
-        # 使用传入的 now 代替 pygame.time.get_ticks()
+        # ---------- 底部统计信息：Lines, High, Time ----------
         elapsed_sec = (now - state.game_start_ticks) // 1000
         mins = elapsed_sec // 60
         secs = elapsed_sec % 60
 
-        # Lines、High、Time 字符串（使用缓存）
         lines_str = str(state.total_lines)
         high_str = str(state.high_score)
         time_str = f"{mins:02d}:{secs:02d}"
@@ -494,7 +529,6 @@ class Renderer:
             time_str, self.font_small, (255, 255, 255)
         )
 
-        # 使用实例变量 _label_strs（仅初始化一次）以避免每帧重建字典
         label_surfs: dict[str, pygame.Surface] = {}
         for key, (txt, clr) in self._label_strs.items():
             label_surfs[key] = self._get_cached_text(
@@ -504,7 +538,6 @@ class Renderer:
         right_bottom_margin = int(RIGHT_BOTTOM_MARGIN * scale)
         right_gap = int(RIGHT_GAP * scale)
 
-        # 使用任意一个 label 或 value 的高度作为行高（取最大值）
         temp_height = max(label_surfs["lines_label"].get_height(),
                           lines_val_surf.get_height())
         row_height = temp_height
@@ -513,17 +546,14 @@ class Renderer:
         high_y = time_y - row_height - right_gap
         lines_y = high_y - row_height - right_gap
 
-        # 绘制 Lines 行
         ds.blit(label_surfs["lines_label"], (sidebar_content_left, lines_y))
         ds.blit(lines_val_surf,
                 (sidebar_content_left + label_surfs["lines_label"].get_width(), lines_y))
 
-        # 绘制 High 行
         ds.blit(label_surfs["high_label"], (sidebar_content_left, high_y))
         ds.blit(high_val_surf,
                 (sidebar_content_left + label_surfs["high_label"].get_width(), high_y))
 
-        # 绘制 Time 行
         ds.blit(label_surfs["time_label"], (sidebar_content_left, time_y))
         ds.blit(time_val_surf,
                 (sidebar_content_left + label_surfs["time_label"].get_width(), time_y))
