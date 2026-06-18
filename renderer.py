@@ -98,6 +98,9 @@ class Renderer:
     _anim_clearing_rows: list[int]  # 当前正在闪烁的行
     _anim_start_ticks: int     # 动画起始 ticks
 
+    # 底部统计标签文本和颜色（实例变量，避免每帧重建字典）
+    _label_strs: dict[str, tuple[str, tuple[int, int, int]]]
+
     def __init__(self) -> None:
         self.font_big = None
         self.font_small = None
@@ -107,6 +110,13 @@ class Renderer:
         self._text_cache = {}
         self._anim_clearing_rows = []
         self._anim_start_ticks = 0
+
+        # 初始化底部统计标签字典（仅一次，避免每帧重建）
+        self._label_strs = {
+            "lines_label": ("Lines: ", (200, 200, 200)),
+            "high_label": ("High: ", (200, 200, 200)),
+            "time_label": ("Time: ", (200, 200, 200)),
+        }
 
     # ------------------------------------------------------------------
     # 字体更新接口（由外部在 scale 变化时调用）
@@ -484,14 +494,9 @@ class Renderer:
             "time", time_str, self.font_small, (255, 255, 255)
         )
 
-        # Labels (Lines:, High:, Time:) 也是静态文本
-        label_strs = {
-            "lines_label": ("Lines: ", (200, 200, 200)),
-            "high_label": ("High: ", (200, 200, 200)),
-            "time_label": ("Time: ", (200, 200, 200)),
-        }
+        # 使用实例变量 _label_strs（仅初始化一次）以避免每帧重建字典
         label_surfs: dict[str, pygame.Surface] = {}
-        for key, (txt, clr) in label_strs.items():
+        for key, (txt, clr) in self._label_strs.items():
             label_surfs[key] = self._get_cached_text(
                 key, txt, self.font_small, clr
             )
