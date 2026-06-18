@@ -8,7 +8,7 @@
 #
 # 此文件主要负责：
 #  - 窗口创建与尺寸缩放
-#  - 事件循环与状态转换
+#  - 事件循环与状态转换（使用状态模式）
 #  - 音频控制（委托给 AudioManager）
 #  - 将渲染委托给 Renderer 类（renderer.py）
 #  - 创建 GameState 快照传递给 Renderer
@@ -26,6 +26,14 @@ from game_state import GameState
 from config_manager import ConfigManager
 from audio_manager import AudioManager
 from input_handler import InputHandler, Action
+from state_handlers import (
+    StateHandler,
+    PlayingState,
+    PausedState,
+    GameOverState,
+    ConfirmQuitState,
+    HelpState,
+)
 
 # ---------- 资源路径辅助函数（支持开发环境和 PyInstaller 打包） ----------
 def _resource_path(relative_path: str) -> str:
@@ -93,6 +101,9 @@ class TetrisApp:
     # ---- 配置管理器 ----
     config: ConfigManager
 
+    # ---- 当前状态处理器（状态模式） ----
+    _current_state: StateHandler
+
     def __init__(self) -> None:
         """初始化 Pygame、窗口、字体、游戏引擎、音频等。"""
         pygame.init()
@@ -115,6 +126,9 @@ class TetrisApp:
 
         # ---- 初始化输入处理器 ----
         self.input_handler = InputHandler(self._on_input_action)
+
+        # ---- 初始化状态处理器（默认 Playing） ----
+        self._current_state = PlayingState()
 
         # 初始时鼠标可见（不再全局隐藏）
         pygame.mouse.set_visible(True)
@@ -295,10 +309,13 @@ class TetrisApp:
         self.current_level = 1
         self._update_speed()
         self.paused = False
+        self.confirm_quit = False
         self.game_start_ticks = pygame.time.get_ticks()
         self._game_over_sound_played = False
         self._help_active = False
         self.input_handler.reset()
+        # 状态切回 Playing
+        self._current_state = PlayingState()
 
     def _toggle_help(self) -> None:
         """切换帮助界面的显示/隐藏。"""
@@ -341,7 +358,7 @@ class TetrisApp:
         while True:
             self._enforce_min_size()
             self._process_events()
-            # 只在游戏进行且非暂停状态时处理自动重复
+            # 只在游戏进行且非暂停/确认退出/帮助状态时处理自动重复
             if not (self.game.game_over or self.paused or self.confirm_quit or self._help_active):
                 self.input_handler.process_auto_repeat()
             else:
@@ -351,9 +368,13 @@ class TetrisApp:
 
     def _process_events(self) -> None:
         """处理所有事件（按优先级和状态分发）"""
+        # 全局一次性事件：game over 音效
         if self.game.game_over and not self._game_over_sound_played:
             self._play_sound("game_over")
             self._game_over_sound_played = True
+            # 如果状态还不是 GameOver，切换过去
+            if not isinstance(self._current_state, GameOverState):
+                self._switch_state(GameOverState())
 
         for event in pygame.event.get():
             # --- 全局高优先级事件（任何时候都能响应）---
@@ -374,24 +395,21 @@ class TetrisApp:
                 self._handle_resize(event)
                 continue
 
-            if self._help_active:
-                if event.type == pygame.KEYDOWN:
-                    self._toggle_help()
-                    continue
-                continue
+            # 委托给当前状态处理器
+            new_state = self._current_state.handle_event(self, event)
+            if new_state is not None:
+                self._switch_state(new_state)
 
-            if self.confirm_quit:
-                self._handle_confirm_quit_event(event)
-            elif self.game.game_over:
-                self._handle_game_over_event(event)
-            elif self.paused:
-                if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_p:
-                        self._toggle_pause()
-                    elif event.key == pygame.K_ESCAPE:
-                        self.confirm_quit = True
-            else:
-                self._handle_playing_event(event)
+            # 如果当前状态是 GameOver 或 确认退出可能导致退出，则不再处理后续事件
+            if isinstance(self._current_state, GameOverState):
+                # 但游戏结束状态可能已经通过 restart 切换为 Playing，所以继续循环
+                pass
+
+    def _switch_state(self, new_state: StateHandler) -> None:
+        """切换到新的状态，并调用生命周期方法。"""
+        self._current_state.on_exit(self)
+        self._current_state = new_state
+        self._current_state.on_enter(self)
 
     def _handle_quit(self) -> None:
         """处理退出事件（保存配置、关闭窗口、退出进程）。"""
@@ -409,46 +427,8 @@ class TetrisApp:
         self.window_height = new_h
         self.screen = pygame.display.set_mode((new_w, new_h), pygame.RESIZABLE)
 
-    def _handle_confirm_quit_event(self, event: pygame.event.Event) -> None:
-        """处理确认退出状态下的按键事件。"""
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_ESCAPE:
-                self._handle_quit()
-            elif event.key == pygame.K_r:
-                self._restart_game()
-                self.confirm_quit = False
-            else:
-                self.confirm_quit = False
-
-    def _handle_game_over_event(self, event: pygame.event.Event) -> None:
-        """处理游戏结束状态下的按键事件。"""
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_RETURN:
-                self._restart_game()
-            elif event.key == pygame.K_ESCAPE:
-                self._handle_quit()
-
-    def _handle_playing_event(self, event: pygame.event.Event) -> None:
-        """处理正常游戏进行中的事件。"""
-        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-            self.confirm_quit = True
-        elif event.type == pygame.KEYDOWN and event.key == pygame.K_p:
-            self._toggle_pause()
-        elif event.type == self.fall_event:
-            self._handle_fall_timer()
-        elif event.type == pygame.KEYDOWN:
-            key = event.key
-            mods = pygame.key.get_mods()
-            if key == pygame.K_F1:
-                self._toggle_help()
-            elif key == pygame.K_SLASH and (mods & pygame.KMOD_SHIFT):
-                self._toggle_help()
-            else:
-                # 将方向键、旋转、硬降等委托给 InputHandler
-                self.input_handler.handle_keydown(key)
-
     def _toggle_pause(self) -> None:
-        """切换暂停状态。"""
+        """切换暂停状态（被状态类调用）。"""
         if self.game.game_over:
             return
         self.paused = not self.paused
@@ -460,7 +440,7 @@ class TetrisApp:
             self.audio.resume_music()
 
     def _handle_fall_timer(self) -> None:
-        """处理下落定时器事件。"""
+        """处理下落定时器事件（被状态类调用）。"""
         if not self.game.move(0, 1):
             self._lock_and_update()
 
