@@ -12,6 +12,7 @@
 #  - 音频控制（委托给 AudioManager）
 #  - 将渲染委托给 Renderer 类（renderer.py）
 #  - 创建 GameState 快照传递给 Renderer
+#  - 输入处理（委托给 InputHandler）
 
 from typing import final
 import sys
@@ -24,6 +25,7 @@ from renderer import Renderer, SCREEN_WIDTH, SCREEN_HEIGHT
 from game_state import GameState
 from config_manager import ConfigManager
 from audio_manager import AudioManager
+from input_handler import InputHandler, Action
 
 # ---------- 资源路径辅助函数（支持开发环境和 PyInstaller 打包） ----------
 def _resource_path(relative_path: str) -> str:
@@ -82,12 +84,8 @@ class TetrisApp:
     # 消行动画开关
     clear_anim_enabled: bool
 
-    # ---------- 自动重复键状态 ----------
-    _DAS_INITIAL = 200
-    _DAS_INTERVAL = 50
-    _key_pressed_time: dict[int, int]
-    _key_last_action_time: dict[int, int]
-    # -----------------------------------------
+    # ---- 输入处理器 ----
+    input_handler: InputHandler
 
     # ---- 渲染器实例 ----
     renderer: Renderer
@@ -115,6 +113,9 @@ class TetrisApp:
         self.audio.sfx_enabled = self.sfx_enabled
         self.audio.load()
 
+        # ---- 初始化输入处理器 ----
+        self.input_handler = InputHandler(self._on_input_action)
+
         # 初始时鼠标可见（不再全局隐藏）
         pygame.mouse.set_visible(True)
         # 字体缓存初始化
@@ -122,10 +123,6 @@ class TetrisApp:
         self._font_big = None
         self._font_small = None
         self._help_font = None
-
-        # 初始化 DAS 状态字典
-        self._key_pressed_time = {}
-        self._key_last_action_time = {}
 
         # 默认关闭 ghost piece
         self.ghost_enabled = False
@@ -174,7 +171,7 @@ class TetrisApp:
 
     def _init_input(self) -> None:
         """设置按键重复参数。"""
-        # 关闭全局自动重复，所有方向键的自动重复由我们手动实现
+        # 关闭全局自动重复，所有方向键的自动重复由 InputHandler 实现
         pygame.key.set_repeat(0)
 
     def _init_game_state(self) -> None:
@@ -237,6 +234,23 @@ class TetrisApp:
         """切换 Ghost piece（落点影子）显示开关。"""
         self.ghost_enabled = not self.ghost_enabled
 
+    # ---- 输入动作回调（由 InputHandler 调用） ----
+    def _on_input_action(self, action: Action) -> None:
+        """根据 InputHandler 发出的动作执行对应的游戏逻辑。"""
+        if action == Action.MOVE_LEFT:
+            self.game.move(-1, 0)
+        elif action == Action.MOVE_RIGHT:
+            self.game.move(1, 0)
+        elif action == Action.SOFT_DROP:
+            if not self.game.move(0, 1):
+                self._lock_and_update()
+        elif action == Action.HARD_DROP:
+            while self.game.move(0, 1):
+                pass
+            self._lock_and_update()
+        elif action == Action.ROTATE:
+            self.game.rotate()
+
     def _enforce_min_size(self) -> None:
         """确保当前窗口不小于最小尺寸。"""
         current_w, current_h = self.screen.get_size()
@@ -284,8 +298,7 @@ class TetrisApp:
         self.game_start_ticks = pygame.time.get_ticks()
         self._game_over_sound_played = False
         self._help_active = False
-        self._key_pressed_time.clear()
-        self._key_last_action_time.clear()
+        self.input_handler.reset()
 
     def _toggle_help(self) -> None:
         """切换帮助界面的显示/隐藏。"""
@@ -328,7 +341,11 @@ class TetrisApp:
         while True:
             self._enforce_min_size()
             self._process_events()
-            self._process_auto_repeat()
+            # 只在游戏进行且非暂停状态时处理自动重复
+            if not (self.game.game_over or self.paused or self.confirm_quit or self._help_active):
+                self.input_handler.process_auto_repeat()
+            else:
+                self.input_handler.reset()
             self._render_game_scene()
             self.clock.tick(60)
 
@@ -427,7 +444,8 @@ class TetrisApp:
             elif key == pygame.K_SLASH and (mods & pygame.KMOD_SHIFT):
                 self._toggle_help()
             else:
-                self._handle_movement_key(event.key)
+                # 将方向键、旋转、硬降等委托给 InputHandler
+                self.input_handler.handle_keydown(key)
 
     def _toggle_pause(self) -> None:
         """切换暂停状态。"""
@@ -443,66 +461,6 @@ class TetrisApp:
 
     def _handle_fall_timer(self) -> None:
         """处理下落定时器事件。"""
-        if not self.game.move(0, 1):
-            self._lock_and_update()
-
-    def _handle_movement_key(self, key: int) -> None:
-        """处理方向键和空格键（硬降）。"""
-        now = pygame.time.get_ticks()
-        if key == pygame.K_UP:
-            self.game.rotate()
-        elif key == pygame.K_LEFT:
-            self.game.move(-1, 0)
-            self._key_pressed_time[pygame.K_LEFT] = now
-            self._key_last_action_time[pygame.K_LEFT] = now
-        elif key == pygame.K_RIGHT:
-            self.game.move(1, 0)
-            self._key_pressed_time[pygame.K_RIGHT] = now
-            self._key_last_action_time[pygame.K_RIGHT] = now
-        elif key == pygame.K_DOWN:
-            if not self.game.move(0, 1):
-                self._lock_and_update()
-            self._key_pressed_time[pygame.K_DOWN] = now
-            self._key_last_action_time[pygame.K_DOWN] = now
-        elif key == pygame.K_SPACE:
-            while self.game.move(0, 1):
-                pass
-            self._lock_and_update()
-
-    def _process_auto_repeat(self) -> None:
-        """每帧检查持续按下的方向键，按照 DAS 参数触发重复移动。"""
-        if self.game.game_over or self.paused or self.confirm_quit or self._help_active:
-            self._key_pressed_time.clear()
-            self._key_last_action_time.clear()
-            return
-
-        now = pygame.time.get_ticks()
-        keys = pygame.key.get_pressed()
-
-        repeat_keys = {
-            pygame.K_LEFT: lambda: self.game.move(-1, 0),
-            pygame.K_RIGHT: lambda: self.game.move(1, 0),
-            pygame.K_DOWN: self._auto_soft_drop,
-        }
-
-        for key, action in repeat_keys.items():
-            if keys[key]:
-                if key not in self._key_pressed_time:
-                    self._key_pressed_time[key] = now
-                    self._key_last_action_time[key] = now
-                else:
-                    elapsed = now - self._key_pressed_time[key]
-                    if elapsed >= self._DAS_INITIAL:
-                        delta = now - self._key_last_action_time[key]
-                        if delta >= self._DAS_INTERVAL:
-                            self._key_last_action_time[key] = now
-                            action()
-            else:
-                self._key_pressed_time.pop(key, None)
-                self._key_last_action_time.pop(key, None)
-
-    def _auto_soft_drop(self) -> None:
-        """软降自动重复时执行的一步下落。"""
         if not self.game.move(0, 1):
             self._lock_and_update()
 
