@@ -414,7 +414,7 @@ class TetrisApp:
                 self._toggle_ghost()
                 continue
             if event.type == pygame.QUIT:
-                self._handle_quit()
+                self.handle_quit()
                 return
             if event.type == pygame.VIDEORESIZE:
                 self._handle_resize(event)
@@ -430,14 +430,6 @@ class TetrisApp:
         self._current_state.on_exit(self)
         self._current_state = new_state
         self._current_state.on_enter(self)
-
-    def _handle_quit(self) -> None:
-        """处理退出事件（保存配置、关闭窗口、退出进程）。"""
-        self.config.save()
-        self.audio.shutdown()
-        pygame.mouse.set_visible(True)
-        pygame.quit()
-        sys.exit()
 
     def _handle_resize(self, event: pygame.event.Event) -> None:
         """处理窗口大小改变事件。"""
