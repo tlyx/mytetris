@@ -2,7 +2,8 @@
 # 负责网格、方块生成、移动、旋转、消行、计分等逻辑
 
 from typing import final
-from random import choice
+from random import shuffle
+from copy import deepcopy
 
 GRID_WIDTH, GRID_HEIGHT = 10, 20
 
@@ -34,6 +35,10 @@ SHAPES_DATA: dict[str, list[tuple[int, int]]] = {
     "Z": [(-1, 0), (0, 0), (0, 1), (1, 1)],
 }
 
+# 七种标准方块类型列表（用于7-bag随机生成）
+ALL_PIECES: list[str] = ["I", "O", "T", "L", "J", "S", "Z"]
+
+
 @final
 class TetrisEngine:
     """游戏逻辑引擎，不依赖任何图形库。"""
@@ -48,6 +53,8 @@ class TetrisEngine:
     current_shape: list[tuple[int, int]]
     x: int
     y: int
+    # 7-bag 相关
+    _bag: list[str]
 
     def __init__(self) -> None:
         """初始化网格与属性，并立即调用 reset 开始第一局。"""
@@ -61,6 +68,7 @@ class TetrisEngine:
         self.current_shape = []
         self.x = 0
         self.y = 0
+        self._bag = []
         self.reset()
 
     def reset(self) -> None:
@@ -70,7 +78,11 @@ class TetrisEngine:
         self.level = 1
         self.total_lines = 0
         self.game_over = False
-        self.next_type = choice(list(SHAPES_DATA.keys()))
+        # 清空 bag 并重新填充
+        self._bag = []
+        self._refill_bag()
+        # 从 bag 中取出第一个方块作为 next_type
+        self.next_type = self._draw_from_bag()
         self._spawn_piece()
 
     def move(self, dx: int, dy: int) -> bool:
@@ -127,8 +139,9 @@ class TetrisEngine:
     def _spawn_piece(self) -> None:
         """生成下一个方块到顶部，若碰撞则标记游戏结束。"""
         self.current_type = self.next_type
-        self.current_shape = SHAPES_DATA[self.current_type]
-        self.next_type = choice(list(SHAPES_DATA.keys()))
+        self.current_shape = deepcopy(SHAPES_DATA[self.current_type])
+        # 从 bag 中取出下一个方块作为 next_type（若 bag 为空则重新填充）
+        self.next_type = self._draw_from_bag()
         self.x = 4
         self.y = 1
 
@@ -147,3 +160,15 @@ class TetrisEngine:
             if ty >= 0 and self.grid[ty][tx]:
                 return True
         return False
+
+    # ---------- 7-bag 随机生成器 ----------
+    def _refill_bag(self) -> None:
+        """用全部七种方块填充 bag 并随机打乱。"""
+        self._bag = deepcopy(ALL_PIECES)
+        shuffle(self._bag)
+
+    def _draw_from_bag(self) -> str:
+        """从 bag 顶部取一个方块类型，bag 为空时自动重新填充。"""
+        if not self._bag:
+            self._refill_bag()
+        return self._bag.pop()
