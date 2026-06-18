@@ -48,6 +48,9 @@ PREVIEW_Y = 130                         # 预览框顶部 y 坐标
 RIGHT_BOTTOM_MARGIN = 60                # 底部统计信息距底部留白
 RIGHT_GAP = 10                          # 底部统计行间距
 
+# 预览框尺寸（逻辑块数，最大形状宽度为4）
+PREVIEW_SIZE = 4
+
 # 覆盖层
 OVERLAY_GAP = 15                        # 覆盖层各行间距
 HELP_GAP = 12                           # 帮助覆盖层各行间距
@@ -436,7 +439,7 @@ class Renderer:
 
         # 预览框（下一个方块）—— 无法简单缓存图块，保留原样
         bs = int(BLOCK_SIZE * scale)
-        preview_size = 4 * bs
+        preview_size = PREVIEW_SIZE * bs
         preview_x = sidebar_content_left + (sidebar_content_width - preview_size) // 2
         preview_y = int(PREVIEW_Y * scale)
         # 预览背景
