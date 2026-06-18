@@ -29,10 +29,7 @@ from input_handler import InputHandler, Action
 from state_handlers import (
     StateHandler,
     PlayingState,
-    PausedState,
     GameOverState,
-    ConfirmQuitState,
-    HelpState,
 )
 
 # ---------- 资源路径辅助函数（支持开发环境和 PyInstaller 打包） ----------
@@ -265,6 +262,57 @@ class TetrisApp:
         elif action == Action.ROTATE:
             self.game.rotate()
 
+    # -------------------- 公开方法（供状态处理器调用） --------------------
+    def toggle_pause(self) -> None:
+        """切换暂停状态（被状态类调用）。"""
+        if self.game.game_over:
+            return
+        self.paused = not self.paused
+        if self.paused:
+            pygame.time.set_timer(self.fall_event, 0)
+            self.audio.pause_music()
+        else:
+            self._update_speed()
+            self.audio.resume_music()
+
+    def handle_fall_timer(self) -> None:
+        """处理下落定时器事件（被状态类调用）。"""
+        if not self.game.move(0, 1):
+            self._lock_and_update()
+
+    def toggle_help(self) -> None:
+        """切换帮助界面的显示/隐藏。"""
+        if self._help_active:
+            self._help_active = False
+            if not self.game.game_over and not self.paused:
+                self._update_speed()
+        else:
+            self._help_active = True
+            pygame.time.set_timer(self.fall_event, 0)
+
+    def restart_game(self) -> None:
+        """重置游戏所有状态，回到新游戏初始状态。"""
+        self.game.reset()
+        self.current_level = 1
+        self._update_speed()
+        self.paused = False
+        self.confirm_quit = False
+        self.game_start_ticks = pygame.time.get_ticks()
+        self._game_over_sound_played = False
+        self._help_active = False
+        self.input_handler.reset()
+        # 状态切回 Playing
+        self._current_state = PlayingState()
+
+    def handle_quit(self) -> None:
+        """处理退出事件（保存配置、关闭窗口、退出进程）。"""
+        self.config.save()
+        self.audio.shutdown()
+        pygame.mouse.set_visible(True)
+        pygame.quit()
+        sys.exit()
+    # ------------------------------------------------------------------
+
     def _enforce_min_size(self) -> None:
         """确保当前窗口不小于最小尺寸。"""
         current_w, current_h = self.screen.get_size()
@@ -302,30 +350,6 @@ class TetrisApp:
             self._play_sound("clear")
         self._update_high_score()
         self._check_level_upgrade()
-
-    def _restart_game(self) -> None:
-        """重置游戏所有状态，回到新游戏初始状态。"""
-        self.game.reset()
-        self.current_level = 1
-        self._update_speed()
-        self.paused = False
-        self.confirm_quit = False
-        self.game_start_ticks = pygame.time.get_ticks()
-        self._game_over_sound_played = False
-        self._help_active = False
-        self.input_handler.reset()
-        # 状态切回 Playing
-        self._current_state = PlayingState()
-
-    def _toggle_help(self) -> None:
-        """切换帮助界面的显示/隐藏。"""
-        if self._help_active:
-            self._help_active = False
-            if not self.game.game_over and not self.paused:
-                self._update_speed()
-        else:
-            self._help_active = True
-            pygame.time.set_timer(self.fall_event, 0)
 
     def _build_game_state(self) -> GameState:
         """从当前游戏状态创建一个只读快照。"""
@@ -400,11 +424,6 @@ class TetrisApp:
             if new_state is not None:
                 self._switch_state(new_state)
 
-            # 如果当前状态是 GameOver 或 确认退出可能导致退出，则不再处理后续事件
-            if isinstance(self._current_state, GameOverState):
-                # 但游戏结束状态可能已经通过 restart 切换为 Playing，所以继续循环
-                pass
-
     def _switch_state(self, new_state: StateHandler) -> None:
         """切换到新的状态，并调用生命周期方法。"""
         self._current_state.on_exit(self)
@@ -426,23 +445,6 @@ class TetrisApp:
         self.window_width = new_w
         self.window_height = new_h
         self.screen = pygame.display.set_mode((new_w, new_h), pygame.RESIZABLE)
-
-    def _toggle_pause(self) -> None:
-        """切换暂停状态（被状态类调用）。"""
-        if self.game.game_over:
-            return
-        self.paused = not self.paused
-        if self.paused:
-            pygame.time.set_timer(self.fall_event, 0)
-            self.audio.pause_music()
-        else:
-            self._update_speed()
-            self.audio.resume_music()
-
-    def _handle_fall_timer(self) -> None:
-        """处理下落定时器事件（被状态类调用）。"""
-        if not self.game.move(0, 1):
-            self._lock_and_update()
 
     def _render_game_scene(self) -> None:
         """极致渲染：创建逻辑表面、保证字体、构建状态、委托给 Renderer。"""
