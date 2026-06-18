@@ -31,13 +31,7 @@ from state_handlers import (
     PlayingState,
     GameOverState,
 )
-
-# ---------- 资源路径辅助函数（支持开发环境和 PyInstaller 打包） ----------
-def _resource_path(relative_path: str) -> str:
-    """获取资源文件的绝对路径，同时兼容 PyInstaller 打包后的路径。"""
-    base = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
-    return str(base / relative_path)
-# -------------------------------------------------------------------------
+from utils import resource_path
 
 # 方块大小（逻辑像素）
 BLOCK_SIZE = 30
@@ -48,12 +42,12 @@ MIN_WINDOW_WIDTH = max(400, 160 + GRID_WIDTH * BLOCK_SIZE + 200 + 50)
 MIN_WINDOW_HEIGHT = 400
 
 # ---- 应用图标路径 ----
-LOGO_FILE = _resource_path("assets/logo.png")
+LOGO_FILE = resource_path("assets/logo.png")
 # -----------------------
 
 # ---- 字体文件路径（使用统一常量便于替换） ----
-FONT_FILE = _resource_path("assets/fonts/DejaVuSans-Bold.ttf")
-HELP_FONT_FILE = _resource_path("assets/fonts/DejaVuSansMono.ttf")
+FONT_FILE = resource_path("assets/fonts/DejaVuSans-Bold.ttf")
+HELP_FONT_FILE = resource_path("assets/fonts/DejaVuSansMono.ttf")
 # ---------------------------------------------
 
 @final

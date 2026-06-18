@@ -1,26 +1,20 @@
 # audio_manager.py — 音频管理器
 # 负责所有音频相关的加载、播放、暂停、切换，与 TetrisApp 解耦。
-# 使用 _resource_path 获取资产文件的绝对路径（支持开发环境和 PyInstaller 打包）。
+# 使用 resource_path 获取资产文件的绝对路径（支持开发环境和 PyInstaller 打包）。
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
 import pygame  # via pygame-ce
 
-
-# ---------- 资源路径辅助函数（复制自 tetris.py，避免循环依赖） ----------
-def _resource_path(relative_path: str) -> str:
-    """获取资源文件的绝对路径，同时兼容 PyInstaller 打包后的路径。"""
-    base = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
-    return str(base / relative_path)
+from utils import resource_path
 
 
-# 音频文件路径（使用 _resource_path 以适应打包环境）
-BG_MUSIC_FILE = _resource_path("assets/bg_music.mp3")
-CLEAR_SOUND_FILE = _resource_path("assets/clear.wav")
-GAME_OVER_SOUND_FILE = _resource_path("assets/game_over.mp3")
+# 音频文件路径（使用 resource_path 以适应打包环境）
+BG_MUSIC_FILE = resource_path("assets/bg_music.mp3")
+CLEAR_SOUND_FILE = resource_path("assets/clear.wav")
+GAME_OVER_SOUND_FILE = resource_path("assets/game_over.mp3")
 
 
 class AudioManager:
