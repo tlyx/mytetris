@@ -21,7 +21,14 @@ from pathlib import Path
 import pygame  # via pygame-ce
 
 from engine import TetrisEngine, GRID_WIDTH, GRID_HEIGHT, MAX_SCORE
-from renderer import Renderer, SCREEN_WIDTH, SCREEN_HEIGHT
+from renderer import (
+    Renderer,
+    SCREEN_WIDTH,
+    SCREEN_HEIGHT,
+    BLOCK_SIZE,
+    LEFT_WIDTH,
+    RIGHT_WIDTH,
+)
 from game_state import GameState
 from config_manager import ConfigManager
 from audio_manager import AudioManager
@@ -33,12 +40,12 @@ from state_handlers import (
 )
 from utils import resource_path
 
-# 方块大小（逻辑像素）
-BLOCK_SIZE = 30
-
 # 最小窗口尺寸（小于此值会被强制拉伸到该最小尺寸）
 # 增加50像素避免黑边过窄
-MIN_WINDOW_WIDTH = max(400, 160 + GRID_WIDTH * BLOCK_SIZE + 200 + 50)
+MIN_WINDOW_WIDTH = max(
+    400,
+    LEFT_WIDTH + GRID_WIDTH * BLOCK_SIZE + RIGHT_WIDTH + 50,
+)
 MIN_WINDOW_HEIGHT = 400
 
 # ---- 应用图标路径 ----
@@ -504,7 +511,7 @@ class TetrisApp:
         self.screen.blit(self._logical, (x_off, y_off))
 
         bs = int(BLOCK_SIZE * scale)
-        left_width_px = int(160 * scale)
+        left_width_px = int(LEFT_WIDTH * scale)
         board_left_px = left_width_px
         board_w_px = GRID_WIDTH * bs
         board_h_px = GRID_HEIGHT * bs
