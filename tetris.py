@@ -162,9 +162,8 @@ class TetrisApp:
             new_w = init_w
             new_h = init_h
 
-        # 确保不小于最小尺寸
-        self.window_width = max(new_w, MIN_WINDOW_WIDTH)
-        self.window_height = max(new_h, MIN_WINDOW_HEIGHT)
+        # 确保不小于最小尺寸（使用统一方法）
+        self.window_width, self.window_height = self._clamp_size(new_w, new_h)
 
     def _init_window_and_surfaces(self) -> None:
         """创建显示窗口、字体、逻辑表面。"""
@@ -308,15 +307,22 @@ class TetrisApp:
         sys.exit()
     # ------------------------------------------------------------------
 
+    # ---------- 窗口尺寸辅助方法 ----------
+    @staticmethod
+    def _clamp_size(w: int, h: int) -> tuple[int, int]:
+        """返回不小于最小尺寸的窗口宽高。"""
+        return max(w, MIN_WINDOW_WIDTH), max(h, MIN_WINDOW_HEIGHT)
+
     def _enforce_min_size(self) -> None:
         """确保当前窗口不小于最小尺寸。"""
         current_w, current_h = self.screen.get_size()
-        new_w = max(current_w, MIN_WINDOW_WIDTH)
-        new_h = max(current_h, MIN_WINDOW_HEIGHT)
+        new_w, new_h = self._clamp_size(current_w, current_h)
         if (new_w, new_h) != (current_w, current_h):
             self.screen = pygame.display.set_mode((new_w, new_h), pygame.RESIZABLE)
             self.window_width = new_w
             self.window_height = new_h
+
+    # ------------------------------------
 
     def _update_speed(self) -> None:
         """根据等级计算下落速度（每级减50ms，最低100ms）。"""
@@ -435,11 +441,10 @@ class TetrisApp:
 
     def _handle_resize(self, event: pygame.event.Event) -> None:
         """处理窗口大小改变事件。"""
-        new_w = max(event.w, MIN_WINDOW_WIDTH)
-        new_h = max(event.h, MIN_WINDOW_HEIGHT)
-        self.window_width = new_w
-        self.window_height = new_h
-        self.screen = pygame.display.set_mode((new_w, new_h), pygame.RESIZABLE)
+        self.window_width, self.window_height = self._clamp_size(event.w, event.h)
+        self.screen = pygame.display.set_mode(
+            (self.window_width, self.window_height), pygame.RESIZABLE
+        )
 
     def _render_game_scene(self) -> None:
         """极致渲染：创建逻辑表面、保证字体、构建状态、委托给 Renderer。"""
