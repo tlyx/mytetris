@@ -53,6 +53,9 @@ OVERLAY_GAP = 15                        # 覆盖层各行间距
 HELP_GAP = 12                           # 帮助覆盖层各行间距
 # -----------------------------------------
 
+# ---- 消行动画持续时间（毫秒） ----
+CLEAR_ANIM_DURATION = 200
+
 # 帮助文本常量
 HELP_LINES = [
     "HOW TO PLAY",
@@ -89,7 +92,6 @@ class Renderer:
     _text_cache: dict[str, tuple[str, pygame.Surface]]
 
     # 消行动画相关
-    _clear_anim_duration: int  # 动画持续时间（毫秒）
     _anim_clearing_rows: list[int]  # 当前正在闪烁的行
     _anim_start_ticks: int     # 动画起始 ticks
 
@@ -100,7 +102,6 @@ class Renderer:
         self._static_bg = None
         self._bg_scale = 0.0
         self._text_cache = {}
-        self._clear_anim_duration = 200
         self._anim_clearing_rows = []
         self._anim_start_ticks = 0
 
@@ -341,12 +342,12 @@ class Renderer:
             # 如果当前有动画进行中
             if self._anim_clearing_rows:
                 elapsed = pygame.time.get_ticks() - self._anim_start_ticks
-                if elapsed >= self._clear_anim_duration:
+                if elapsed >= CLEAR_ANIM_DURATION:
                     # 动画结束
                     self._anim_clearing_rows = []
                 else:
                     # 计算当前 alpha (从 255 渐变为 0)
-                    alpha = int(255 * (1 - elapsed / self._clear_anim_duration))
+                    alpha = int(255 * (1 - elapsed / CLEAR_ANIM_DURATION))
                     for row in self._anim_clearing_rows:
                         # 创建半透明白色矩形
                         flash_surf = pygame.Surface((_board_w, bs), pygame.SRCALPHA)
