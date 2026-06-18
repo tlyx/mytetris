@@ -18,7 +18,7 @@ import os
 import sys
 import json
 
-import pygame
+import pygame  # via pygame-ce
 import platformdirs
 
 from engine import TetrisEngine, GRID_WIDTH, GRID_HEIGHT, MAX_SCORE

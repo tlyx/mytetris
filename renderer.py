@@ -8,7 +8,7 @@
 
 from typing import final
 
-import pygame
+import pygame  # via pygame-ce
 
 from engine import (
     COLORS,
