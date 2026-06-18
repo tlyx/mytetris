@@ -3,7 +3,6 @@
 
 from typing import final
 from random import shuffle
-from copy import deepcopy
 
 GRID_WIDTH, GRID_HEIGHT = 10, 20
 
@@ -154,7 +153,8 @@ class TetrisEngine:
     def _spawn_piece(self) -> None:
         """生成下一个方块到顶部，若碰撞则标记游戏结束。"""
         self.current_type = self.next_type
-        self.current_shape = deepcopy(SHAPES_DATA[self.current_type])
+        # 使用 list() 浅拷贝即可（内部元组不可变）
+        self.current_shape = list(SHAPES_DATA[self.current_type])
         # 从 bag 中取出下一个方块作为 next_type（若 bag 为空则重新填充）
         self.next_type = self._draw_from_bag()
         self.x = 4
@@ -179,7 +179,7 @@ class TetrisEngine:
     # ---------- 7-bag 随机生成器 ----------
     def _refill_bag(self) -> None:
         """用全部七种方块填充 bag 并随机打乱。"""
-        self._bag = deepcopy(ALL_PIECES)
+        self._bag = list(ALL_PIECES)   # 浅拷贝即可，元素为不可变字符串
         shuffle(self._bag)
 
     def _draw_from_bag(self) -> str:
