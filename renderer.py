@@ -15,7 +15,6 @@ from engine import (
     GRID_WIDTH,
     GRID_HEIGHT,
     SHAPES_DATA,
-    # MAX_SCORE 未使用，移除
 )
 from game_state import GameState
 
@@ -61,12 +60,16 @@ class Renderer:
     _static_bg: pygame.Surface | None
     _bg_scale: float  # 上一次构建静态背景时的 scale
 
+    # 文字表面缓存（避免每帧重新渲染）
+    _text_cache: dict[str, tuple[str, pygame.Surface]]
+
     def __init__(self) -> None:
         self.font_big = None
         self.font_small = None
         self.help_font = None
         self._static_bg = None
         self._bg_scale = 0.0
+        self._text_cache = {}
 
     # ------------------------------------------------------------------
     # 字体更新接口（由外部在 scale 变化时调用）
@@ -82,9 +85,34 @@ class Renderer:
         self.font_small = font_small
         self.help_font = help_font
 
+        # 字体改变后，文字缓存全部失效
+        self._text_cache.clear()
+
         if abs(scale - self._bg_scale) > 1e-9:
             self._bg_scale = scale
             self._static_bg = self._build_static_bg(scale)
+
+    # ------------------------------------------------------------------
+    # 文字缓存辅助方法
+    # ------------------------------------------------------------------
+    def _get_cached_text(
+        self,
+        key: str,
+        text: str,
+        font: pygame.font.Font,
+        color: tuple[int, int, int],
+    ) -> pygame.Surface:
+        """返回缓存的文字表面，仅在字符串变化时重新渲染。"""
+        cached = self._text_cache.get(key)
+        if cached is not None and cached[0] == text:
+            return cached[1]
+
+        # 重新渲染并缓存
+        surface = font.render(text, True, color)
+        # font.render 不会返回 None，断言消除可选性
+        assert surface is not None
+        self._text_cache[key] = (text, surface)
+        return surface
 
     # ------------------------------------------------------------------
     # 公开渲染入口
@@ -266,16 +294,18 @@ class Renderer:
         left_padding = int(10 * scale)
         left_content_x = left_padding
 
-        # 音乐 / 音效状态（从底部向上排列）
+        # 音乐状态（使用缓存）
         music_str = "Music: " + ("ON" if state.music_enabled else "OFF")
-        music_surf = self.font_small.render(
-            music_str, True,
-            (0, 255, 0) if state.music_enabled else (200, 50, 50),
+        music_color = (0, 255, 0) if state.music_enabled else (200, 50, 50)
+        music_surf = self._get_cached_text(
+            "music", music_str, self.font_small, music_color
         )
+
+        # 音效状态（使用缓存）
         sfx_str = "SFX:    " + ("ON" if state.sfx_enabled else "OFF")
-        sfx_surf = self.font_small.render(
-            sfx_str, True,
-            (0, 255, 0) if state.sfx_enabled else (200, 50, 50),
+        sfx_color = (0, 255, 0) if state.sfx_enabled else (200, 50, 50)
+        sfx_surf = self._get_cached_text(
+            "sfx", sfx_str, self.font_small, sfx_color
         )
 
         bottom_margin = int(60 * scale)
@@ -303,18 +333,22 @@ class Renderer:
         sidebar_content_right = sidebar_left + right_width_px - content_padding
         sidebar_content_width = sidebar_content_right - sidebar_content_left
 
-        # LV 数值
-        lv_val = self.font_big.render(f"{state.level}", True, (255, 255, 255))
-        ds.blit(lv_val, (sidebar_content_left, 45))
-
-        # SCORE 数值
-        score_val = self.font_big.render(
-            f"{state.score:6d}", True, COLORS["SCORE_GOLD"],
+        # LV 数值（使用缓存）
+        lv_str = f"{state.level}"
+        lv_surf = self._get_cached_text(
+            "lv", lv_str, self.font_big, (255, 255, 255)
         )
-        ds.blit(score_val,
-                (sidebar_content_right - score_val.get_width(), 45))
+        ds.blit(lv_surf, (sidebar_content_left, 45))
 
-        # 预览框（下一个方块）
+        # SCORE 数值（使用缓存）
+        score_str = f"{state.score:6d}"
+        score_surf = self._get_cached_text(
+            "score", score_str, self.font_big, COLORS["SCORE_GOLD"]
+        )
+        ds.blit(score_surf,
+                (sidebar_content_right - score_surf.get_width(), 45))
+
+        # 预览框（下一个方块）—— 无法简单缓存图块，保留原样
         bs = int(BLOCK_SIZE * scale)
         preview_size = 4 * bs
         preview_x = sidebar_content_left + (sidebar_content_width - preview_size) // 2
@@ -344,39 +378,60 @@ class Renderer:
         elapsed_sec = (pygame.time.get_ticks() - state.game_start_ticks) // 1000
         mins = elapsed_sec // 60
         secs = elapsed_sec % 60
+
+        # Lines、High、Time 字符串（使用缓存）
+        lines_str = str(state.total_lines)
+        high_str = str(state.high_score)
         time_str = f"{mins:02d}:{secs:02d}"
 
-        bottom_lines = [
-            ("Lines", str(state.total_lines)),
-            ("High", str(state.high_score)),
-            ("Time", time_str),
-        ]
+        lines_val_surf = self._get_cached_text(
+            "lines", lines_str, self.font_small, (255, 255, 255)
+        )
+        high_val_surf = self._get_cached_text(
+            "high", high_str, self.font_small, (255, 255, 255)
+        )
+        time_val_surf = self._get_cached_text(
+            "time", time_str, self.font_small, (255, 255, 255)
+        )
+
+        # Labels (Lines:, High:, Time:) 也是静态文本
+        label_strs = {
+            "lines_label": ("Lines: ", (200, 200, 200)),
+            "high_label": ("High: ", (200, 200, 200)),
+            "time_label": ("Time: ", (200, 200, 200)),
+        }
+        label_surfs: dict[str, pygame.Surface] = {}
+        for key, (txt, clr) in label_strs.items():
+            label_surfs[key] = self._get_cached_text(
+                key, txt, self.font_small, clr
+            )
 
         right_bottom_margin = int(60 * scale)
         right_gap = int(10 * scale)
 
-        temp_label = self.font_small.render("Lines: ", True, (200, 200, 200))
-        temp_val = self.font_small.render("000", True, (255, 255, 255))
-        row_height = max(temp_label.get_height(), temp_val.get_height())
+        # 使用任意一个 label 或 value 的高度作为行高（取最大值）
+        temp_height = max(label_surfs["lines_label"].get_height(),
+                          lines_val_surf.get_height())
+        row_height = temp_height
 
         time_y = logical_h - right_bottom_margin - row_height
         high_y = time_y - row_height - right_gap
         lines_y = high_y - row_height - right_gap
 
-        for i, (label_text, value_text) in enumerate(bottom_lines):
-            if i == 0:
-                y = lines_y
-            elif i == 1:
-                y = high_y
-            else:
-                y = time_y
-            label_surf = self.font_small.render(label_text + ": ", True,
-                                                (200, 200, 200))
-            val_surf = self.font_small.render(value_text, True,
-                                              (255, 255, 255))
-            ds.blit(label_surf, (sidebar_content_left, y))
-            ds.blit(val_surf,
-                    (sidebar_content_left + label_surf.get_width(), y))
+        # 绘制 Lines 行
+        ds.blit(label_surfs["lines_label"], (sidebar_content_left, lines_y))
+        ds.blit(lines_val_surf,
+                (sidebar_content_left + label_surfs["lines_label"].get_width(), lines_y))
+
+        # 绘制 High 行
+        ds.blit(label_surfs["high_label"], (sidebar_content_left, high_y))
+        ds.blit(high_val_surf,
+                (sidebar_content_left + label_surfs["high_label"].get_width(), high_y))
+
+        # 绘制 Time 行
+        ds.blit(label_surfs["time_label"], (sidebar_content_left, time_y))
+        ds.blit(time_val_surf,
+                (sidebar_content_left + label_surfs["time_label"].get_width(), time_y))
 
     # ------------------------------------------------------------------
     # 覆盖层绘制工具方法
@@ -407,9 +462,14 @@ class Renderer:
         surface.blit(overlay, (0, 0))
 
         gap = int(15 * scale)
-        title_surf = self.font_big.render(title, True, title_color)
-        line_surfs = [self.font_small.render(text, True, color)
-                      for text, color in lines]
+        title_surf = self._get_cached_text(
+            f"overlay_title_{title}", title, self.font_big, title_color
+        )
+        line_surfs: list[pygame.Surface] = []
+        for text, color in lines:
+            cache_key = f"overlay_line_{text}"
+            line_surf = self._get_cached_text(cache_key, text, self.font_small, color)
+            line_surfs.append(line_surf)
 
         total_h = (title_surf.get_height()
                    + sum(s.get_height() for s in line_surfs)
@@ -453,11 +513,19 @@ class Renderer:
         title_color = (255, 200, 0)
         body_color = (255, 255, 255)
 
-        title_surf = self.help_font.render(title_line, True, title_color)
+        # 帮助文字也使用缓存
+        title_surf = self._get_cached_text(
+            "help_title", title_line, self.help_font, title_color
+        )
         tx = (logical_w - title_surf.get_width()) // 2
         gap = int(12 * scale)
-        body_surfaces = [self.help_font.render(line, True, body_color)
-                         for line in body_lines]
+
+        body_surfaces: list[pygame.Surface] = []
+        for i, line in enumerate(body_lines):
+            cache_key = f"help_body_{i}"
+            surf = self._get_cached_text(cache_key, line, self.help_font, body_color)
+            body_surfaces.append(surf)
+
         total_body_h = sum(s.get_height() for s in body_surfaces) + \
                        (len(body_surfaces) - 1) * gap
         total_h = title_surf.get_height() + gap + total_body_h
