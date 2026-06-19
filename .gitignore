@@ -11,6 +11,7 @@ wheels/
 # Virtual environments
 .venv
 .aider*
+!.aiderignore
 
 ### --- IDE 与编辑器 (所有项目通用) ---
 .idea/

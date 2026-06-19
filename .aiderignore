@@ -1,0 +1,17 @@
+# 忽略所有图片文件
+*.jpg
+*.png
+*.gif
+*.svg
+
+# 忽略所有音视频文件
+*.mp3
+*.wav
+*.mp4
+*.ogg
+
+uv.lock
+
+# 忽略特定文件夹下的所有内容
+assets/
+screenshots/
