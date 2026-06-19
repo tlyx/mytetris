@@ -43,13 +43,11 @@ def get_combined_version(default_base="0.0.0-unknown"):
 APP_VERSION = get_combined_version()
 print(f"📦 [BUILD LOG] Successfully fetched Hybrid Version: {APP_VERSION}")
 
-# 将生成的动态版本号写入 build 缓存目录，避免污染项目根目录
+# 构建 build 缓存目录，避免污染项目根目录
 BUILD_DIR = "build"
 os.makedirs(BUILD_DIR, exist_ok=True)
-VERSION_FILE = os.path.join(BUILD_DIR, "_version.py")
 
-with open(VERSION_FILE, "w", encoding="utf-8") as f:
-    f.write(f'__version__ = "{APP_VERSION}"\n')
+# ✂️ 【已切除盲肠】原先在这里生成本地幽灵 _version.py 的冗余逻辑已安全物理删除
 
 # =========================================================================
 # 1. LOCALIZATION PREPARATION LAYER (构建本地化缓存层)
@@ -71,7 +69,7 @@ with open(os.path.join(ZH_LPROJ, "InfoPlist.strings"), "w", encoding="utf-8") as
 # =========================================================================
 a = Analysis(
     ['main.py'],
-    pathex=[BUILD_DIR],      # 🎯 将 build 目录加入搜索路径，让 PyInstaller 顺利打包 _version.py
+    pathex=[],               # 🎯 移除了对 build 目录的依赖，确保搜索路径彻底干净
     binaries=[],
     datas=[
         # 全部直接释放到 .app/Contents/Resources/ 正下方
