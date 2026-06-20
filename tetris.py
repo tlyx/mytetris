@@ -345,8 +345,8 @@ class TetrisApp:
     # ------------------------------------
 
     def _update_speed(self) -> None:
-        """根据等级计算下落速度（每级减50ms，最低100ms）。"""
-        speed = max(100, 500 - (self.game.level - 1) * 50)
+        """根据等级计算下落速度，使用 engine 中的统一公式。"""
+        speed = TetrisEngine.fall_speed(self.game.level)
         pygame.time.set_timer(self.fall_event, speed)
         self.current_level = self.game.level
 

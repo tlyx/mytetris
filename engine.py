@@ -11,6 +11,14 @@ MAX_SCORE = 999999
 MAX_TOTAL_LINES = 999999
 # -----------------------------
 
+# ---------- 速度与级别相关常量 ----------
+MAX_INITIAL_SPEED = 500          # 初始下落间隔（毫秒）
+SPEED_DECREASE = 30              # 每升一级减少的毫秒数
+MIN_SPEED = 100                  # 速度下限（最快）
+# 根据线性公式计算最大级别：当 500 - (level-1)*30 <= 100 时，level >= 14
+MAX_LEVEL = (MAX_INITIAL_SPEED - MIN_SPEED) // SPEED_DECREASE + 1   # =14
+# ---------------------------------------
+
 COLORS: dict[str, tuple[int, int, int]] = {
     "BACKGROUND": (10, 12, 15),
     "GRID_LINE": (30, 33, 40),
@@ -139,7 +147,9 @@ class TetrisEngine:
         if self.score > MAX_SCORE:
             self.score = MAX_SCORE
 
-        self.level = (self.total_lines // 10) + 1
+        # 级别上限限制
+        potential_level = (self.total_lines // 10) + 1
+        self.level = min(potential_level, MAX_LEVEL)
 
         # 从网格中删除满行（从后往前删，避免索引错乱），再在顶部插入空行
         if lines_cleared > 0:
@@ -202,3 +212,13 @@ class TetrisEngine:
         result = self._last_cleared_rows[:]
         self._last_cleared_rows = []
         return result
+
+    # ---------- 新增：根据等级计算下落速度（毫秒） ----------
+    @staticmethod
+    def fall_speed(level: int) -> int:
+        """根据等级返回下落间隔（毫秒），使用统一的线性公式。
+
+        公式基于 MAX_INITIAL_SPEED、SPEED_DECREASE、MIN_SPEED 常量。
+        """
+        speed = MAX_INITIAL_SPEED - (level - 1) * SPEED_DECREASE
+        return max(MIN_SPEED, speed)
