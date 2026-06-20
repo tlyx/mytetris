@@ -20,11 +20,12 @@ ConfigValue = bool | int
 class ConfigManager:
     """管理游戏配置（音乐、音效、消行动画、最高分）的加载与保存。"""
 
-    # 配置字段默认值
+    # 配置字段默认值（bool 在前按字母顺序，数字在后）
     _defaults: ClassVar[dict[str, ConfigValue]] = {
+        "clear_anim_enabled": True,
+        "experimental": False,                     # 实验性功能开关
         "music_enabled": True,
         "sfx_enabled": True,
-        "clear_anim_enabled": True,
         "high_score": 0,
     }
 
@@ -60,8 +61,8 @@ class ConfigManager:
                     # 对最高分进行上限和下限检查
                     if key == "high_score":
                         value = self._clamp_high_score(int(value))
-                    # 其他字段转为布尔值
-                    elif key in ("music_enabled", "sfx_enabled", "clear_anim_enabled"):
+                    else:
+                        # 其余字段（包括 experimental）均视为布尔值
                         value = bool(value)
                     self._data[key] = value
         except (FileNotFoundError, json.JSONDecodeError, ValueError):
@@ -97,10 +98,32 @@ class ConfigManager:
             self._data[key] = value
 
     # ---------- 便捷属性访问（与原有 TetrisApp 属性名一致） ----------
+    # （按 _defaults 中 bool 在前字母顺序，数字在后）
+    @property
+    def clear_anim_enabled(self) -> bool:
+        val = self._data["clear_anim_enabled"]
+        # 运行时应为布尔值，确保类型检查通过
+        assert isinstance(val, bool)
+        return val
+
+    @clear_anim_enabled.setter
+    def clear_anim_enabled(self, value: bool) -> None:
+        self._data["clear_anim_enabled"] = value
+
+    # ---------- 实验性功能开关 ----------
+    @property
+    def experimental(self) -> bool:
+        val = self._data["experimental"]
+        assert isinstance(val, bool)
+        return val
+
+    @experimental.setter
+    def experimental(self, value: bool) -> None:
+        self._data["experimental"] = value
+
     @property
     def music_enabled(self) -> bool:
         val = self._data["music_enabled"]
-        # 运行时应为布尔值，确保类型检查通过
         assert isinstance(val, bool)
         return val
 
@@ -117,16 +140,6 @@ class ConfigManager:
     @sfx_enabled.setter
     def sfx_enabled(self, value: bool) -> None:
         self._data["sfx_enabled"] = value
-
-    @property
-    def clear_anim_enabled(self) -> bool:
-        val = self._data["clear_anim_enabled"]
-        assert isinstance(val, bool)
-        return val
-
-    @clear_anim_enabled.setter
-    def clear_anim_enabled(self, value: bool) -> None:
-        self._data["clear_anim_enabled"] = value
 
     @property
     def high_score(self) -> int:
