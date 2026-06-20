@@ -121,14 +121,16 @@ class TetrisApp:
         self._enforce_min_size()
         self._init_icon()
 
-        # ---- 加载配置（优先于音频初始化） ----
+        # ---- 加载配置（包含音乐/音效开关） ----
         self._init_config()
 
-        # ---- 初始化音频（使用配置中的音乐/音效开关） ----
+        # ---- 初始化音频（此时尚未同步开关状态） ----
         self.audio = AudioManager()
-        self.audio.music_enabled = self.music_enabled
-        self.audio.sfx_enabled = self.sfx_enabled
         self.audio.load()
+
+        # ---- 将配置中的开关状态同步到 AudioManager ----
+        self.audio.set_music_enabled(self.config.music_enabled)
+        self.audio.set_sfx_enabled(self.config.sfx_enabled)
 
         # ---- 初始化输入处理器 ----
         self.input_handler = InputHandler(self._on_input_action)
@@ -207,8 +209,7 @@ class TetrisApp:
         self.confirm_quit = False
         self.high_score = 0
         self.game_start_ticks = pygame.time.get_ticks()
-        self.music_enabled = True
-        self.sfx_enabled = True
+        # 注意：music_enabled/sfx_enabled 已移入 config，不再在此处初始化
         self.clear_anim_enabled = True
         self._game_over_sound_played = False
         self._help_active = False
@@ -232,27 +233,26 @@ class TetrisApp:
         """加载配置管理器并覆盖默认设置（音乐、音效、消行动画、最高分）。"""
         self.config = ConfigManager()
         self.config.load()
-        self.music_enabled = self.config.music_enabled
-        self.sfx_enabled = self.config.sfx_enabled
+        # 注意：不再从 config 复制到 self.music_enabled/sfx_enabled，因为属性已代理
         self.clear_anim_enabled = self.config.clear_anim_enabled
         self.high_score = self.config.high_score
 
-    # ---- 音频控制（委托给 AudioManager） ----
+    # ---- 音频控制（直接操作 config，委托给 AudioManager） ----
     def _toggle_music(self) -> None:
         """切换背景音乐的开关（M键）。"""
-        self.audio.toggle_music()
-        self.music_enabled = self.audio.music_enabled
-        self.config.music_enabled = self.music_enabled
+        new_state = not self.config.music_enabled
+        self.config.music_enabled = new_state
+        self.audio.set_music_enabled(new_state)
+        # 不在此处 save，退出时自动保存
 
     def _toggle_sfx(self) -> None:
         """切换音效的开关（S键）。"""
-        self.audio.toggle_sfx()
-        self.sfx_enabled = self.audio.sfx_enabled
-        self.config.sfx_enabled = self.sfx_enabled
+        new_state = not self.config.sfx_enabled
+        self.config.sfx_enabled = new_state
+        self.audio.set_sfx_enabled(new_state)
+        # 不在此处 save，退出时自动保存
 
-    def _play_sound(self, name: str) -> None:
-        """播放指定音效（若已启用且资源存在）。"""
-        self.audio.play_sfx(name)
+    # 音效播放方法已移除，统一直接调用 self.audio.play_sfx(name)
 
     def _toggle_ghost(self) -> None:
         """切换 Ghost piece（落点影子）显示开关。"""
@@ -368,7 +368,7 @@ class TetrisApp:
         prev_lines = self.game.total_lines
         self.game.lock_and_clear_lines()
         if self.game.total_lines > prev_lines:
-            self._play_sound("clear")
+            self.audio.play_sfx("clear")  # 直接委托给 AudioManager
         self._update_high_score()
         self._check_level_upgrade()
 
@@ -390,8 +390,8 @@ class TetrisApp:
             paused=self.paused,
             confirm_quit=self.confirm_quit,
             help_active=self._help_active,
-            music_enabled=self.music_enabled,
-            sfx_enabled=self.sfx_enabled,
+            music_enabled=self.config.music_enabled,  # 直接从 config 读取
+            sfx_enabled=self.config.sfx_enabled,      # 直接从 config 读取
             ghost_y=self.game.get_ghost_y(),
             ghost_enabled=self.ghost_enabled,
             clearing_rows=self.game.poll_cleared_rows(),
@@ -417,7 +417,7 @@ class TetrisApp:
         """处理所有事件（按优先级和状态分发）"""
         # 全局一次性事件：game over 音效
         if self.game.game_over and not self._game_over_sound_played:
-            self._play_sound("game_over")
+            self.audio.play_sfx("game_over")  # 直接委托给 AudioManager
             self._game_over_sound_played = True
             # 如果状态还不是 GameOver，切换过去
             if not isinstance(self._current_state, GameOverState):
