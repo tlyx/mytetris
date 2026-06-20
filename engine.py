@@ -216,9 +216,13 @@ class TetrisEngine:
     # ---------- 新增：根据等级计算下落速度（毫秒） ----------
     @staticmethod
     def fall_speed(level: int) -> int:
-        """根据等级返回下落间隔（毫秒），使用统一的线性公式。
+        """返回下落间隔（毫秒），使用匀加速曲线（速度线性增长）。
 
-        公式基于 MAX_INITIAL_SPEED、SPEED_DECREASE、MIN_SPEED 常量。
+        速度范围 2.0～10.0 格/秒，每升一级速度增加量相等。
         """
-        speed = MAX_INITIAL_SPEED - (level - 1) * SPEED_DECREASE
-        return max(MIN_SPEED, speed)
+        speed_min = 1000.0 / MAX_INITIAL_SPEED   # 2.0 格/秒
+        speed_max = 1000.0 / MIN_SPEED           # 10.0 格/秒
+        # 线性插值速度
+        speed = speed_min + (speed_max - speed_min) * (level - 1) / (MAX_LEVEL - 1)
+        # 转换为毫秒间隔
+        return int(round(1000.0 / speed))
