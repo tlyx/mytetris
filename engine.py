@@ -167,8 +167,13 @@ class TetrisEngine:
         if self._check_collision(self.x, self.y):
             self.game_over = True
 
-    def _check_collision(self, nx: int, ny: int, shape=None) -> bool:
-        shape = shape or self.current_shape
+    def _check_collision(
+        self,
+        nx: int,
+        ny: int,
+        shape: list[tuple[int, int]] | None = None,
+    ) -> bool:
+        shape = shape if shape is not None else self.current_shape
 
         for dx, dy in shape:
             tx, ty = nx + dx, ny + dy

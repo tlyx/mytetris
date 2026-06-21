@@ -19,9 +19,8 @@ import sys
 from pathlib import Path
 
 import pygame  # via pygame-ce
-import copy
 
-from engine import TetrisEngine, GRID_WIDTH, GRID_HEIGHT, MAX_SCORE
+from engine import TetrisEngine, GRID_WIDTH, GRID_HEIGHT, MAX_SCORE, SHAPES_DATA
 from renderer import (
     Renderer,
     SCREEN_WIDTH,
@@ -168,6 +167,7 @@ class TetrisApp:
         self._bot_locked = False
         self._bot_last_target = None
         # -------------------------------
+
     # ------------------------------------------------------------------
     # 初始化辅助方法 (将 __init__ 按功能拆分)
     # ------------------------------------------------------------------
@@ -575,76 +575,9 @@ class TetrisApp:
 
         pygame.display.flip()
 
-    def _simulate_position(self, rotation, target_x):
-        grid_copy = [row[:] for row in self.game.grid]
+    # ---------- bot 相关方法 ----------
 
-        shape = self.game.current_shape.copy()
-
-        # rotate shape
-        for _ in range(rotation):
-            shape = [(-dy, dx) for dx, dy in shape]
-
-        # simulate drop
-        x = target_x
-        y = 0
-
-        def collides(x, y):
-            for dx, dy in shape:
-                tx, ty = x + dx, y + dy
-                if tx < 0 or tx >= GRID_WIDTH or ty >= GRID_HEIGHT:
-                    return True
-                if ty >= 0 and grid_copy[ty][tx]:
-                    return True
-            return False
-
-        if collides(x, y):
-            return float("-inf")
-
-        while not collides(x, y + 1):
-            y += 1
-
-        for dx, dy in shape:
-            gx, gy = x + dx, y + dy
-            if 0 <= gy < GRID_HEIGHT and 0 <= gx < GRID_WIDTH:
-                grid_copy[gy][gx] = True
-
-        return self._evaluate_grid(grid_copy)
-
-    def _evaluate_board(self, sim):
-        grid = sim.grid
-
-        height = 0
-        holes = 0
-
-        for x in range(GRID_WIDTH):
-            block_found = False
-
-            for y in range(GRID_HEIGHT):
-                if grid[y][x]:
-                    if not block_found:
-                        height += GRID_HEIGHT - y
-                        block_found = True
-                else:
-                    if block_found:
-                        holes += 1
-
-        return -(height * 5 + holes * 50)
-
-    def _execute(self, move):
-        rotation, target_x = move
-
-        for _ in range(rotation):
-            self._on_input_action(Action.ROTATE, from_bot=True)
-
-        while self.game.x < target_x:
-            self._on_input_action(Action.MOVE_RIGHT, from_bot=True)
-
-        while self.game.x > target_x:
-            self._on_input_action(Action.MOVE_LEFT, from_bot=True)
-
-        self._on_input_action(Action.HARD_DROP, from_bot=True)
-
-    def _run_bot(self):
+    def _run_bot(self) -> None:
         if self.game.game_over or self.paused:
             return
 
@@ -654,8 +587,7 @@ class TetrisApp:
             self._last_piece_type = self.game.current_type
 
         if self._bot_plan is None:
-            import engine
-            shape = engine.SHAPES_DATA[self.game.current_type]
+            shape = SHAPES_DATA[self.game.current_type]
             self._bot_plan = self._solve(self.game.grid, shape)
             self._bot_step = 0
 
@@ -669,7 +601,7 @@ class TetrisApp:
 
         # ---------------- HORIZONTAL ----------------
         piece_cells = self.game.get_piece_cells()
-        min_x = min(x for x, y in piece_cells)
+        min_x = min(x for x, _ in piece_cells)   # <-- 修改点1：y -> _
 
         dx = target_x - min_x
 
@@ -692,7 +624,13 @@ class TetrisApp:
         self._bot_plan = None
         self._bot_step = 0
 
-    def _simulate(self, grid, shape, rotation, target_x):
+    def _simulate(
+        self,
+        grid: list[list[tuple[int, int, int] | None]],
+        shape: list[tuple[int, int]],
+        rotation: int,
+        target_x: int,
+    ) -> float | None:
         import copy
 
         piece = list(shape)
@@ -702,15 +640,15 @@ class TetrisApp:
             piece = [(-py, px) for px, py in piece]
 
         # normalize shape (IMPORTANT: stable anchor)
-        min_x = min(px for px, py in piece)
-        min_y = min(py for px, py in piece)
+        min_x = min(px for px, _ in piece)         # <-- 修改点2：py -> _
+        min_y = min(py for _, py in piece)         # <-- 修改点3：px -> _
         piece = [(px - min_x, py - min_y) for px, py in piece]
 
         # FINAL x clamp BEFORE collision test (THIS FIXES wall sticking)
         target_x = max(0, min(GRID_WIDTH - 1, target_x))
 
         # check if fits horizontally at all
-        max_px = max(px for px, py in piece)
+        max_px = max(px for px, _ in piece)        # <-- 修改点4：py -> _
         if target_x + max_px >= GRID_WIDTH:
             return None
 
@@ -723,16 +661,23 @@ class TetrisApp:
         while not self._collides(grid, piece, target_x, y + 1):
             y += 1
 
-        new_grid = copy.deepcopy(grid)
+        new_grid: list[list[tuple[int, int, int] | None]] = copy.deepcopy(grid)
 
         for px, py in piece:
             gx = target_x + px
             gy = y + py
             if 0 <= gx < GRID_WIDTH and 0 <= gy < GRID_HEIGHT:
-                new_grid[gy][gx] = True
+                new_grid[gy][gx] = (1, 1, 1)  # placeholder, only occupancy matters
 
         return self._evaluate_grid(new_grid)
-    def _collides(self, grid, piece, x, y):
+
+    def _collides(
+        self,
+        grid: list[list[tuple[int, int, int] | None]],
+        piece: list[tuple[int, int]],
+        x: int,
+        y: int,
+    ) -> bool:
         for px, py in piece:
             gx = x + px
             gy = y + py
@@ -741,13 +686,16 @@ class TetrisApp:
                 return True
             if gy >= GRID_HEIGHT:
                 return True
-            if gy >= 0 and grid[gy][gx]:
+            if gy >= 0 and grid[gy][gx] is not None:
                 return True
 
         return False
 
-    def _evaluate_grid(self, grid):
-        heights = []
+    def _evaluate_grid(
+        self,
+        grid: list[list[tuple[int, int, int] | None]],
+    ) -> float:
+        heights: list[int] = []
         holes = 0
         bumpiness = 0
         lines = 0
@@ -761,7 +709,7 @@ class TetrisApp:
             block_found = False
 
             for y in range(GRID_HEIGHT):
-                if grid[y][x]:
+                if grid[y][x] is not None:
                     if not block_found:
                         col_height = GRID_HEIGHT - y
                         block_found = True
@@ -787,27 +735,30 @@ class TetrisApp:
                 - abs(GRID_WIDTH // 2 - heights.index(max(heights))) * 3
         )
 
-    def _solve(self, grid, shape):
-        import engine
-
+    def _solve(
+        self,
+        grid: list[list[tuple[int, int, int] | None]],
+        shape: list[tuple[int, int]],
+    ) -> tuple[int, int]:
         next_type = getattr(self.game, "next_type", None)
-        next_shape = engine.SHAPES_DATA.get(next_type) if next_type else None
+        next_shape: list[tuple[int, int]] | None = (
+            SHAPES_DATA.get(next_type) if next_type else None
+        )
 
-        best_score = float("-inf")
-        best_move = (0, GRID_WIDTH // 2)
+        best_score: float = float("-inf")
+        best_move: tuple[int, int] = (0, GRID_WIDTH // 2)
 
         for rotation1 in range(4):
             for x1 in range(GRID_WIDTH):
-
                 score1 = self._simulate(grid, shape, rotation1, x1)
                 if score1 is None:
                     continue
 
                 # If no next piece info → fallback to greedy
                 if not next_shape:
-                    total = score1
+                    total: float = score1
                 else:
-                    best_next = float("-inf")
+                    best_next: float = float("-inf")
 
                     for rotation2 in range(4):
                         for x2 in range(GRID_WIDTH):
@@ -824,64 +775,3 @@ class TetrisApp:
                     best_move = (rotation1, x1)
 
         return best_move
-
-    def _can_move(self, dx):
-        """
-        Safe movement check based on collision, not engine state alone.
-        Prevents desync between bot logic and engine constraints.
-        """
-
-        new_x = self.game.x + dx
-
-        shape = self.game.current_shape
-
-        for px, py in shape:
-            gx = new_x + px
-            gy = self.game.y + py
-
-            # wall check
-            if gx < 0 or gx >= GRID_WIDTH:
-                return False
-
-            # floor check
-            if gy >= GRID_HEIGHT:
-                return False
-
-            # collision check
-            if gy >= 0 and self.game.grid[gy][gx]:
-                return False
-
-        return True
-
-    def _simulate_grid(self, grid, shape, rotation, x):
-        import copy
-
-        piece = list(shape)
-
-        # rotate
-        for _ in range(rotation):
-            piece = [(-py, px) for px, py in piece]
-
-        # normalize
-        min_x = min(px for px, py in piece)
-        min_y = min(py for px, py in piece)
-        piece = [(px - min_x, py - min_y) for px, py in piece]
-
-        x = max(0, min(GRID_WIDTH - 1, x))
-
-        if self._collides(grid, piece, x, 0):
-            return None
-
-        y = 0
-        while not self._collides(grid, piece, x, y + 1):
-            y += 1
-
-        new_grid = copy.deepcopy(grid)
-
-        for px, py in piece:
-            gx = x + px
-            gy = y + py
-            if 0 <= gx < GRID_WIDTH and 0 <= gy < GRID_HEIGHT:
-                new_grid[gy][gx] = True
-
-        return new_grid
