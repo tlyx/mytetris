@@ -20,7 +20,7 @@ from pathlib import Path
 
 import pygame  # via pygame-ce
 
-from engine import TetrisEngine, GRID_WIDTH, GRID_HEIGHT, MAX_SCORE, SHAPES_DATA
+from engine import TetrisEngine, GRID_WIDTH, GRID_HEIGHT, MAX_SCORE
 from renderer import (
     Renderer,
     SCREEN_WIDTH,
@@ -439,7 +439,7 @@ class TetrisApp:
                 prev_total_lines = self.game.total_lines
                 self.bot.update(self.game)
                 if self.game.total_lines > prev_total_lines:
-                    self._play_sound("clear")
+                    self.audio.play_sfx("clear")   # <-- 修复：改用 audio.play_sfx
                 self._update_high_score()
                 self._check_level_upgrade()
 
