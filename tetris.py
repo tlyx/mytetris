@@ -336,8 +336,9 @@ class TetrisApp:
         self.input_handler.reset()
         # 状态切回 Playing
         self._current_state = PlayingState()
-        # 重置 Bot
+        # 重置 Bot（包括 bot_enabled 状态）
         self.bot = Bot()
+        self.bot_enabled = False
         self._bot_was_enabled = False
 
     def handle_quit(self) -> None:
