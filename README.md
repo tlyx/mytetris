@@ -34,6 +34,7 @@
     *   Background music with toggle (M key).
     *   Sound effects for line clears and game over, with toggle (S key).
 *   **High Score Persistence**: Best score is saved automatically across sessions.
+*   **Auto‑play Bot**: Let the computer play the game automatically with a toggleable AI player (press A).
 
 ## Prerequisites
 
@@ -102,6 +103,7 @@ xattr -cr /Applications/mytetris.app
 | M                | Toggle background music       |
 | S                | Toggle sound effects          |
 | F1 / ?           | Toggle help                   |
+| A                | Toggle auto‑play bot          |
 
 ## License
 
