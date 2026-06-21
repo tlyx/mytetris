@@ -1,6 +1,6 @@
 [project]
 name = "mytetris"
-version = "0.9.8"
+version = "0.9.9"
 description = "Homemade MyTetris with AI"
 readme = "README.md"
 requires-python = ">=3.13"
