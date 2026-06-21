@@ -39,6 +39,7 @@ from state_handlers import (
     GameOverState,
 )
 from utils import resource_path
+from bot import Bot  # <-- 新增导入
 
 # 最小窗口尺寸（小于此值会被强制拉伸到该最小尺寸）
 # 增加50像素避免黑边过窄
@@ -105,6 +106,10 @@ class TetrisApp:
     # ---- 统一时间源 ----
     _now: int  # 每帧更新，存储当前时间戳
 
+    # ---- bot 相关 ----
+    bot: Bot
+    bot_enabled: bool
+
     @property
     def now(self) -> int:
         """返回当前帧的时间戳（毫秒），供状态处理器和输入处理器使用。"""
@@ -152,20 +157,9 @@ class TetrisApp:
 
         # 初始化时间
         self._now = 0
-        # ---------- BOT STATE ----------
+        # ---------- BOT 状态 ----------
+        self.bot = Bot()
         self.bot_enabled = False
-        self._bot_plan = None
-        self._bot_phase = "plan"
-        self._bot_target_x = 0
-        self._bot_rotation = 0
-        self._bot_step = 0
-        self._bot_timer = 0
-        self._bot_target_x = 0
-        self._bot_ready = False
-        self._bot_dropping = False
-        self._last_piece_type = None
-        self._bot_locked = False
-        self._bot_last_target = None
         # -------------------------------
 
     # ------------------------------------------------------------------
@@ -227,9 +221,6 @@ class TetrisApp:
         self.clear_anim_enabled = True
         self._game_over_sound_played = False
         self._help_active = False
-
-        # FIX: required for bot stability
-        self._last_piece_type = None
 
     def _init_sidebar_style(self) -> None:
         """设置侧边栏背景色（灰蓝色调）。"""
@@ -345,6 +336,8 @@ class TetrisApp:
         self.input_handler.reset()
         # 状态切回 Playing
         self._current_state = PlayingState()
+        # 重置 Bot
+        self.bot = Bot()
 
     def handle_quit(self) -> None:
         """处理退出事件（保存配置、关闭窗口、退出进程）。"""
@@ -442,8 +435,13 @@ class TetrisApp:
                 self.input_handler.reset()
 
             # bot runs independently
-            if self.bot_enabled:
-                self._run_bot()
+            if self.bot_enabled and not self.game.game_over and not self.paused:
+                prev_total_lines = self.game.total_lines
+                self.bot.update(self.game)
+                if self.game.total_lines > prev_total_lines:
+                    self._play_sound("clear")
+                self._update_high_score()
+                self._check_level_upgrade()
 
             self._render_game_scene()
             self.clock.tick(60)
@@ -469,11 +467,9 @@ class TetrisApp:
                 self._toggle_ghost()
                 continue
 
-            # BOT TOGGLE FIXED
+            # BOT TOGGLE
             if event.type == pygame.KEYDOWN and event.key == pygame.K_a:
                 self.bot_enabled = not self.bot_enabled
-                self._bot_plan = None
-                self._bot_step = 0
                 print("BOT:", "ON" if self.bot_enabled else "OFF")
                 continue
 
@@ -574,204 +570,3 @@ class TetrisApp:
                 pygame.mouse.set_visible(True)
 
         pygame.display.flip()
-
-    # ---------- bot 相关方法 ----------
-
-    def _run_bot(self) -> None:
-        if self.game.game_over or self.paused:
-            return
-
-        if self.game.current_type != self._last_piece_type:
-            self._bot_plan = None
-            self._bot_step = 0
-            self._last_piece_type = self.game.current_type
-
-        if self._bot_plan is None:
-            shape = SHAPES_DATA[self.game.current_type]
-            self._bot_plan = self._solve(self.game.grid, shape)
-            self._bot_step = 0
-
-        rotation, target_x = self._bot_plan
-
-        # ---------------- ROTATION ----------------
-        if self._bot_step < rotation:
-            self.game.rotate()
-            self._bot_step += 1
-            return
-
-        # ---------------- HORIZONTAL ----------------
-        piece_cells = self.game.get_piece_cells()
-        min_x = min(x for x, _ in piece_cells)   # <-- 修改点1：y -> _
-
-        dx = target_x - min_x
-
-        if dx > 0:
-            if not self.game.move(1, 0):
-                self._bot_plan = None
-            return
-
-        if dx < 0:
-            if not self.game.move(-1, 0):
-                self._bot_plan = None
-            return
-
-        # ---------------- DROP ----------------
-        while self.game.move(0, 1):
-            pass
-
-        self._lock_and_update()
-
-        self._bot_plan = None
-        self._bot_step = 0
-
-    def _simulate(
-        self,
-        grid: list[list[tuple[int, int, int] | None]],
-        shape: list[tuple[int, int]],
-        rotation: int,
-        target_x: int,
-    ) -> float | None:
-        import copy
-
-        piece = list(shape)
-
-        # rotate
-        for _ in range(rotation):
-            piece = [(-py, px) for px, py in piece]
-
-        # normalize shape (IMPORTANT: stable anchor)
-        min_x = min(px for px, _ in piece)         # <-- 修改点2：py -> _
-        min_y = min(py for _, py in piece)         # <-- 修改点3：px -> _
-        piece = [(px - min_x, py - min_y) for px, py in piece]
-
-        # FINAL x clamp BEFORE collision test (THIS FIXES wall sticking)
-        target_x = max(0, min(GRID_WIDTH - 1, target_x))
-
-        # check if fits horizontally at all
-        max_px = max(px for px, _ in piece)        # <-- 修改点4：py -> _
-        if target_x + max_px >= GRID_WIDTH:
-            return None
-
-        # collision at spawn
-        if self._collides(grid, piece, target_x, 0):
-            return None
-
-        # drop simulation
-        y = 0
-        while not self._collides(grid, piece, target_x, y + 1):
-            y += 1
-
-        new_grid: list[list[tuple[int, int, int] | None]] = copy.deepcopy(grid)
-
-        for px, py in piece:
-            gx = target_x + px
-            gy = y + py
-            if 0 <= gx < GRID_WIDTH and 0 <= gy < GRID_HEIGHT:
-                new_grid[gy][gx] = (1, 1, 1)  # placeholder, only occupancy matters
-
-        return self._evaluate_grid(new_grid)
-
-    def _collides(
-        self,
-        grid: list[list[tuple[int, int, int] | None]],
-        piece: list[tuple[int, int]],
-        x: int,
-        y: int,
-    ) -> bool:
-        for px, py in piece:
-            gx = x + px
-            gy = y + py
-
-            if gx < 0 or gx >= GRID_WIDTH:
-                return True
-            if gy >= GRID_HEIGHT:
-                return True
-            if gy >= 0 and grid[gy][gx] is not None:
-                return True
-
-        return False
-
-    def _evaluate_grid(
-        self,
-        grid: list[list[tuple[int, int, int] | None]],
-    ) -> float:
-        heights: list[int] = []
-        holes = 0
-        bumpiness = 0
-        lines = 0
-
-        for y in range(GRID_HEIGHT):
-            if all(cell is not None for cell in grid[y]):
-                lines += 1
-
-        for x in range(GRID_WIDTH):
-            col_height = 0
-            block_found = False
-
-            for y in range(GRID_HEIGHT):
-                if grid[y][x] is not None:
-                    if not block_found:
-                        col_height = GRID_HEIGHT - y
-                        block_found = True
-                else:
-                    if block_found:
-                        holes += 1
-
-            heights.append(col_height)
-
-        for i in range(GRID_WIDTH - 1):
-            bumpiness += abs(heights[i] - heights[i + 1])
-
-        aggregate_height = sum(heights)
-
-        max_height = max(heights)
-
-        return (
-                lines * 800
-                - aggregate_height * 6
-                - holes * 120
-                - bumpiness * 4
-                - max_height * 2
-                - abs(GRID_WIDTH // 2 - heights.index(max(heights))) * 3
-        )
-
-    def _solve(
-        self,
-        grid: list[list[tuple[int, int, int] | None]],
-        shape: list[tuple[int, int]],
-    ) -> tuple[int, int]:
-        next_type = getattr(self.game, "next_type", None)
-        next_shape: list[tuple[int, int]] | None = (
-            SHAPES_DATA.get(next_type) if next_type else None
-        )
-
-        best_score: float = float("-inf")
-        best_move: tuple[int, int] = (0, GRID_WIDTH // 2)
-
-        for rotation1 in range(4):
-            for x1 in range(GRID_WIDTH):
-                score1 = self._simulate(grid, shape, rotation1, x1)
-                if score1 is None:
-                    continue
-
-                # If no next piece info → fallback to greedy
-                if not next_shape:
-                    total: float = score1
-                else:
-                    best_next: float = float("-inf")
-
-                    for rotation2 in range(4):
-                        for x2 in range(GRID_WIDTH):
-                            score2 = self._simulate(grid, next_shape, rotation2, x2)
-                            if score2 is None:
-                                continue
-                            if score2 > best_next:
-                                best_next = score2
-
-                    total = score1 + 0.5 * best_next
-
-                if total > best_score:
-                    best_score = total
-                    best_move = (rotation1, x1)
-
-        return best_move
