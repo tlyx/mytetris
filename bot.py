@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import copy
-from typing import Optional
 
 from engine import TetrisEngine, GRID_WIDTH, GRID_HEIGHT, SHAPES_DATA
 
@@ -13,9 +12,9 @@ class Bot:
     """具有简单乐高型评估的自动方块机器人。"""
 
     def __init__(self) -> None:
-        self._plan: Optional[tuple[int, int]] = None  # (rotation, target_x)
+        self._plan: tuple[int, int] | None = None  # (rotation, target_x)
         self._step: int = 0
-        self._last_piece_type: Optional[str] = None
+        self._last_piece_type: str | None = None
 
     def reset(self) -> None:
         """重置内部状态（当游戏重新开始时调用）。"""
@@ -80,13 +79,13 @@ class Bot:
 
     def _solve(
         self,
-        grid: list[list[Optional[tuple[int, int, int]]]],
+        grid: list[list[tuple[int, int, int] | None]],
         shape: list[tuple[int, int]],
         engine: TetrisEngine,
     ) -> tuple[int, int]:
         """返回最佳移动 (rotation, target_x)。"""
         next_type = getattr(engine, "next_type", None)
-        next_shape: Optional[list[tuple[int, int]]] = (
+        next_shape: list[tuple[int, int]] | None = (
             SHAPES_DATA.get(next_type) if next_type else None
         )
 
@@ -121,11 +120,11 @@ class Bot:
 
     def _simulate(
         self,
-        grid: list[list[Optional[tuple[int, int, int]]]],
+        grid: list[list[tuple[int, int, int] | None]],
         shape: list[tuple[int, int]],
         rotation: int,
         target_x: int,
-    ) -> Optional[float]:
+    ) -> float | None:
         """模拟放置并返回评估分数；若无法放置则返回 None。"""
         piece = list(shape)
 
@@ -154,7 +153,7 @@ class Bot:
         while not self._collides(grid, piece, target_x, y + 1):
             y += 1
 
-        new_grid: list[list[Optional[tuple[int, int, int]]]] = copy.deepcopy(grid)
+        new_grid: list[list[tuple[int, int, int] | None]] = copy.deepcopy(grid)
         for px, py in piece:
             gx = target_x + px
             gy = y + py
@@ -165,7 +164,7 @@ class Bot:
 
     @staticmethod
     def _collides(
-        grid: list[list[Optional[tuple[int, int, int]]]],
+        grid: list[list[tuple[int, int, int] | None]],
         piece: list[tuple[int, int]],
         x: int,
         y: int,
@@ -185,7 +184,7 @@ class Bot:
 
     @staticmethod
     def _evaluate_grid(
-        grid: list[list[Optional[tuple[int, int, int]]]],
+        grid: list[list[tuple[int, int, int] | None]],
     ) -> float:
         """根据启发式规则返回分数（越高越好）。"""
         heights: list[int] = []
