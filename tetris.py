@@ -271,9 +271,8 @@ class TetrisApp:
 
     # ---- 输入动作回调（由 InputHandler 调用） ----
 
-    def _on_input_action(self, action: Action, from_bot: bool = False) -> None:
-        # Only block HUMAN input when bot is active
-        if self.bot_enabled and not from_bot:
+    def _on_input_action(self, action: Action) -> None:
+        if self.bot_enabled:
             return
 
         if action == Action.MOVE_LEFT:
