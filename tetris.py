@@ -20,7 +20,7 @@ from pathlib import Path
 
 import pygame  # via pygame-ce
 
-from engine import TetrisEngine, GRID_WIDTH, GRID_HEIGHT, MAX_SCORE
+from engine import TetrisEngine, GRID_WIDTH, GRID_HEIGHT, MAX_SCORE, SHAPES_DATA
 from renderer import (
     Renderer,
     SCREEN_WIDTH,
@@ -39,6 +39,7 @@ from state_handlers import (
     GameOverState,
 )
 from utils import resource_path
+from bot import Bot  # <-- 新增导入
 
 # 最小窗口尺寸（小于此值会被强制拉伸到该最小尺寸）
 # 增加50像素避免黑边过窄
@@ -105,6 +106,10 @@ class TetrisApp:
     # ---- 统一时间源 ----
     _now: int  # 每帧更新，存储当前时间戳
 
+    # ---- bot 相关 ----
+    bot: Bot
+    bot_enabled: bool
+
     @property
     def now(self) -> int:
         """返回当前帧的时间戳（毫秒），供状态处理器和输入处理器使用。"""
@@ -154,6 +159,10 @@ class TetrisApp:
 
         # 初始化时间
         self._now = 0
+        # ---------- BOT 状态 ----------
+        self.bot = Bot()
+        self.bot_enabled = False
+        # -------------------------------
 
     # ------------------------------------------------------------------
     # 初始化辅助方法 (将 __init__ 按功能拆分)
@@ -259,19 +268,29 @@ class TetrisApp:
         self.ghost_enabled = not self.ghost_enabled
 
     # ---- 输入动作回调（由 InputHandler 调用） ----
-    def _on_input_action(self, action: Action) -> None:
-        """根据 InputHandler 发出的动作执行对应的游戏逻辑。"""
+
+    def _on_input_action(self, action: Action, from_bot: bool = False) -> None:
+        print("APPLYING:", action, "BOT:" if from_bot else "HUMAN")
+
+        # Only block HUMAN input when bot is active
+        if self.bot_enabled and not from_bot:
+            return
+
         if action == Action.MOVE_LEFT:
             self.game.move(-1, 0)
+
         elif action == Action.MOVE_RIGHT:
             self.game.move(1, 0)
+
         elif action == Action.SOFT_DROP:
             if not self.game.move(0, 1):
                 self._lock_and_update()
+
         elif action == Action.HARD_DROP:
             while self.game.move(0, 1):
                 pass
             self._lock_and_update()
+
         elif action == Action.ROTATE:
             self.game.rotate()
 
@@ -317,6 +336,8 @@ class TetrisApp:
         self.input_handler.reset()
         # 状态切回 Playing
         self._current_state = PlayingState()
+        # 重置 Bot
+        self.bot = Bot()
 
     def handle_quit(self) -> None:
         """处理退出事件（保存配置、关闭窗口、退出进程）。"""
@@ -399,50 +420,67 @@ class TetrisApp:
         )
 
     def run(self) -> None:
-        """主循环：保持窗口尺寸、处理事件、渲染场景"""
+        """Main game loop."""
         while True:
-            # 更新统一时间源
             self._now = pygame.time.get_ticks()
+
             self._enforce_min_size()
             self._process_events()
-            # 只在游戏进行且非暂停/确认退出/帮助状态时处理自动重复
+
+            # ONLY process auto repeat when player is active
             if not (self.game.game_over or self.paused or self.confirm_quit or self._help_active):
-                self.input_handler.process_auto_repeat(self._now)
+                if not self.bot_enabled:
+                    self.input_handler.process_auto_repeat(self._now)
             else:
                 self.input_handler.reset()
+
+            # bot runs independently
+            if self.bot_enabled and not self.game.game_over and not self.paused:
+                prev_total_lines = self.game.total_lines
+                self.bot.update(self.game)
+                if self.game.total_lines > prev_total_lines:
+                    self._play_sound("clear")
+                self._update_high_score()
+                self._check_level_upgrade()
+
             self._render_game_scene()
             self.clock.tick(60)
 
     def _process_events(self) -> None:
-        """处理所有事件（按优先级和状态分发）"""
-        # 全局一次性事件：game over 音效
         if self.game.game_over and not self._game_over_sound_played:
             self.audio.play_sfx("game_over")  # 直接委托给 AudioManager
             self._game_over_sound_played = True
-            # 如果状态还不是 GameOver，切换过去
             if not isinstance(self._current_state, GameOverState):
                 self._switch_state(GameOverState())
 
         for event in pygame.event.get():
-            # --- 全局高优先级事件（任何时候都能响应）---
+
             if event.type == pygame.KEYDOWN and event.key == pygame.K_m:
                 self._toggle_music()
                 continue
+
             if event.type == pygame.KEYDOWN and event.key == pygame.K_s:
                 self._toggle_sfx()
                 continue
-            # Ghost piece 开关（G键）全局响应
+
             if event.type == pygame.KEYDOWN and event.key == pygame.K_g:
                 self._toggle_ghost()
                 continue
+
+            # BOT TOGGLE
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_a:
+                self.bot_enabled = not self.bot_enabled
+                print("BOT:", "ON" if self.bot_enabled else "OFF")
+                continue
+
             if event.type == pygame.QUIT:
                 self.handle_quit()
                 return
+
             if event.type == pygame.VIDEORESIZE:
                 self._handle_resize(event)
                 continue
 
-            # 委托给当前状态处理器
             new_state = self._current_state.handle_event(self, event)
             if new_state is not None:
                 self._switch_state(new_state)

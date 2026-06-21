@@ -108,14 +108,18 @@ class TetrisEngine:
         return False
 
     def rotate(self) -> None:
-        """尝试旋转当前方块（O 型不旋转），支持 Wall Kick。"""
         if self.current_type == "O":
             return
-        new_shape: list[tuple[int, int]] = [(-dy, dx) for dx, dy in self.current_shape]
+
+        new_shape = [(-dy, dx) for dx, dy in self.current_shape]
+
+        # wall kick check first
         if not self._check_collision(self.x, self.y, new_shape):
             self.current_shape = new_shape
             return
+
         kicks = [(1, 0), (-1, 0), (0, -1), (1, -1), (-1, -1), (0, -2)]
+
         for ox, oy in kicks:
             if not self._check_collision(self.x + ox, self.y + oy, new_shape):
                 self.x += ox
@@ -168,23 +172,35 @@ class TetrisEngine:
         # 从 bag 中取出下一个方块作为 next_type（若 bag 为空则重新填充）
         self.next_type = self._draw_from_bag()
         self.x = 4
-        self.y = 1
+        self.y = 0
 
         if self._check_collision(self.x, self.y):
             self.game_over = True
 
     def _check_collision(
-        self, nx: int, ny: int, shape: list[tuple[int, int]] | None = None
+        self,
+        nx: int,
+        ny: int,
+        shape: list[tuple[int, int]] | None = None,
     ) -> bool:
-        """检查方块在给定位置是否与墙壁或已有块碰撞。"""
-        shape = shape or self.current_shape
+        shape = shape if shape is not None else self.current_shape
+
         for dx, dy in shape:
             tx, ty = nx + dx, ny + dy
-            if not (0 <= tx < GRID_WIDTH and 0 <= ty < GRID_HEIGHT):
+
+            # FIX: allow negative y during spawn phase
+            if tx < 0 or tx >= GRID_WIDTH:
                 return True
-            if ty >= 0 and self.grid[ty][tx]:
+            if ty >= GRID_HEIGHT:
                 return True
+            if ty >= 0 and self.grid[ty][tx] is not None:
+                return True
+
         return False
+
+    def get_piece_cells(self):
+        """Return absolute positions of current piece blocks on the grid."""
+        return [(self.x + dx, self.y + dy) for dx, dy in self.current_shape]
 
     # ---------- 7-bag 随机生成器 ----------
     def _refill_bag(self) -> None:
