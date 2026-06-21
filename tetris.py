@@ -39,7 +39,7 @@ from state_handlers import (
     GameOverState,
 )
 from utils import resource_path
-from bot import Bot  # <-- 新增导入
+from bot import Bot
 
 # 最小窗口尺寸（小于此值会被强制拉伸到该最小尺寸）
 # 增加50像素避免黑边过窄
@@ -109,6 +109,7 @@ class TetrisApp:
     # ---- bot 相关 ----
     bot: Bot
     bot_enabled: bool
+    _bot_was_enabled: bool  # 标记 bot 是否曾被启用过（用于决定是否保存配置）
 
     @property
     def now(self) -> int:
@@ -162,6 +163,7 @@ class TetrisApp:
         # ---------- BOT 状态 ----------
         self.bot = Bot()
         self.bot_enabled = False
+        self._bot_was_enabled = False  # 初始没有启用过 bot
         # -------------------------------
 
     # ------------------------------------------------------------------
@@ -338,10 +340,13 @@ class TetrisApp:
         self._current_state = PlayingState()
         # 重置 Bot
         self.bot = Bot()
+        self._bot_was_enabled = False
 
     def handle_quit(self) -> None:
         """处理退出事件（保存配置、关闭窗口、退出进程）。"""
-        self.config.save()
+        # 只有 bot 从未被启用时才保存配置（bot 运行后的数据不算）
+        if not self._bot_was_enabled:
+            self.config.save()
         self.audio.shutdown()
         pygame.mouse.set_visible(True)
         pygame.quit()
@@ -377,7 +382,11 @@ class TetrisApp:
             self._update_speed()
 
     def _update_high_score(self) -> None:
-        """实时更新最高分（内存中）。退出时统一保存配置。"""
+        """实时更新最高分（内存中）。退出时统一保存配置。
+           若 bot 曾启用（包含正在启用），则禁止更新最高分。
+        """
+        if self._bot_was_enabled:
+            return  # bot 运行期间及之后的分数不记入最高分
         if self.game.score > self.high_score:
             self.high_score = min(self.game.score, MAX_SCORE)
             self.config.high_score = self.high_score
@@ -439,7 +448,7 @@ class TetrisApp:
                 prev_total_lines = self.game.total_lines
                 self.bot.update(self.game)
                 if self.game.total_lines > prev_total_lines:
-                    self.audio.play_sfx("clear")   # <-- 修复：改用 audio.play_sfx
+                    self.audio.play_sfx("clear")
                 self._update_high_score()
                 self._check_level_upgrade()
 
@@ -470,6 +479,8 @@ class TetrisApp:
             # BOT TOGGLE
             if event.type == pygame.KEYDOWN and event.key == pygame.K_a:
                 self.bot_enabled = not self.bot_enabled
+                if self.bot_enabled:
+                    self._bot_was_enabled = True  # 记录 bot 曾启用
                 print("BOT:", "ON" if self.bot_enabled else "OFF")
                 continue
 
