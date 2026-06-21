@@ -476,8 +476,11 @@ class TetrisApp:
                 self._toggle_ghost()
                 continue
 
-            # BOT TOGGLE
+            # BOT TOGGLE – 仅当 experimental 模式启用时才允许
             if event.type == pygame.KEYDOWN and event.key == pygame.K_a:
+                if not self.config.experimental:
+                    print("BOT: experimental mode is disabled, cannot toggle bot")
+                    continue
                 self.bot_enabled = not self.bot_enabled
                 if self.bot_enabled:
                     self._bot_was_enabled = True  # 记录 bot 曾启用

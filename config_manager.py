@@ -23,7 +23,7 @@ class ConfigManager:
     # 配置字段默认值（bool 在前按字母顺序，数字在后）
     _defaults: ClassVar[dict[str, ConfigValue]] = {
         "clear_anim_enabled": True,
-        "experimental": False,                     # 实验性功能开关
+        "experimental": True,                     # 实验性功能开关，默认为 True
         "music_enabled": True,
         "sfx_enabled": True,
         "high_score": 0,
