@@ -1,0 +1,10 @@
+{
+  "typeCheckingMode": "basic",
+  "reportUnusedCallResult": false,
+  "reportAny": false,
+  "exclude": [
+    "tests",
+    ".venv",
+    "__pycache__"
+  ]
+}
