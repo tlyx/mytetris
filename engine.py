@@ -45,6 +45,37 @@ SHAPES_DATA: dict[str, list[tuple[int, int]]] = {
 # 七种标准方块类型列表（用于7-bag随机生成）
 ALL_PIECES: list[str] = ["I", "O", "T", "L", "J", "S", "Z"]
 
+# ----------------- Wall kick / spawn related constants -----------------
+# These are a compact, pragmatic set of kick offsets to try when a rotation
+# collides. They are not a full SRS implementation but are more explicit
+# and easier to maintain than an ad-hoc inline list.
+# I-piece generally needs wider horizontal kicks, so we provide a separate
+# set for it.
+WALL_KICKS_OTHERS: list[tuple[int, int]] = [
+    (0, 0),
+    (1, 0),
+    (-1, 0),
+    (0, -1),
+    (1, -1),
+    (-1, -1),
+    (0, -2),
+]
+
+WALL_KICKS_I: list[tuple[int, int]] = [
+    (0, 0),
+    (1, 0),
+    (-1, 0),
+    (2, 0),
+    (-2, 0),
+    (0, -1),
+    (0, -2),
+]
+
+# Note: spawn behavior will align the top of the piece to row 0 so all
+# piece cells are at ty >= 0 immediately after spawn. This makes spawn
+# deterministic and consistent across piece types.
+# ---------------------------------------------------------------------
+
 
 @final
 class TetrisEngine:
@@ -63,6 +94,7 @@ class TetrisEngine:
     current_shape: list[tuple[int, int]]
     x: int
     y: int
+    rotation: int
     # 7-bag 相关
     _bag: list[str]
 
@@ -81,6 +113,9 @@ class TetrisEngine:
         self.current_shape = []
         self.x = 0
         self.y = 0
+        # rotation state 0..3 (0 = spawn orientation). Stored to allow
+        # future SRS-style kick tables and deterministic rotation behavior.
+        self.rotation = 0
         self._bag = []
         self._last_cleared_rows = []
         self.reset()
@@ -97,6 +132,8 @@ class TetrisEngine:
         self._refill_bag()
         # 从 bag 中取出第一个方块作为 next_type
         self.next_type = self._draw_from_bag()
+        # ensure rotation state reset and spawn first piece
+        self.rotation = 0
         self._spawn_piece()
 
     def move(self, dx: int, dy: int) -> bool:
@@ -108,23 +145,37 @@ class TetrisEngine:
         return False
 
     def rotate(self) -> None:
+        """Rotate current piece (no-op for O) and attempt wall-kicks.
+
+        The rotation here uses a 90-degree CCW transform (x,y) -> (-y,x)
+        to remain compatible with the rest of the code. If the rotated
+        shape collides, try a sequence of kick offsets (separate sets for
+        the ‘I’ piece and for other pieces). This is a pragmatic, readable
+        kick sequence rather than a full SRS implementation.
+        """
         if self.current_type == "O":
             return
 
+        # rotate 90 deg CCW
         new_shape = [(-dy, dx) for dx, dy in self.current_shape]
 
-        # wall kick check first
+        # try without kicks first
         if not self._check_collision(self.x, self.y, new_shape):
             self.current_shape = new_shape
+            # update rotation state (90deg CCW)
+            self.rotation = (self.rotation + 1) % 4
             return
 
-        kicks = [(1, 0), (-1, 0), (0, -1), (1, -1), (-1, -1), (0, -2)]
+        # choose appropriate kick set
+        kicks = WALL_KICKS_I if self.current_type == "I" else WALL_KICKS_OTHERS
 
         for ox, oy in kicks:
             if not self._check_collision(self.x + ox, self.y + oy, new_shape):
                 self.x += ox
                 self.y += oy
                 self.current_shape = new_shape
+                # update rotation state only when rotation actually applied
+                self.rotation = (self.rotation + 1) % 4
                 return
 
     def lock_and_clear_lines(self) -> None:
@@ -171,9 +222,24 @@ class TetrisEngine:
         self.current_shape = list(SHAPES_DATA[self.current_type])
         # 从 bag 中取出下一个方块作为 next_type（若 bag 为空则重新填充）
         self.next_type = self._draw_from_bag()
-        self.x = 4
-        self.y = 0
+        # Compute a horizontally centered spawn X based on the piece bounding
+        # box so different-shaped pieces appear centered on spawn instead of
+        # always using a fixed constant.
+        min_px = min(px for px, _ in self.current_shape)
+        max_px = max(px for px, _ in self.current_shape)
+        piece_width = max_px - min_px + 1
+        self.x = (GRID_WIDTH - piece_width) // 2 - min_px
 
+        # Align the top of the piece to row 0 so all piece cells have
+        # ty >= 0 immediately after spawn. This makes behavior consistent
+        # across piece types (no negative ty during normal spawn).
+        min_py = min(py for _, py in self.current_shape)
+        self.y = -min_py
+
+        # reset rotation state for the newly spawned piece
+        self.rotation = 0
+
+        # If spawning collides immediately, the game is over.
         if self._check_collision(self.x, self.y):
             self.game_over = True
 
@@ -236,9 +302,19 @@ class TetrisEngine:
 
         速度范围 2.0～10.0 格/秒，每升一级速度增加量相等。
         """
-        speed_min = 1000.0 / MAX_INITIAL_SPEED   # 2.0 格/秒
-        speed_max = 1000.0 / MIN_SPEED           # 10.0 格/秒
-        # 线性插值速度
-        speed = speed_min + (speed_max - speed_min) * (level - 1) / (MAX_LEVEL - 1)
-        # 转换为毫秒间隔
-        return int(round(1000.0 / speed))
+        # Interpret the constants as milliseconds-per-cell for endpoints.
+        # Convert to cells-per-second for interpolation to keep linear
+        # progression in terms of falling speed (cells/sec), then convert
+        # back to a millisecond interval.
+        cells_per_sec_min = 1000.0 / MAX_INITIAL_SPEED   # e.g. 2.0 cells/sec
+        cells_per_sec_max = 1000.0 / MIN_SPEED           # e.g. 10.0 cells/sec
+
+        # linear interpolation of cells/sec across levels
+        cells_per_sec = (
+            cells_per_sec_min
+            + (cells_per_sec_max - cells_per_sec_min) * (level - 1) / (MAX_LEVEL - 1)
+        )
+
+        # convert to milliseconds per cell (interval)
+        ms_per_cell = 1000.0 / cells_per_sec
+        return int(round(ms_per_cell))
