@@ -116,7 +116,7 @@ def test_check_collision_out_of_bounds_public():
 
 def test_poll_cleared_rows_clears_record():
     eng = make_empty_engine()
-    eng._last_cleared_rows = [0, 1]
+    helpers.set_last_cleared_rows(eng, [0, 1])
     out = eng.poll_cleared_rows()
     assert out == [0, 1]
     assert eng.poll_cleared_rows() == []
