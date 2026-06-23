@@ -92,8 +92,8 @@ class Bot:
         grid: list[list[tuple[int, int, int] | None]],
         shape: list[tuple[int, int]],
         engine: TetrisEngine,
-    ) -> tuple[int, int]:
-        """返回最佳移动 (rotation, target_x)。"""
+    ) -> tuple[int, int] | None:
+        """返回最佳移动 (rotation, target_x)。若无合法放置则返回 None。"""
         next_type = getattr(engine, "next_type", None)
         next_shape: list[tuple[int, int]] | None = (
             SHAPES_DATA.get(next_type) if next_type else None
@@ -101,12 +101,15 @@ class Bot:
 
         best_score: float = float("-inf")
         best_move: tuple[int, int] = (0, GRID_WIDTH // 2)
+        found_any = False
 
         for rotation1 in range(4):
             for x1 in range(GRID_WIDTH):
                 score1 = self._simulate(grid, shape, rotation1, x1, engine)
                 if score1 is None:
                     continue
+
+                found_any = True
 
                 # 如果没有下一块信息，则采用贪心
                 if not next_shape:
@@ -128,6 +131,8 @@ class Bot:
                     best_score = total
                     best_move = (rotation1, x1)
 
+        if not found_any:
+            return None
         return best_move
 
     def _simulate(

@@ -244,9 +244,7 @@ class Renderer:
         bs = int(BLOCK_SIZE * scale)
         board_left = left_width_px
         board_w = GRID_WIDTH * bs
-        board_h = GRID_HEIGHT * bs
         sidebar_left = board_left + board_w
-        border_color = (80, 85, 95)
 
         # 游戏区域背景（覆盖至侧边栏左边缘）
         game_area_width = sidebar_left - board_left
