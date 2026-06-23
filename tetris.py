@@ -121,25 +121,17 @@ class TetrisApp:
         pygame.init()
         self._init_display_sizes()
         self._init_window_and_surfaces()
-        self._init_input()
+        self._init_input()          # 输入初始化（包含 input_handler 创建）
         self._init_game_state()
         self._init_sidebar_style()
         self._enforce_min_size()
-        self._init_icon()
+        TetrisApp._init_icon()
 
         # ---- 加载配置（包含音乐/音效开关） ----
         self._init_config()
 
-        # ---- 初始化音频（此时尚未同步开关状态） ----
-        self.audio = AudioManager()
-        self.audio.load()
-
-        # ---- 将配置中的开关状态同步到 AudioManager ----
-        self.audio.set_music_enabled(self.config.music_enabled)
-        self.audio.set_sfx_enabled(self.config.sfx_enabled)
-
-        # ---- 初始化输入处理器 ----
-        self.input_handler = InputHandler(self._on_input_action)
+        # ---- 初始化音频（包含 AudioManager 创建与开关同步） ----
+        self._init_audio()
 
         # ---- 初始化状态处理器（默认 Playing） ----
         self._current_state = PlayingState()
@@ -160,10 +152,9 @@ class TetrisApp:
 
         # 初始化时间
         self._now = 0
+
         # ---------- BOT 状态 ----------
-        self.bot = Bot()
-        self.bot_enabled = False
-        self._bot_was_enabled = False  # 初始没有启用过 bot
+        self._init_bot()
         # -------------------------------
 
     # ------------------------------------------------------------------
@@ -197,7 +188,7 @@ class TetrisApp:
         self.window_width, self.window_height = self._clamp_size(new_w, new_h)
 
     def _init_window_and_surfaces(self) -> None:
-        """创建显示窗口、字体、逻辑表面。"""
+        """创建显示窗口及逻辑表面。"""
         self.screen = pygame.display.set_mode(
             (self.window_width, self.window_height), pygame.RESIZABLE
         )
@@ -205,9 +196,12 @@ class TetrisApp:
         self._logical = None   # 逻辑表面，渲染时按比例缩放
 
     def _init_input(self) -> None:
-        """设置按键重复参数。"""
+        """设置按键重复参数并创建输入处理器。"""
         # 关闭全局自动重复，所有方向键的自动重复由 InputHandler 实现
         pygame.key.set_repeat(0)
+
+        # 创建输入处理器，绑定按键回调
+        self.input_handler = InputHandler(self._on_input_action)
 
     def _init_game_state(self) -> None:
         """初始化游戏引擎、定时器、等级、分数、暂停等状态。"""
@@ -229,7 +223,8 @@ class TetrisApp:
         """设置侧边栏背景色（灰蓝色调）。"""
         self.sidebar_bg = (40, 45, 55)
 
-    def _init_icon(self) -> None:
+    @staticmethod
+    def _init_icon() -> None:
         """设置窗口图标。"""
         if Path(LOGO_FILE).is_file():
             try:
@@ -247,6 +242,21 @@ class TetrisApp:
         # 注意：不再从 config 复制到 self.music_enabled/sfx_enabled，因为属性已代理
         self.clear_anim_enabled = self.config.clear_anim_enabled
         self.high_score = self.config.high_score
+
+    # ---- 音频初始化 ----
+    def _init_audio(self) -> None:
+        """创建 AudioManager 实例并同步配置中的开关状态。"""
+        self.audio = AudioManager()
+        self.audio.load()
+        self.audio.set_music_enabled(self.config.music_enabled)
+        self.audio.set_sfx_enabled(self.config.sfx_enabled)
+
+    # ---- BOT 初始化 ----
+    def _init_bot(self) -> None:
+        """创建新的 Bot 实例（默认关闭）。"""
+        self.bot = Bot()
+        self.bot_enabled = False
+        self._bot_was_enabled = False
 
     # ---- 音频控制（直接操作 config，委托给 AudioManager） ----
     def _toggle_music(self) -> None:
@@ -336,9 +346,7 @@ class TetrisApp:
         # 状态切回 Playing
         self._current_state = PlayingState()
         # 重置 Bot（包括 bot_enabled 状态）
-        self.bot = Bot()
-        self.bot_enabled = False
-        self._bot_was_enabled = False
+        self._init_bot()
 
     def handle_quit(self) -> None:
         """处理退出事件（保存配置、关闭窗口、退出进程）。"""
@@ -425,6 +433,60 @@ class TetrisApp:
             clearing_rows=self.game.poll_cleared_rows(),
             clear_anim_enabled=self.clear_anim_enabled,
         )
+
+    # ---- 新拆分的方法：字体加载与鼠标隐藏 ----
+
+    def _ensure_fonts(self, scale: float) -> None:
+        """确保字体已根据当前缩放比例加载，若字体文件缺失则退出程序。"""
+        if (self._font_big is None
+                or self._font_small is None
+                or self._help_font is None
+                or abs(scale - self._current_scale) > 1e-9):
+            # 检查必选字体文件是否存在
+            if not Path(FONT_FILE).is_file():
+                print(f"FATAL: Required font file not found: {FONT_FILE}")
+                sys.exit(1)
+            if not Path(HELP_FONT_FILE).is_file():
+                print(f"FATAL: Required font file not found: {HELP_FONT_FILE}")
+                sys.exit(1)
+
+            self._current_scale = scale
+            font_size = max(10, int(32 * scale))
+            small_font_size = max(8, int(20 * scale))
+            help_font_size = max(8, int(20 * scale))
+            self._font_big = pygame.font.Font(FONT_FILE, font_size)
+            self._font_small = pygame.font.Font(FONT_FILE, small_font_size)
+            self._help_font = pygame.font.Font(HELP_FONT_FILE, help_font_size)
+
+            self.renderer.update_fonts(
+                scale, self._font_big, self._font_small, self._help_font,
+            )
+
+    @staticmethod
+    def _update_mouse_visibility(
+        x_off: int,
+        y_off: int,
+        board_left_px: int,
+        board_w_px: int,
+        board_h_px: int,
+    ) -> None:
+        """根据鼠标是否位于游戏棋盘矩形内，切换鼠标隐藏/显示。"""
+        mx, my = pygame.mouse.get_pos()
+        board_phys_left = x_off + board_left_px
+        board_phys_top = y_off
+        board_phys_right = board_phys_left + board_w_px
+        board_phys_bottom = board_phys_top + board_h_px
+        in_board = (board_phys_left <= mx <= board_phys_right and
+                    board_phys_top <= my <= board_phys_bottom)
+
+        if in_board:
+            if pygame.mouse.get_visible():
+                pygame.mouse.set_visible(False)
+        else:
+            if not pygame.mouse.get_visible():
+                pygame.mouse.set_visible(True)
+
+    # ------------------------------------------------------------------
 
     def run(self) -> None:
         """Main game loop."""
@@ -524,30 +586,8 @@ class TetrisApp:
                 or self._logical.get_height() != logical_h):
             self._logical = pygame.Surface((logical_w, logical_h))
 
-        # 首次访问或 scale 变化时重新加载字体，并检查字体文件是否存在
-        if (self._font_big is None
-                or self._font_small is None
-                or self._help_font is None
-                or abs(scale - self._current_scale) > 1e-9):
-            # 检查必选字体文件是否存在
-            if not Path(FONT_FILE).is_file():
-                print(f"FATAL: Required font file not found: {FONT_FILE}")
-                sys.exit(1)
-            if not Path(HELP_FONT_FILE).is_file():
-                print(f"FATAL: Required font file not found: {HELP_FONT_FILE}")
-                sys.exit(1)
-
-            self._current_scale = scale
-            font_size = max(10, int(32 * scale))
-            small_font_size = max(8, int(20 * scale))
-            help_font_size = max(8, int(20 * scale))
-            self._font_big = pygame.font.Font(FONT_FILE, font_size)
-            self._font_small = pygame.font.Font(FONT_FILE, small_font_size)
-            self._help_font = pygame.font.Font(HELP_FONT_FILE, help_font_size)
-
-            self.renderer.update_fonts(
-                scale, self._font_big, self._font_small, self._help_font,
-            )
+        # 字体处理委托给独立方法
+        self._ensure_fonts(scale)
 
         state = self._build_game_state()
 
@@ -566,19 +606,9 @@ class TetrisApp:
         board_w_px = GRID_WIDTH * bs
         board_h_px = GRID_HEIGHT * bs
 
-        mx, my = pygame.mouse.get_pos()
-        board_phys_left = x_off + board_left_px
-        board_phys_top = y_off
-        board_phys_right = board_phys_left + board_w_px
-        board_phys_bottom = board_phys_top + board_h_px
-        in_board = (board_phys_left <= mx <= board_phys_right and
-                    board_phys_top <= my <= board_phys_bottom)
-
-        if in_board:
-            if pygame.mouse.get_visible():
-                pygame.mouse.set_visible(False)
-        else:
-            if not pygame.mouse.get_visible():
-                pygame.mouse.set_visible(True)
+        # 鼠标隐藏逻辑委托给独立方法
+        TetrisApp._update_mouse_visibility(
+            x_off, y_off, board_left_px, board_w_px, board_h_px,
+        )
 
         pygame.display.flip()
