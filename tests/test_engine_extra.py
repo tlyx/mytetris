@@ -82,8 +82,8 @@ def test_rotation_uses_kicks_to_succeed():
 
 def test_lock_and_clear_multiple_lines_scoring():
     eng = make_empty_engine()
-    # pre-fill bottom 3 rows to simulate multiple full lines
-    for r in range(GRID_HEIGHT - 3, GRID_HEIGHT):
+    # pre-fill bottom 3 rows to simulate multiple full lines (engine grid is bottom-origin)
+    for r in range(0, 3):
         eng.grid[r] = [(1, 1, 1)] * GRID_WIDTH
 
     prev_total = eng.total_lines
@@ -102,7 +102,7 @@ def test_get_piece_cells_after_move_and_rotate():
     cells = eng.get_piece_cells()
     assert len(cells) == 4
     for gx, gy in cells:
-        assert -1 <= gy < GRID_HEIGHT
+        assert 0 <= gy < GRID_HEIGHT
         assert 0 <= gx < GRID_WIDTH
 
 
@@ -110,7 +110,8 @@ def test_check_collision_out_of_bounds_public():
     eng = make_empty_engine()
     helpers.spawn_piece_for_test(eng, "I")
     assert helpers.check_collision(eng, -100, eng.y) is True
-    assert helpers.check_collision(eng, eng.x, GRID_HEIGHT + 10) is True
+    # engine allows pieces above the top during spawn, so very large y should not be a collision
+    assert helpers.check_collision(eng, eng.x, GRID_HEIGHT + 10) is False
 
 
 def test_poll_cleared_rows_clears_record():
@@ -124,7 +125,7 @@ def test_poll_cleared_rows_clears_record():
 def test_game_over_on_spawn_if_collides():
     eng = make_empty_engine()
     # fill top row so spawn likely collides
-    eng.grid[0] = [(2, 2, 2)] * GRID_WIDTH
+    eng.grid[GRID_HEIGHT - 1] = [(2, 2, 2)] * GRID_WIDTH
     helpers.spawn_piece_for_test(eng, "I")
     assert eng.game_over is True
 

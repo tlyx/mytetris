@@ -282,11 +282,11 @@ class TetrisApp:
             self.game.move(1, 0)
 
         elif action == Action.SOFT_DROP:
-            if not self.game.move(0, 1):
+            if not self.game.move(0, -1):
                 self._lock_and_update()
 
         elif action == Action.HARD_DROP:
-            while self.game.move(0, 1):
+            while self.game.move(0, -1):
                 pass
             self._lock_and_update()
 
@@ -309,7 +309,7 @@ class TetrisApp:
 
     def handle_fall_timer(self) -> None:
         """处理下落定时器事件（被状态类调用）。"""
-        if not self.game.move(0, 1):
+        if not self.game.move(0, -1):
             self._lock_and_update()
 
     def toggle_help(self) -> None:
@@ -434,7 +434,7 @@ class TetrisApp:
             self._enforce_min_size()
             self._process_events()
 
-            # ONLY process auto repeat when player is active
+            # ONLY process auto-repeat when player is active
             if not (self.game.game_over or self.paused or self.confirm_quit or self._help_active):
                 if not self.bot_enabled:
                     self.input_handler.process_auto_repeat(self._now)

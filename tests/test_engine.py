@@ -14,10 +14,11 @@ def test_spawn_top_aligned_all_pieces():
     eng = make_empty_engine()
     for piece in SHAPES_DATA.keys():
         helpers.spawn_piece_for_test(eng, piece)
-        # current_shape uses relative coords; check that top-most cell is at row 0
-        min_py = min(py for _, py in eng.current_shape)
-        # after spawn eng.y should be -min_py so min_py + eng.y == 0
-        assert min_py + eng.y == 0, f"{piece} not top-aligned: min_py={min_py}, y={eng.y}"
+        # engine 使用底部原点：grid[0] 为底部，spawn 时最高单元应位于 GRID_HEIGHT-1
+        max_py = max(py for _, py in eng.current_shape)
+        assert max_py + eng.y == GRID_HEIGHT - 1, (
+            f"{piece} not top-aligned: max_py={max_py}, y={eng.y}"
+        )
 
 
 def test_move_boundaries():
@@ -62,7 +63,7 @@ def test_rotate_o_piece_noop():
 def test_lock_and_clear_lines_updates_score_and_grid():
     eng = make_empty_engine()
     # pre-fill bottom row to simulate a full line
-    eng.grid[-1] = [(1, 1, 1)] * GRID_WIDTH
+    eng.grid[0] = [(1, 1, 1)] * GRID_WIDTH
     prev_total = eng.total_lines
     prev_score = eng.score
     # ensure current_shape does not interfere
@@ -79,9 +80,9 @@ def test_get_ghost_y_simple():
     helpers.spawn_piece_for_test(eng, "I")
     # drop current piece to bottom via ghost calculation
     g = eng.get_ghost_y()
-    # ghost must be >= current y and less than GRID_HEIGHT
-    assert g >= eng.y
-    assert g < GRID_HEIGHT
+    # engine 使用底部原点：落点 y 应小于等于当前 y 且不小于0
+    assert g <= eng.y
+    assert g >= 0
 
 
 def test_fall_speed_monotonic():

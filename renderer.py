@@ -313,39 +313,47 @@ class Renderer:
         """绘制 10×20 棋盘、当前操控块（不绘制边框，已在静态背景中完成）。
            同时绘制 ghost piece（落点影子）和消行动画闪烁。"""
         # A. 绘制主棋盘（已锁定的方块）
-        for r in range(GRID_HEIGHT):
+        # 注意：engine 内部 grid 使用 bottom-origin (grid[0] 为底部)，
+        # 渲染时需要将 internal row 映射为屏幕行（0=top）
+        for screen_r in range(GRID_HEIGHT):
+            engine_row = GRID_HEIGHT - 1 - screen_r
             for c in range(GRID_WIDTH):
                 color: tuple[int, int, int] = (
-                    state.grid[r][c] or COLORS["GRID_LINE"]
+                    state.grid[engine_row][c] or COLORS["GRID_LINE"]
                 )
-                rect = (board_left + c * bs, r * bs, bs - 1, bs - 1)
+                rect = (board_left + c * bs, screen_r * bs, bs - 1, bs - 1)
                 pygame.draw.rect(ds, color, rect)
 
         # B. 绘制 Ghost piece（半透明影子，仅在启用时绘制）
         if not state.game_over and state.ghost_enabled:
             ghost_y = state.ghost_y
-            # 当前方块的实际 y 坐标可能高于 ghost_y，但只绘制影子位置
             if ghost_y != state.current_y:
                 ghost_color = COLORS[state.current_type]
                 for dx, dy in state.current_shape:
-                    tx = board_left + (state.current_x + dx) * bs
-                    ty = ghost_y + dy
-                    if ty >= 0:
-                        # 创建一个带 alpha 的表面
+                    gx = state.current_x + dx
+                    gy = ghost_y + dy  # internal y (bottom-origin)
+                    if 0 <= gy < GRID_HEIGHT:
+                        screen_row = GRID_HEIGHT - 1 - gy
+                        tx = board_left + gx * bs
+                        ty_px = screen_row * bs
                         ghost_surf = pygame.Surface((bs - 1, bs - 1), pygame.SRCALPHA)
-                        ghost_surf.fill((*ghost_color, 80))  # alpha = 80
-                        ds.blit(ghost_surf, (tx, ty * bs))
+                        ghost_surf.fill((*ghost_color, 80))
+                        ds.blit(ghost_surf, (tx, ty_px))
 
         # C. 绘制当前操控块（在 ghost piece 之上，覆盖它）
         if not state.game_over:
             for dx, dy in state.current_shape:
-                rect = (
-                    board_left + (state.current_x + dx) * bs,
-                    (state.current_y + dy) * bs,
-                    bs - 1,
-                    bs - 1,
-                )
-                pygame.draw.rect(ds, COLORS[state.current_type], rect)
+                gx = state.current_x + dx
+                gy = state.current_y + dy
+                if 0 <= gy < GRID_HEIGHT:
+                    screen_row = GRID_HEIGHT - 1 - gy
+                    rect = (
+                        board_left + gx * bs,
+                        screen_row * bs,
+                        bs - 1,
+                        bs - 1,
+                    )
+                    pygame.draw.rect(ds, COLORS[state.current_type], rect)
 
         # D. 消行动画闪烁（仅在启用时绘制）
         if state.clear_anim_enabled:
@@ -367,7 +375,9 @@ class Renderer:
                         # 创建半透明白色矩形
                         flash_surf = pygame.Surface((_board_w, bs), pygame.SRCALPHA)
                         flash_surf.fill((255, 255, 255, alpha))
-                        ds.blit(flash_surf, (board_left, row * bs))
+                        # row is internal (0=bottom); map to screen row
+                        screen_row = GRID_HEIGHT - 1 - row
+                        ds.blit(flash_surf, (board_left, screen_row * bs))
         else:
             # 动画禁用时，清空残留的动画状态
             self._anim_clearing_rows = []
@@ -493,9 +503,14 @@ class Renderer:
         preview_rect_inner = pygame.Rect(preview_x, preview_y, preview_size, preview_size)
         pygame.draw.rect(ds, (40, 45, 55), preview_rect_inner)
 
+        # NOTE: SHAPES_DATA uses the engine internal bottom-origin
+        # coordinate system (y increases upward). When drawing the
+        # preview (screen coordinates where y increases downward) we
+        # must flip the vertical component so the preview matches the
+        # in-play orientation seen on the main board.
         next_shape: list[tuple[int, int]] = SHAPES_DATA[state.next_type]
-        xs: list[int] = [dx for dx, _dy in next_shape]
-        ys: list[int] = [dy for _dx, dy in next_shape]
+        xs = [dx for dx, _dy in next_shape]
+        ys = [dy for _dx, dy in next_shape]
         min_dx = min(xs)
         max_dx = max(xs)
         min_dy = min(ys)
@@ -504,11 +519,14 @@ class Renderer:
         shape_height = max_dy - min_dy + 1
         offset_x = (preview_size - shape_width * bs) // 2
         offset_y = (preview_size - shape_height * bs) // 2
+
+        # Map engine (dx, dy) -> screen pixels. For vertical mapping we use
+        # (max_dy - dy) so that larger dy (higher in engine coords) appears
+        # higher (smaller screen y) in the preview box.
         for dx, dy in next_shape:
             px = preview_x + offset_x + (dx - min_dx) * bs
-            py = preview_y + offset_y + (dy - min_dy) * bs
-            pygame.draw.rect(ds, COLORS[state.next_type],
-                             (px, py, bs - 1, bs - 1))
+            py = preview_y + offset_y + (max_dy - dy) * bs
+            pygame.draw.rect(ds, COLORS[state.next_type], (px, py, bs - 1, bs - 1))
 
         # ---------- 底部统计信息：Lines, High, Time ----------
         elapsed_sec = (now - state.game_start_ticks) // 1000

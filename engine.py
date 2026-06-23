@@ -33,13 +33,15 @@ COLORS: dict[str, tuple[int, int, int]] = {
 }
 
 SHAPES_DATA: dict[str, list[tuple[int, int]]] = {
+    # Converted to bottom-origin coordinates: y signs inverted compared to previous top-origin data.
+    # Now each (dx, dy) is relative to bottom-origin (y increases upward).
     "I": [(-1, 0), (0, 0), (1, 0), (2, 0)],
-    "O": [(0, 0), (1, 0), (0, 1), (1, 1)],
-    "T": [(0, -1), (-1, 0), (0, 0), (1, 0)],
-    "L": [(1, -1), (-1, 0), (0, 0), (1, 0)],
-    "J": [(-1, -1), (-1, 0), (0, 0), (1, 0)],
-    "S": [(0, 0), (1, 0), (-1, 1), (0, 1)],
-    "Z": [(-1, 0), (0, 0), (0, 1), (1, 1)],
+    "O": [(0, 0), (1, 0), (0, -1), (1, -1)],
+    "T": [(0, 1), (-1, 0), (0, 0), (1, 0)],
+    "L": [(1, 1), (-1, 0), (0, 0), (1, 0)],
+    "J": [(-1, 1), (-1, 0), (0, 0), (1, 0)],
+    "S": [(0, 0), (1, 0), (-1, -1), (0, -1)],
+    "Z": [(-1, 0), (0, 0), (0, -1), (1, -1)],
 }
 
 # 七种标准方块类型列表（用于7-bag随机生成）
@@ -55,10 +57,12 @@ WALL_KICKS_OTHERS: list[tuple[int, int]] = [
     (0, 0),
     (1, 0),
     (-1, 0),
-    (0, -1),
-    (1, -1),
-    (-1, -1),
-    (0, -2),
+    # vertical components were inverted when switching to bottom-origin;
+    # use positive values to represent upward kicks in internal coords.
+    (0, 1),
+    (1, 1),
+    (-1, 1),
+    (0, 2),
 ]
 
 WALL_KICKS_I: list[tuple[int, int]] = [
@@ -67,8 +71,9 @@ WALL_KICKS_I: list[tuple[int, int]] = [
     (-1, 0),
     (2, 0),
     (-2, 0),
-    (0, -1),
-    (0, -2),
+    # same vertical flip for I-piece special kicks
+    (0, 1),
+    (0, 2),
 ]
 
 # Note: spawn behavior will align the top of the piece to row 0 so all
@@ -137,34 +142,39 @@ class TetrisEngine:
         self._spawn_piece()
 
     def move(self, dx: int, dy: int) -> bool:
-        """尝试移动当前方块，返回是否成功移动。"""
+        """尝试移动当前方块，返回是否成功移动。
+
+        Note: internal coordinates use bottom-origin with y increasing upward,
+        therefore callers that request a downward move should pass dy = -1.
+        """
         if not self._check_collision(self.x + dx, self.y + dy):
             self.x += dx
             self.y += dy
             return True
         return False
 
-    def rotate(self) -> None:
+    def rotate(self) -> bool:
         """Rotate current piece (no-op for O) and attempt wall-kicks.
 
-        The rotation here uses a 90-degree CCW transform (x,y) -> (-y,x)
-        to remain compatible with the rest of the code. If the rotated
-        shape collides, try a sequence of kick offsets (separate sets for
-        the ‘I’ piece and for other pieces). This is a pragmatic, readable
-        kick sequence rather than a full SRS implementation.
+        Returns True if the rotation was applied (possibly after a kick),
+        False if no rotation occurred (O-piece or all kicks collided).
+
+        The rotation here uses a 90-degree CLOCKWISE transform in the
+        engine's internal bottom-origin coords: (x, y) -> (y, -x).
         """
         if self.current_type == "O":
-            return
+            # O-piece rotation is a no-op
+            return False
 
-        # rotate 90 deg CCW
-        new_shape = [(-dy, dx) for dx, dy in self.current_shape]
+        # rotate 90 deg CLOCKWISE in engine internal coords.
+        new_shape = [(dy, -dx) for dx, dy in self.current_shape]
 
         # try without kicks first
         if not self._check_collision(self.x, self.y, new_shape):
             self.current_shape = new_shape
-            # update rotation state (90deg CCW)
+            # update rotation state (one step in our clockwise convention)
             self.rotation = (self.rotation + 1) % 4
-            return
+            return True
 
         # choose appropriate kick set
         kicks = WALL_KICKS_I if self.current_type == "I" else WALL_KICKS_OTHERS
@@ -176,16 +186,25 @@ class TetrisEngine:
                 self.current_shape = new_shape
                 # update rotation state only when rotation actually applied
                 self.rotation = (self.rotation + 1) % 4
-                return
+                return True
+
+        # rotation failed (all kicks collide)
+        return False
 
     def lock_and_clear_lines(self) -> None:
-        """锁定当前方块到网格，然后检测并消除满行，更新分数、等级，生成下一个方块。"""
+        """锁定当前方块到网格，然后检测并消除满行，更新分数、等级，生成下一个方块。
+
+        Internal grid semantics: self.grid[0] is the bottom row; self.grid[GRID_HEIGHT-1]
+        is the top row.
+        """
         lock_color = COLORS[self.current_type]
         for dx, dy in self.current_shape:
-            if 0 <= self.y + dy < GRID_HEIGHT:
-                self.grid[self.y + dy][self.x + dx] = lock_color
+            gx = self.x + dx
+            gy = self.y + dy
+            if 0 <= gy < GRID_HEIGHT and 0 <= gx < GRID_WIDTH:
+                self.grid[gy][gx] = lock_color
 
-        # 记录所有满行的行号
+        # 记录所有满行的行号（internal indexing: 0=bottom）
         cleared_rows: list[int] = []
         for row in range(GRID_HEIGHT):
             if all(cell is not None for cell in self.grid[row]):
@@ -202,44 +221,38 @@ class TetrisEngine:
         if self.score > MAX_SCORE:
             self.score = MAX_SCORE
 
-        # 级别上限限制
+        # 更新等级
         potential_level = (self.total_lines // 10) + 1
         self.level = min(potential_level, MAX_LEVEL)
 
-        # 从网格中删除满行（从后往前删，避免索引错乱），再在顶部插入空行
+        # 从网格中删除满行（从高索引到低索引删除以避免索引错乱），再在顶部插入空行
         if lines_cleared > 0:
-            for row in reversed(cleared_rows):
+            for row in sorted(cleared_rows, reverse=True):
                 del self.grid[row]
             for _ in range(lines_cleared):
-                self.grid.insert(0, [None for _ in range(GRID_WIDTH)])
+                self.grid.append([None for _ in range(GRID_WIDTH)])
 
         self._spawn_piece()
 
     def _spawn_piece(self) -> None:
-        """生成下一个方块到顶部，若碰撞则标记游戏结束。"""
+        """生成下一个方块到顶部（internal bottom-origin），若碰撞则标记游戏结束。"""
         self.current_type = self.next_type
-        # 使用 list() 浅拷贝即可（内部元组不可变）
         self.current_shape = list(SHAPES_DATA[self.current_type])
-        # 从 bag 中取出下一个方块作为 next_type（若 bag 为空则重新填充）
         self.next_type = self._draw_from_bag()
-        # Compute a horizontally centered spawn X based on the piece bounding
-        # box so different-shaped pieces appear centered on spawn instead of
-        # always using a fixed constant.
+
+        # 水平居中 spawn（基于 piece 的 bounding box）
         min_px = min(px for px, _ in self.current_shape)
         max_px = max(px for px, _ in self.current_shape)
         piece_width = max_px - min_px + 1
         self.x = (GRID_WIDTH - piece_width) // 2 - min_px
 
-        # Align the top of the piece to row 0 so all piece cells have
-        # ty >= 0 immediately after spawn. This makes behavior consistent
-        # across piece types (no negative ty during normal spawn).
-        min_py = min(py for _, py in self.current_shape)
-        self.y = -min_py
+        # 将 piece 的最高单元对齐到顶部（internal top row = GRID_HEIGHT - 1）
+        max_py = max(py for _, py in self.current_shape)
+        self.y = GRID_HEIGHT - 1 - max_py
 
-        # reset rotation state for the newly spawned piece
+        # reset rotation
         self.rotation = 0
 
-        # If spawning collides immediately, the game is over.
         if self._check_collision(self.x, self.y):
             self.game_over = True
 
@@ -249,24 +262,50 @@ class TetrisEngine:
         ny: int,
         shape: list[tuple[int, int]] | None = None,
     ) -> bool:
+        """
+        检查在内部坐标（底部原点）下放置 shape 于 (nx, ny) 是否与边界或已锁定方块冲突。
+
+        规则：
+          - gx 越界 -> collision
+          - gy < 0 -> collision
+          - gy >= GRID_HEIGHT -> allow (spawn above top)
+          - 否则如果 grid[gy][gx] 非 None -> collision
+        """
         shape = shape if shape is not None else self.current_shape
 
         for dx, dy in shape:
-            tx, ty = nx + dx, ny + dy
+            gx = nx + dx
+            gy = ny + dy  # internal bottom-origin y
 
-            # FIX: allow negative y during spawn phase
-            if tx < 0 or tx >= GRID_WIDTH:
+            if gx < 0 or gx >= GRID_WIDTH:
                 return True
-            if ty >= GRID_HEIGHT:
+            if gy < 0:
                 return True
-            if ty >= 0 and self.grid[ty][tx] is not None:
+            if gy >= GRID_HEIGHT:
+                # allow parts above the top (spawn area)
+                continue
+            if self.grid[gy][gx] is not None:
                 return True
 
         return False
 
     def get_piece_cells(self):
-        """Return absolute positions of current piece blocks on the grid."""
+        """Return absolute positions of current piece blocks using internal coords (bottom-origin)."""
         return [(self.x + dx, self.y + dy) for dx, dy in self.current_shape]
+
+    def can_place(
+        self,
+        nx: int,
+        ny: int,
+        shape: list[tuple[int, int]] | None = None,
+    ) -> bool:
+        """Public helper: return True iff placing `shape` at (nx, ny) would NOT collide.
+
+        This is a thin, readable wrapper around the internal _check_collision
+        (which returns True on collision). Callers that need to query validity
+        of a placement should use this rather than duplicating collision logic.
+        """
+        return not self._check_collision(nx, ny, shape)
 
     # ---------- 7-bag 随机生成器 ----------
     def _refill_bag(self) -> None:
@@ -282,10 +321,13 @@ class TetrisEngine:
 
     # ---------- Ghost piece ----------
     def get_ghost_y(self) -> int:
-        """返回当前方块垂直落到底部后的 y 坐标。"""
+        """返回当前方块垂直落到底部后的内部 y（底部为 0）。
+
+        在内部坐标系中，下落方向表示为 y 减小（向下移动使 y 减 1）。
+        """
         ghost_y = self.y
-        while not self._check_collision(self.x, ghost_y + 1):
-            ghost_y += 1
+        while not self._check_collision(self.x, ghost_y - 1):
+            ghost_y -= 1
         return ghost_y
 
     # ---------- 消行动画轮询 ----------
