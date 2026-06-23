@@ -284,19 +284,7 @@ class Renderer:
                          (sidebar_content_left, sep_y1),
                          (sidebar_content_right, sep_y1), 1)
 
-        # ---- 边框（上、左、下） ----
-        # 上
-        pygame.draw.line(ds, border_color, (board_left, 0),
-                         (board_left + board_w, 0), 2)
-        # 左
-        pygame.draw.line(ds, border_color, (board_left, 0),
-                         (board_left, board_h), 2)
-        # 下
-        pygame.draw.line(ds, border_color, (board_left, board_h),
-                         (board_left + board_w, board_h), 2)
-        # 右边分隔线（侧边栏左侧）
-        pygame.draw.line(ds, border_color, (sidebar_left, 0),
-                         (sidebar_left, board_h), 2)
+        # ---- 边框在动态绘制中完成，此处不再绘制 ----
 
         return bg
 
@@ -310,8 +298,8 @@ class Renderer:
         _board_w: int, _board_h: int, _border_color: tuple[int, int, int],
         now: int,  # 当前时间（毫秒），用于消行动画
     ) -> None:
-        """绘制 10×20 棋盘、当前操控块（不绘制边框，已在静态背景中完成）。
-           同时绘制 ghost piece（落点影子）和消行动画闪烁。"""
+        """绘制 10×20 棋盘、当前操控块
+           同时绘制 ghost piece（落点影子）和消行动画闪烁"""
         # A. 绘制主棋盘（已锁定的方块）
         # 注意：engine 内部 grid 使用 bottom-origin (grid[0] 为底部)，
         # 渲染时需要将 internal row 映射为屏幕行（0=top）
@@ -381,6 +369,16 @@ class Renderer:
         else:
             # 动画禁用时，清空残留的动画状态
             self._anim_clearing_rows = []
+
+        # 动态绘制棋盘边框（上、左、下）及右侧分隔线，覆盖可能残留的像素点
+        pygame.draw.line(ds, _border_color, (board_left, 0),
+                         (board_left + _board_w, 0), 2)
+        pygame.draw.line(ds, _border_color, (board_left, 0),
+                         (board_left, _board_h), 2)
+        pygame.draw.line(ds, _border_color, (board_left, _board_h),
+                         (board_left + _board_w, _board_h), 2)
+        pygame.draw.line(ds, _border_color, (board_left + _board_w, 0),
+                         (board_left + _board_w, _board_h), 2)
 
     def _draw_left_panel(
         self, ds: pygame.Surface, state: GameState,
