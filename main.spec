@@ -31,7 +31,7 @@ def get_combined_version(default_base="0.0.0-unknown"):
     # 2. 尝试追加当前的 Git 短哈希作为动态后缀
     try:
         short_sha = subprocess.check_output(
-            ["git", "rev-parse", "--short", "HEAD"], 
+            ["git", "rev-parse", "--short", "HEAD"],
             stderr=subprocess.DEVNULL
         ).decode("utf-8").strip()
         return f"{base_version}-{short_sha}"
@@ -121,7 +121,7 @@ app = BUNDLE(
     a.datas,
     name='mytetris.app',
     icon='assets/logo.png',
-    bundle_identifier='org.tlyx.tetris',
+    bundle_identifier='org.tlyx.mytetris',
     info_plist={
         'CFBundleShortVersionString': APP_VERSION,  # 🎯 动态同步系统显示版本号
         'CFBundleVersion': APP_VERSION,             # 🎯 动态同步内部构建版本号
