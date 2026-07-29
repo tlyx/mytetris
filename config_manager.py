@@ -67,7 +67,7 @@ class ConfigManager:
                     self._data[key] = value
         except (FileNotFoundError, json.JSONDecodeError, ValueError):
             pass  # 配置文件不存在或格式错误是正常的，保持默认值
-        except Exception as exc:
+        except OSError as exc:
             print(f"WARNING: Failed to load config: {exc}")
         # 记录初始影子值
         self._shadow = dict(self._data)
@@ -82,7 +82,7 @@ class ConfigManager:
             with open(path, "w") as f:
                 json.dump(self._data, f, indent=2)
             self._shadow = dict(self._data)
-        except Exception as exc:
+        except OSError as exc:
             print(f"WARNING: Failed to save config: {exc}")
 
     # ---------- 读取配置项 ----------

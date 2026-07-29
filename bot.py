@@ -123,8 +123,7 @@ class Bot:
                             )
                             if score2 is None:
                                 continue
-                            if score2 > best_next:
-                                best_next = score2
+                            best_next = max(best_next, score2)
                     total = score1 + 0.5 * best_next
 
                 if total > best_score:

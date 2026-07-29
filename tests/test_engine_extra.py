@@ -83,7 +83,7 @@ def test_rotation_uses_kicks_to_succeed():
 def test_lock_and_clear_multiple_lines_scoring():
     eng = make_empty_engine()
     # pre-fill bottom 3 rows to simulate multiple full lines (engine grid is bottom-origin)
-    for r in range(0, 3):
+    for r in range(3):
         eng.grid[r] = [(1, 1, 1)] * GRID_WIDTH
 
     prev_total = eng.total_lines

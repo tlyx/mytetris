@@ -11,7 +11,7 @@ def make_empty_engine():
 
 def test_spawn_top_aligned_all_pieces():
     eng = make_empty_engine()
-    for piece in SHAPES_DATA.keys():
+    for piece in SHAPES_DATA:
         helpers.spawn_piece_for_test(eng, piece)
         # engine 使用底部原点：grid[0] 为底部，spawn 时最高单元应位于 GRID_HEIGHT-1
         max_py = max(py for _, py in eng.current_shape)

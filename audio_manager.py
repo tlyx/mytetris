@@ -59,7 +59,7 @@ class AudioManager:
             # 不再在此处自动播放音乐，由外部在 set_music_enabled 中处理
             # （load 之后外部会调用 set_music_enabled）
 
-        except Exception as exc:
+        except (FileNotFoundError, pygame.error, OSError) as exc:
             print(f"WARNING: Failed to load audio files: {exc}")
             self.audio_enabled = False
 

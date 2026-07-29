@@ -2,7 +2,7 @@
 # 负责网格、方块生成、移动、旋转、消行、计分等逻辑
 
 from random import shuffle
-from typing import final
+from typing import ClassVar, final
 
 GRID_WIDTH, GRID_HEIGHT = 10, 20
 
@@ -87,7 +87,7 @@ class TetrisEngine:
     """游戏逻辑引擎，不依赖任何图形库。"""
 
     # 消行得分表（类常量）
-    SCORE_TABLE: dict[int, int] = {0: 0, 1: 100, 2: 300, 3: 500, 4: 800}
+    SCORE_TABLE: ClassVar[dict[int, int]] = {0: 0, 1: 100, 2: 300, 3: 500, 4: 800}
 
     grid: list[list[tuple[int, int, int] | None]]
     score: int
@@ -213,13 +213,11 @@ class TetrisEngine:
 
         lines_cleared = len(cleared_rows)
         self.total_lines += lines_cleared
-        if self.total_lines > MAX_TOTAL_LINES:
-            self.total_lines = MAX_TOTAL_LINES
+        self.total_lines = min(self.total_lines, MAX_TOTAL_LINES)
 
         # 使用类常量 SCORE_TABLE
         self.score += TetrisEngine.SCORE_TABLE.get(lines_cleared, 800) * self.level
-        if self.score > MAX_SCORE:
-            self.score = MAX_SCORE
+        self.score = min(self.score, MAX_SCORE)
 
         # 更新等级
         potential_level = (self.total_lines // 10) + 1
@@ -359,4 +357,4 @@ class TetrisEngine:
 
         # convert to milliseconds per cell (interval)
         ms_per_cell = 1000.0 / cells_per_sec
-        return int(round(ms_per_cell))
+        return round(ms_per_cell)

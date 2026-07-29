@@ -69,10 +69,7 @@ class PlayingState(StateHandler):
         elif event.type == pygame.KEYDOWN:
             key = event.key
             mods = pygame.key.get_mods()
-            if key == pygame.K_F1:
-                app.toggle_help()
-                return HelpState()
-            elif key == pygame.K_SLASH and (mods & pygame.KMOD_SHIFT):
+            if key == pygame.K_F1 or (key == pygame.K_SLASH and (mods & pygame.KMOD_SHIFT)):
                 app.toggle_help()
                 return HelpState()
             else:
