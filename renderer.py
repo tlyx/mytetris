@@ -12,8 +12,8 @@ import pygame  # via pygame-ce
 
 from engine import (
     COLORS,
-    GRID_WIDTH,
     GRID_HEIGHT,
+    GRID_WIDTH,
     SHAPES_DATA,
 )
 from game_state import GameState

@@ -11,7 +11,6 @@ import pygame  # via pygame-ce
 
 from utils import resource_path
 
-
 # 音频文件路径（使用 resource_path 以适应打包环境）
 BG_MUSIC_FILE = resource_path("assets/bg_music.mp3")
 CLEAR_SOUND_FILE = resource_path("assets/clear.wav")

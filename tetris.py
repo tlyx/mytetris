@@ -14,32 +14,32 @@
 #  - 创建 GameState 快照传递给 Renderer
 #  - 输入处理（委托给 InputHandler）
 
-from typing import final
 import sys
 from pathlib import Path
+from typing import final
 
 import pygame  # via pygame-ce
 
-from engine import TetrisEngine, GRID_WIDTH, GRID_HEIGHT, MAX_SCORE
+from audio_manager import AudioManager
+from bot import Bot
+from config_manager import ConfigManager
+from engine import GRID_HEIGHT, GRID_WIDTH, MAX_SCORE, TetrisEngine
+from game_state import GameState
+from input_handler import Action, InputHandler
 from renderer import (
-    Renderer,
-    SCREEN_WIDTH,
-    SCREEN_HEIGHT,
     BLOCK_SIZE,
     LEFT_WIDTH,
     RIGHT_WIDTH,
+    SCREEN_HEIGHT,
+    SCREEN_WIDTH,
+    Renderer,
 )
-from game_state import GameState
-from config_manager import ConfigManager
-from audio_manager import AudioManager
-from input_handler import InputHandler, Action
 from state_handlers import (
-    StateHandler,
-    PlayingState,
     GameOverState,
+    PlayingState,
+    StateHandler,
 )
 from utils import resource_path
-from bot import Bot
 
 # 最小窗口尺寸（小于此值会被强制拉伸到该最小尺寸）
 # 增加50像素避免黑边过窄

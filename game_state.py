@@ -3,6 +3,7 @@
 
 from dataclasses import dataclass
 
+
 @dataclass(frozen=True)
 class GameState:
     """某一时刻游戏的所有渲染所需状态（只读快照）"""

@@ -1,8 +1,8 @@
 # engine.py — 我的方块核心引擎
 # 负责网格、方块生成、移动、旋转、消行、计分等逻辑
 
-from typing import final
 from random import shuffle
+from typing import final
 
 GRID_WIDTH, GRID_HEIGHT = 10, 20
 

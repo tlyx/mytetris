@@ -10,7 +10,7 @@ and use the utilities to set up deterministic engine scenarios.
 
 from __future__ import annotations
 
-from typing import Optional, List, Tuple
+from typing import List, Optional, Tuple  # noqa: UP035
 
 from engine import TetrisEngine
 

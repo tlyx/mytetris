@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import copy
 
-from engine import TetrisEngine, GRID_WIDTH, GRID_HEIGHT, SHAPES_DATA
+from engine import GRID_HEIGHT, GRID_WIDTH, SHAPES_DATA, TetrisEngine
 
 
 class Bot:

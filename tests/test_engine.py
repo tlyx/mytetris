@@ -1,5 +1,4 @@
-
-from engine import TetrisEngine, GRID_HEIGHT, GRID_WIDTH, SHAPES_DATA
+from engine import GRID_HEIGHT, GRID_WIDTH, SHAPES_DATA, TetrisEngine
 from tests import helpers
 
 
@@ -105,4 +104,3 @@ def test_bag_draw_and_refill():
     # bag should be empty now; next draw should refill without error
     c = helpers.draw_from_bag(eng)
     assert c in ["I", "O", "T", "L", "J", "S", "Z"]
-

@@ -1,11 +1,11 @@
-
 from engine import (
-    TetrisEngine,
     GRID_HEIGHT,
     GRID_WIDTH,
-    WALL_KICKS_OTHERS,
     WALL_KICKS_I,
+    WALL_KICKS_OTHERS,
+    TetrisEngine,
 )
+
 # SHAPES_DATA was previously imported but is not needed here
 from tests import helpers
 
@@ -128,4 +128,3 @@ def test_game_over_on_spawn_if_collides():
     eng.grid[GRID_HEIGHT - 1] = [(2, 2, 2)] * GRID_WIDTH
     helpers.spawn_piece_for_test(eng, "I")
     assert eng.game_over is True
-

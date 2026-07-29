@@ -25,8 +25,8 @@ Usage:
    package in the CI job rather than relying on this runtime shim.
 """
 
-import sys
 import os
+import sys
 
 # Compute the project root (one level up from the tests directory)
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))

@@ -4,15 +4,15 @@
 
 from __future__ import annotations
 
-from typing import override, Protocol, TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol, override
 
 import pygame
 
 if TYPE_CHECKING:
     from engine import TetrisEngine
 
-from input_handler import InputHandler
 from config_manager import ConfigManager
+from input_handler import InputHandler
 
 
 class AppInterface(Protocol):

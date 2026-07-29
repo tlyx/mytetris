@@ -1,5 +1,6 @@
 from tetris import TetrisApp
 
+
 def main() -> None:
     print("MyTetris (macOS Lab)")
     app = TetrisApp()
