@@ -1,15 +1,160 @@
 # bot.py — 自动游戏机器人，独立于 TetrisApp
 # 使用 TetrisEngine 提供的接口进行规划、移动与锁定。
+#
+# 决策：2-ply 前瞻，一次性求解（无跨帧状态）。对当前块的每个
+# (rotation, x) 候选，先把候选落定到盘面快照上形成 post 盘面，再在
+# post 盘面上搜索下一块的最佳落点（copy-on-write：写入 → 求值 → 撤销，
+# 避免内层深拷贝）。评分 = 当前块落定得分 + 0.5 × 下一块最佳得分。
+#
+# 求解基于盘面快照与 engine 的共享几何原语（rotate_shape / spawn_y /
+# collides / drop_y / cells_in_bounds），碰撞检查作用于模拟盘面而非
+# 引擎实时网格，保证 2-ply 模拟语义正确（历史 bug：旧版内层模拟用
+# engine.can_place 检查实时网格，与 post 盘面不一致）。
 
 from __future__ import annotations
 
 import copy
 
-from engine import GRID_HEIGHT, GRID_WIDTH, SHAPES_DATA, TetrisEngine
+from engine import (
+    GRID_HEIGHT,
+    GRID_WIDTH,
+    SHAPES_DATA,
+    TetrisEngine,
+    cells_in_bounds,
+    collides,
+    drop_y,
+    rotate_shape,
+    spawn_y,
+)
+
+# 模拟落子时的占位颜色（启发式只关心单元格是否被占用）
+_OCCUPIED: tuple[int, int, int] = (1, 1, 1)
+
+
+def best_move(
+    grid: list[list[tuple[int, int, int] | None]],
+    shape: list[tuple[int, int]],
+    next_shape: list[tuple[int, int]] | None,
+) -> tuple[int, int] | None:
+    """2-ply 前瞻求解：返回当前块最优 (rotation, target_x)，无合法落点返回 None。
+
+    对每个 (rotation, x) 候选：
+      1. 将候选落定到盘面快照，得到 post 盘面（每候选一次深拷贝）；
+      2. 在 post 盘面上穷举下一块的最佳落点（copy-on-write，免内层深拷贝）；
+      3. 按 score1 + 0.5 * best_next 选取最优候选。
+    """
+    best_score = float("-inf")
+    best: tuple[int, int] | None = None
+    for rotation in range(4):
+        piece = rotate_shape(shape, rotation)
+        for x in range(GRID_WIDTH):
+            y = landing_y(grid, piece, x)
+            if y is None:
+                continue
+            # post 盘面：候选落定后的结果（每候选一次深拷贝）
+            post = copy.deepcopy(grid)
+            for gx, gy in cells_in_bounds(x, y, piece):
+                post[gy][gx] = _OCCUPIED
+            score = evaluate(post)
+            if next_shape is not None:
+                score += 0.5 * best_next(post, next_shape)
+            if score > best_score:
+                best_score = score
+                best = (rotation, x)
+    return best
+
+
+def best_next(
+    grid: list[list[tuple[int, int, int] | None]],
+    shape: list[tuple[int, int]],
+) -> float:
+    """在 grid（post 盘面）上穷举下一块的最佳落点得分（copy-on-write）。
+
+    写入仅 4 个单元格，求值后原位撤销，避免为每个内层候选做深拷贝。
+    """
+    best = float("-inf")
+    for rotation in range(4):
+        piece = rotate_shape(shape, rotation)
+        for x in range(GRID_WIDTH):
+            y = landing_y(grid, piece, x)
+            if y is None:
+                continue
+            cells = cells_in_bounds(x, y, piece)
+            saved = [grid[gy][gx] for gx, gy in cells]
+            for gx, gy in cells:
+                grid[gy][gx] = _OCCUPIED
+            score = evaluate(grid)
+            for (gx, gy), prev in zip(cells, saved):
+                grid[gy][gx] = prev
+            best = max(best, score)
+    return best
+
+
+def landing_y(
+    grid: list[list[tuple[int, int, int] | None]],
+    piece: list[tuple[int, int]],
+    x: int,
+) -> int | None:
+    """返回 piece 落在 x 列的最终 y（底部原点）；无法放置返回 None。
+
+    与引擎生成位/碰撞/下落规则共用 engine.collides / drop_y / spawn_y；
+    碰撞检查作用于传入的模拟盘面（而非引擎实时网格）。
+    """
+    min_px = min(px for px, _ in piece)
+    max_px = max(px for px, _ in piece)
+    if x + min_px < 0 or x + max_px >= GRID_WIDTH:
+        return None
+    y = spawn_y(piece)
+    if collides(grid, x, y, piece):
+        return None
+    return drop_y(grid, piece, x, y)
+
+
+def evaluate(grid: list[list[tuple[int, int, int] | None]]) -> float:
+    """根据启发式规则返回分数（越高越好）。"""
+    heights: list[int] = []
+    holes = 0
+    bumpiness = 0
+    lines = 0
+
+    # 计算完整行数
+    for y in range(GRID_HEIGHT):
+        if all(cell is not None for cell in grid[y]):
+            lines += 1
+
+    # 计算每列高度与空洞（底部原点：grid[0] 为底）
+    for x in range(GRID_WIDTH):
+        col_height = 0
+        block_found = False
+        # 从最高行向下扫描（top -> bottom）
+        for y in range(GRID_HEIGHT - 1, -1, -1):
+            if grid[y][x] is not None:
+                if not block_found:
+                    col_height = y + 1
+                    block_found = True
+            else:
+                if block_found:
+                    holes += 1
+        heights.append(col_height)
+
+    for i in range(GRID_WIDTH - 1):
+        bumpiness += abs(heights[i] - heights[i + 1])
+
+    aggregate_height = sum(heights)
+    max_height = max(heights)
+
+    return (
+        lines * 800
+        - aggregate_height * 6
+        - holes * 120
+        - bumpiness * 4
+        - max_height * 2
+        - abs(GRID_WIDTH // 2 - heights.index(max(heights))) * 3
+    )
 
 
 class Bot:
-    """具有简单乐高型评估的自动方块机器人。"""
+    """自动方块机器人：2-ply 前瞻求解，逐帧执行计划。"""
 
     def __init__(self) -> None:
         self._plan: tuple[int, int] | None = None  # (rotation, target_x)
@@ -34,11 +179,12 @@ class Bot:
             self._last_piece_type = engine.current_type
 
         if self._plan is None:
-            # 生成新计划（可能是昂贵的操作）
+            # 生成新计划（一次性求解，约 20~100ms，单帧内完成）
             shape = SHAPES_DATA[engine.current_type]
-            self._plan = self._solve(engine.grid, shape, engine)
+            next_shape = SHAPES_DATA.get(engine.next_type)
+            self._plan = best_move(engine.grid, shape, next_shape)
             if self._plan is None:
-                # no legal placement found; abandon current attempt and retry next frame
+                # 无合法放置；放弃当前尝试，下一帧重试（由重力下落接管）
                 return
 
         rotation, target_x = self._plan
@@ -82,146 +228,3 @@ class Bot:
 
         self._plan = None
         self._step = 0
-
-    # ------------------------------------------------------------------
-    #  以下为启发式搜索与评估函数（从原 TetrisApp 直接迁移而来）
-    # ------------------------------------------------------------------
-
-    def _solve(
-        self,
-        grid: list[list[tuple[int, int, int] | None]],
-        shape: list[tuple[int, int]],
-        engine: TetrisEngine,
-    ) -> tuple[int, int] | None:
-        """返回最佳移动 (rotation, target_x)。若无合法放置则返回 None。"""
-        next_type = getattr(engine, "next_type", None)
-        next_shape: list[tuple[int, int]] | None = (
-            SHAPES_DATA.get(next_type) if next_type else None
-        )
-
-        best_score: float = float("-inf")
-        best_move: tuple[int, int] = (0, GRID_WIDTH // 2)
-        found_any = False
-
-        for rotation1 in range(4):
-            for x1 in range(GRID_WIDTH):
-                score1 = self._simulate(grid, shape, rotation1, x1, engine)
-                if score1 is None:
-                    continue
-
-                found_any = True
-
-                # 如果没有下一块信息，则采用贪心
-                if not next_shape:
-                    total: float = score1
-                else:
-                    best_next: float = float("-inf")
-                    for rotation2 in range(4):
-                        for x2 in range(GRID_WIDTH):
-                            score2 = self._simulate(
-                                grid, next_shape, rotation2, x2, engine
-                            )
-                            if score2 is None:
-                                continue
-                            best_next = max(best_next, score2)
-                    total = score1 + 0.5 * best_next
-
-                if total > best_score:
-                    best_score = total
-                    best_move = (rotation1, x1)
-
-        if not found_any:
-            return None
-        return best_move
-
-    def _simulate(
-        self,
-        grid: list[list[tuple[int, int, int] | None]],
-        shape: list[tuple[int, int]],
-        rotation: int,
-        target_x: int,
-        engine: TetrisEngine,
-    ) -> float | None:
-        """模拟放置并返回评估分数；若无法放置则返回 None。"""
-        piece = list(shape)
-
-        # 旋转(与 engine 保持相同的 90° 变换方向).
-        # Engine currently uses a 90° CLOCKWISE transform (x,y) -> (y,-x),
-        # so apply the same here to keep simulation consistent.
-        for _ in range(rotation):
-            piece = [(py, -px) for px, py in piece]
-
-        # 不做垂直归一化；使用 piece 的相对坐标（bottom-origin）
-
-        # 限制 x 在合法范围内（基于 piece 的 min/max px）
-        min_px = min(px for px, _ in piece)
-        max_px = max(px for px, _ in piece)
-        if target_x + min_px < 0 or target_x + max_px >= GRID_WIDTH:
-            return None
-
-        # spawn y 与 engine._spawn_piece 保持一致：
-        # place top-most block at GRID_HEIGHT - 1 -> y = GRID_HEIGHT - 1 - max_py
-        max_py = max(py for _, py in piece)
-        y = GRID_HEIGHT - 1 - max_py
-
-        # 检查生成位置是否有碰撞 -> use engine.can_place to avoid duplicating rules
-        if not engine.can_place(target_x, y, piece):
-            return None
-
-        # 模拟下落（向下为 y-1）
-        while engine.can_place(target_x, y - 1, piece):
-            y -= 1
-
-        new_grid: list[list[tuple[int, int, int] | None]] = copy.deepcopy(grid)
-        for px, py in piece:
-            gx = target_x + px
-            gy = y + py
-            if 0 <= gx < GRID_WIDTH and 0 <= gy < GRID_HEIGHT:
-                new_grid[gy][gx] = (1, 1, 1)  # 占位符，仅关心被占用
-
-        return self._evaluate_grid(new_grid)
-
-    @staticmethod
-    def _evaluate_grid(
-        grid: list[list[tuple[int, int, int] | None]],
-    ) -> float:
-        """根据启发式规则返回分数（越高越好）。"""
-        heights: list[int] = []
-        holes = 0
-        bumpiness = 0
-        lines = 0
-
-        # 计算完整行数
-        for y in range(GRID_HEIGHT):
-            if all(cell is not None for cell in grid[y]):
-                lines += 1
-
-        # 计算每列高度与空洞（底部原点：grid[0] 为底）
-        for x in range(GRID_WIDTH):
-            col_height = 0
-            block_found = False
-            # 从最高行向下扫描（top -> bottom）
-            for y in range(GRID_HEIGHT - 1, -1, -1):
-                if grid[y][x] is not None:
-                    if not block_found:
-                        col_height = y + 1
-                        block_found = True
-                else:
-                    if block_found:
-                        holes += 1
-            heights.append(col_height)
-
-        for i in range(GRID_WIDTH - 1):
-            bumpiness += abs(heights[i] - heights[i + 1])
-
-        aggregate_height = sum(heights)
-        max_height = max(heights)
-
-        return (
-            lines * 800
-            - aggregate_height * 6
-            - holes * 120
-            - bumpiness * 4
-            - max_height * 2
-            - abs(GRID_WIDTH // 2 - heights.index(max(heights))) * 3
-        )
