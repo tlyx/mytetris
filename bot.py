@@ -4,7 +4,9 @@
 # 决策：2-ply 前瞻，一次性求解（无跨帧状态）。对当前块的每个
 # (rotation, x) 候选，先把候选落定到盘面快照上形成 post 盘面，再在
 # post 盘面上搜索下一块的最佳落点（copy-on-write：写入 → 求值 → 撤销，
-# 避免内层深拷贝）。评分 = 当前块落定得分 + 0.5 × 下一块最佳得分。
+# 避免内层深拷贝）。评分 = 当前块落定得分 + 0.5 × 下一块最佳得分，
+# 评估采用 Pierre Dellacherie 特征（landing height / 消行 / 行过渡 /
+# 列过渡 / 空洞 / 井深和，见 evaluate）。
 #
 # 求解基于盘面快照与 engine 的共享几何原语（rotate_shape / spawn_y /
 # collides / drop_y / cells_in_bounds），碰撞检查作用于模拟盘面而非
@@ -51,11 +53,12 @@ def best_move(
             y = landing_y(grid, piece, x)
             if y is None:
                 continue
+            landing_height = y + min(py for _, py in piece)
             # post 盘面：候选落定后的结果（每候选一次深拷贝）
             post = copy.deepcopy(grid)
             for gx, gy in cells_in_bounds(x, y, piece):
                 post[gy][gx] = _OCCUPIED
-            score = evaluate(post)
+            score = evaluate(post, landing_height)
             if next_shape is not None:
                 score += 0.5 * best_next(post, next_shape)
             if score > best_score:
@@ -79,11 +82,12 @@ def best_next(
             y = landing_y(grid, piece, x)
             if y is None:
                 continue
+            landing_height = y + min(py for _, py in piece)
             cells = cells_in_bounds(x, y, piece)
             saved = [grid[gy][gx] for gx, gy in cells]
             for gx, gy in cells:
                 grid[gy][gx] = _OCCUPIED
-            score = evaluate(grid)
+            score = evaluate(grid, landing_height)
             for (gx, gy), prev in zip(cells, saved):
                 grid[gy][gx] = prev
             best = max(best, score)
@@ -110,47 +114,132 @@ def landing_y(
     return drop_y(grid, piece, x, y)
 
 
-def evaluate(grid: list[list[tuple[int, int, int] | None]]) -> float:
-    """根据启发式规则返回分数（越高越好）。"""
-    heights: list[int] = []
+def board_features(
+    grid: list[list[tuple[int, int, int] | None]],
+) -> tuple[int, int, int, int, int]:
+    """统计盘面特征，返回 (完整行数, 空洞数, 行过渡数, 列过渡数, 井深和)。
+
+    行过渡：同一行内 填/空 相邻变化次数，左右边界视为已填。
+    列过渡：同一列内 填/空 相邻变化次数，列顶以上的“天空”视为已填
+            （空洞在列过渡中体现为 +2，实心列过渡为 0）。
+    井：空单元格左右相邻均为已填（列内连续井单元格累加为井深和）。
+    """
+    rows_cleared = 0
     holes = 0
-    bumpiness = 0
-    lines = 0
+    row_transitions = 0
+    column_transitions = 0
+    well_sums = 0
 
-    # 计算完整行数
+    # 完整行数与行过渡（左右边界视为已填）
     for y in range(GRID_HEIGHT):
-        if all(cell is not None for cell in grid[y]):
-            lines += 1
+        row = grid[y]
+        if all(cell is not None for cell in row):
+            rows_cleared += 1
+        prev = True
+        for cell in row:
+            filled = cell is not None
+            if filled != prev:
+                row_transitions += 1
+            prev = filled
+        if not prev:
+            row_transitions += 1
 
-    # 计算每列高度与空洞（底部原点：grid[0] 为底）
+    # 列过渡、空洞、井（逐列扫描）
     for x in range(GRID_WIDTH):
-        col_height = 0
-        block_found = False
-        # 从最高行向下扫描（top -> bottom）
+        in_stack = False
+        prev = True  # 顶部天空视为已填
+        for y in range(GRID_HEIGHT - 1, -1, -1):
+            filled = grid[y][x] is not None
+            if filled:
+                in_stack = True
+            cur = filled or not in_stack  # 天空视为已填
+            if cur != prev:
+                column_transitions += 1
+            prev = cur
+
+        in_stack = False
         for y in range(GRID_HEIGHT - 1, -1, -1):
             if grid[y][x] is not None:
-                if not block_found:
-                    col_height = y + 1
-                    block_found = True
-            else:
-                if block_found:
-                    holes += 1
-        heights.append(col_height)
+                in_stack = True
+            elif in_stack:
+                holes += 1
 
-    for i in range(GRID_WIDTH - 1):
-        bumpiness += abs(heights[i] - heights[i + 1])
+        if 0 < x < GRID_WIDTH - 1:
+            for y in range(GRID_HEIGHT):
+                if (
+                    grid[y][x] is None
+                    and grid[y][x - 1] is not None
+                    and grid[y][x + 1] is not None
+                ):
+                    well_sums += 1
 
-    aggregate_height = sum(heights)
-    max_height = max(heights)
+    return rows_cleared, holes, row_transitions, column_transitions, well_sums
 
+
+def evaluate(
+    grid: list[list[tuple[int, int, int] | None]],
+    landing_height: int,
+) -> float:
+    """Pierre Dellacherie 评估（越高越好）。
+
+    landing_height：落点高度（方块最低单元格距底部的行数，贴底为 0），
+    由调用方在落定模拟时计算并传入。
+
+    权重来自经典 Dellacherie 单块算法：
+        -1 × landing_height
+        +1 × 已消除行数
+        -1 × 行过渡
+        -1 × 列过渡
+        -4 × 空洞
+        -1 × 井深和
+
+    旧版启发式（lines*800 - aggregate_height*6 - holes*120 - bumpiness*4
+    - max_height*2 - |中心列偏移|*3）已由本函数替换，原实现保留如下：
+    """
+    rows_cleared, holes, row_trans, col_trans, well_sums = board_features(grid)
     return (
-        lines * 800
-        - aggregate_height * 6
-        - holes * 120
-        - bumpiness * 4
-        - max_height * 2
-        - abs(GRID_WIDTH // 2 - heights.index(max(heights))) * 3
+        -1.0 * landing_height
+        + 1.0 * rows_cleared
+        - 1.0 * row_trans
+        - 1.0 * col_trans
+        - 4.0 * holes
+        - 1.0 * well_sums
     )
+
+
+# 旧版评估（被 Dellacherie 替换，保留供对照）：
+#
+#     heights: list[int] = []
+#     holes = 0
+#     bumpiness = 0
+#     lines = 0
+#     for y in range(GRID_HEIGHT):
+#         if all(cell is not None for cell in grid[y]):
+#             lines += 1
+#     for x in range(GRID_WIDTH):
+#         col_height = 0
+#         block_found = False
+#         for y in range(GRID_HEIGHT - 1, -1, -1):
+#             if grid[y][x] is not None:
+#                 if not block_found:
+#                     col_height = y + 1
+#                     block_found = True
+#             else:
+#                 if block_found:
+#                     holes += 1
+#         heights.append(col_height)
+#     for i in range(GRID_WIDTH - 1):
+#         bumpiness += abs(heights[i] - heights[i + 1])
+#     aggregate_height = sum(heights)
+#     max_height = max(heights)
+#     return (
+#         lines * 800
+#         - aggregate_height * 6
+#         - holes * 120
+#         - bumpiness * 4
+#         - max_height * 2
+#         - abs(GRID_WIDTH // 2 - heights.index(max(heights))) * 3
+#     )
 
 
 class Bot:
