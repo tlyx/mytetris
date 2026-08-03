@@ -82,6 +82,84 @@ WALL_KICKS_I: list[tuple[int, int]] = [
 # ---------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------
+# 纯几何原语（无状态，引擎方法与外部模拟共享）
+#
+# 所有函数使用内部底部原点坐标（y 向上为正）。提取为模块级函数，
+# 使 bot 的模拟与引擎实际规则使用同一份实现，避免两处各自维护导致
+# 语义漂移（bot 不能直接调 engine.can_place，它检查的是引擎实时网格，
+# 而模拟必须作用在模拟盘面上）。
+# ---------------------------------------------------------------------
+
+def rotate_shape(
+    shape: list[tuple[int, int]], times: int = 1
+) -> list[tuple[int, int]]:
+    """按引擎的 90° 顺时针变换旋转 shape times 次：(x, y) -> (y, -x)。"""
+    piece = shape
+    for _ in range(times):
+        piece = [(py, -px) for px, py in piece]
+    return piece
+
+
+def spawn_y(shape: list[tuple[int, int]]) -> int:
+    """返回生成位 y：将 shape 的最高单元对齐到顶部行（GRID_HEIGHT - 1）。"""
+    return GRID_HEIGHT - 1 - max(py for _, py in shape)
+
+
+def collides(
+    grid: list[list[tuple[int, int, int] | None]],
+    x: int,
+    y: int,
+    shape: list[tuple[int, int]],
+) -> bool:
+    """检查在内部坐标下放置 shape 于 (x, y) 是否与边界或已锁定方块冲突。
+
+    规则：
+      - gx 越界 -> 冲突
+      - gy < 0 -> 冲突
+      - gy >= GRID_HEIGHT -> 放行（生成区允许超出顶部）
+      - 否则 grid[gy][gx] 非 None -> 冲突
+    """
+    for dx, dy in shape:
+        gx = x + dx
+        gy = y + dy
+        if gx < 0 or gx >= GRID_WIDTH:
+            return True
+        if gy < 0:
+            return True
+        if gy >= GRID_HEIGHT:
+            continue
+        if grid[gy][gx] is not None:
+            return True
+    return False
+
+
+def drop_y(
+    grid: list[list[tuple[int, int, int] | None]],
+    shape: list[tuple[int, int]],
+    x: int,
+    start_y: int,
+) -> int:
+    """从 start_y 垂直下落 shape 到不能再下，返回最终 y（start_y 处必须合法）。"""
+    y = start_y
+    while not collides(grid, x, y - 1, shape):
+        y -= 1
+    return y
+
+
+def cells_in_bounds(
+    x: int,
+    y: int,
+    shape: list[tuple[int, int]],
+) -> list[tuple[int, int]]:
+    """返回落定后实际在边界内的单元格坐标（超出顶部的部分被丢弃）。"""
+    return [
+        (x + dx, y + dy)
+        for dx, dy in shape
+        if 0 <= x + dx < GRID_WIDTH and 0 <= y + dy < GRID_HEIGHT
+    ]
+
+
 @final
 class TetrisEngine:
     """游戏逻辑引擎，不依赖任何图形库。"""
@@ -167,7 +245,7 @@ class TetrisEngine:
             return False
 
         # rotate 90 deg CLOCKWISE in engine internal coords.
-        new_shape = [(dy, -dx) for dx, dy in self.current_shape]
+        new_shape = rotate_shape(self.current_shape, 1)
 
         # try without kicks first
         if not self._check_collision(self.x, self.y, new_shape):
@@ -198,11 +276,8 @@ class TetrisEngine:
         is the top row.
         """
         lock_color = COLORS[self.current_type]
-        for dx, dy in self.current_shape:
-            gx = self.x + dx
-            gy = self.y + dy
-            if 0 <= gy < GRID_HEIGHT and 0 <= gx < GRID_WIDTH:
-                self.grid[gy][gx] = lock_color
+        for gx, gy in cells_in_bounds(self.x, self.y, self.current_shape):
+            self.grid[gy][gx] = lock_color
 
         # 记录所有满行的行号（internal indexing: 0=bottom）
         cleared_rows: list[int] = []
@@ -245,8 +320,7 @@ class TetrisEngine:
         self.x = (GRID_WIDTH - piece_width) // 2 - min_px
 
         # 将 piece 的最高单元对齐到顶部（internal top row = GRID_HEIGHT - 1）
-        max_py = max(py for _, py in self.current_shape)
-        self.y = GRID_HEIGHT - 1 - max_py
+        self.y = spawn_y(self.current_shape)
 
         # reset rotation
         self.rotation = 0
@@ -271,21 +345,7 @@ class TetrisEngine:
         """
         shape = shape if shape is not None else self.current_shape
 
-        for dx, dy in shape:
-            gx = nx + dx
-            gy = ny + dy  # internal bottom-origin y
-
-            if gx < 0 or gx >= GRID_WIDTH:
-                return True
-            if gy < 0:
-                return True
-            if gy >= GRID_HEIGHT:
-                # allow parts above the top (spawn area)
-                continue
-            if self.grid[gy][gx] is not None:
-                return True
-
-        return False
+        return collides(self.grid, nx, ny, shape)
 
     def get_piece_cells(self):
         """Return absolute positions of current piece blocks using internal coords (bottom-origin)."""
@@ -323,10 +383,7 @@ class TetrisEngine:
 
         在内部坐标系中，下落方向表示为 y 减小（向下移动使 y 减 1）。
         """
-        ghost_y = self.y
-        while not self._check_collision(self.x, ghost_y - 1):
-            ghost_y -= 1
-        return ghost_y
+        return drop_y(self.grid, self.current_shape, self.x, self.y)
 
     # ---------- 消行动画轮询 ----------
     def poll_cleared_rows(self) -> list[int]:

@@ -1,9 +1,15 @@
 from engine import (
     GRID_HEIGHT,
     GRID_WIDTH,
+    SHAPES_DATA,
     WALL_KICKS_I,
     WALL_KICKS_OTHERS,
     TetrisEngine,
+    cells_in_bounds,
+    collides,
+    drop_y,
+    rotate_shape,
+    spawn_y,
 )
 
 # SHAPES_DATA was previously imported but is not needed here
@@ -128,3 +134,58 @@ def test_game_over_on_spawn_if_collides():
     eng.grid[GRID_HEIGHT - 1] = [(2, 2, 2)] * GRID_WIDTH
     helpers.spawn_piece_for_test(eng, "I")
     assert eng.game_over is True
+
+
+# ----------------------------------------------------------------------
+# 共享纯几何原语（engine 模块级函数，供引擎方法与 bot 模拟共用）
+# ----------------------------------------------------------------------
+
+def test_rotate_shape_contract():
+    """旋转 4 次回到原形；90° 顺时针变换与引擎约定一致。"""
+    t = SHAPES_DATA["T"]
+    assert rotate_shape(t, 4) == t
+    assert rotate_shape(t, 0) == t
+    # T 的 (0, 1) 单元（y 向上）顺时针转 90° 后应位于 (1, 0)
+    assert (1, 0) in rotate_shape(t, 1)
+
+
+def test_spawn_y_aligns_top():
+    """生成位把 shape 最高单元对齐到顶部行。"""
+    i = SHAPES_DATA["I"]      # max_py = 0 -> 顶行
+    t = SHAPES_DATA["T"]      # max_py = 1 -> 顶行下方一行
+    assert spawn_y(i) == GRID_HEIGHT - 1
+    assert spawn_y(t) == GRID_HEIGHT - 2
+
+
+def test_collides_contract():
+    """边界/占用规则：越界、低于底部、占用均冲突；高于顶部放行。"""
+    grid = [[None] * GRID_WIDTH for _ in range(GRID_HEIGHT)]
+    one = [(0, 0)]
+    assert collides(grid, 0, 0, one) is False
+    assert collides(grid, -1, 0, one) is True          # 左越界
+    assert collides(grid, GRID_WIDTH, 0, one) is True  # 右越界
+    assert collides(grid, 0, -1, one) is True          # 低于底部
+    assert collides(grid, 0, GRID_HEIGHT + 10, one) is False  # 高于顶部放行
+    grid[0][3] = (9, 9, 9)
+    assert collides(grid, 3, 0, one) is True           # 占用冲突
+
+
+def test_drop_y_lands_on_bottom_or_stack():
+    """垂直下落：空盘落到底部，遇到已锁定方块则停在其上。"""
+    grid = [[None] * GRID_WIDTH for _ in range(GRID_HEIGHT)]
+    i = SHAPES_DATA["I"]  # 水平 I，max_py=0，生成 y=19
+    y = drop_y(grid, i, 3, spawn_y(i))
+    assert y == 0  # 空盘直落到底
+    # 在列 3 底部放一个方块，I 应停在它上面
+    grid[0][3] = (9, 9, 9)
+    y = drop_y(grid, i, 3, spawn_y(i))
+    assert y == 1
+
+
+def test_cells_in_bounds_filters_out_of_bounds():
+    """只保留边界内的单元格（丢弃超出顶部的部分）。"""
+    assert cells_in_bounds(0, 0, [(0, 0), (1, 0), (-1, 0)]) == [
+        (0, 0), (1, 0),
+    ]
+    # 生成区允许 y 超出顶部：这些单元格不写入
+    assert cells_in_bounds(0, GRID_HEIGHT, [(0, 1)]) == []
