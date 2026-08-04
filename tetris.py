@@ -316,9 +316,8 @@ class TetrisApp:
             self.game.add_score(2 * distance)  # 硬降每格 +2（指南标准）
             self._lock_and_update()
 
-        elif action == Action.ROTATE:
-            if self.game.rotate():
-                self._reset_lock_delay()
+        elif action == Action.ROTATE and self.game.rotate():
+            self._reset_lock_delay()
 
     # -------------------- 公开方法（供状态处理器调用） --------------------
     # 这些方法必须与 AppInterface 协议中的签名一致

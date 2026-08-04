@@ -14,8 +14,8 @@ import os
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
-from tetris import LOCK_DELAY_MS, TetrisApp
 from input_handler import Action
+from tetris import LOCK_DELAY_MS, TetrisApp
 
 
 def _app_with_piece_at_bottom() -> TetrisApp:

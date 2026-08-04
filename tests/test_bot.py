@@ -19,7 +19,7 @@ import copy
 
 import pytest
 
-from bot import Bot, STRATEGIES, best_move, board_features, evaluate, landing_y
+from bot import STRATEGIES, Bot, best_move, board_features, evaluate, landing_y
 from engine import (
     GRID_HEIGHT,
     GRID_WIDTH,
