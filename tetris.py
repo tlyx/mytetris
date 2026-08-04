@@ -318,7 +318,14 @@ class TetrisApp:
             self.audio.resume_music()
 
     def handle_fall_timer(self) -> None:
-        """处理下落定时器事件（被状态类调用）。"""
+        """处理下落定时器事件（被状态类调用）。
+
+        bot 模式下重力由 bot 自行驱动（求解→移动→硬降→锁定），定时器
+        不得介入：否则高等级/帧卡顿时可能抢在 bot 计划前把当前块直落
+        锁定（不旋转、不按计划）。
+        """
+        if self.bot_enabled:
+            return
         if not self.game.move(0, -1):
             self._lock_and_update()
 
