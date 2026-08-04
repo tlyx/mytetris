@@ -8,8 +8,8 @@
 #
 # 评估策略可选用（STRATEGIES 注册表，Bot 构造参数或 set_strategy /
 # cycle_strategy 切换）：
-#   - dellacherie（默认）：经典特征（landing height / 消行 / 行过渡 /
-#     列过渡 / 空洞 / 井深和），重存活、稳如老狗；
+#   - modern（默认）：经典 Dellacherie 特征（landing height / 消行 /
+#     行过渡 / 列过渡 / 空洞 / 井深和），重存活、稳如老狗；
 #   - legacy：Dellacherie 之前的手调启发式，清行更大胆（Tetris 略多
 #     但更早顶死）。
 #
@@ -44,7 +44,7 @@ from engine import (
 _OCCUPIED: tuple[int, int, int] = (1, 1, 1)
 
 # 默认评估策略（见 STRATEGIES 注册表）
-DEFAULT_STRATEGY = "dellacherie"
+DEFAULT_STRATEGY = "modern"
 
 
 def best_move(
@@ -60,7 +60,7 @@ def best_move(
       2. 在 post 盘面上穷举下一块的最佳落点（copy-on-write，免内层深拷贝）；
       3. 按 score1 + 0.5 * best_next 选取最优候选。
 
-    :param strategy: 评估策略名（见 STRATEGIES），默认 dellacherie。
+    :param strategy: 评估策略名（见 STRATEGIES），默认 modern。
     """
     scorer = get_strategy(strategy)
     best_score = float("-inf")
@@ -276,9 +276,9 @@ def legacy_evaluate(
 
 
 # 评估策略注册表：名称 -> 评分函数 (grid, landing_height) -> float
-STRATEGY_ORDER: tuple[str, ...] = ("dellacherie", "legacy")
+STRATEGY_ORDER: tuple[str, ...] = ("modern", "legacy")
 STRATEGIES: dict[str, Callable[[list[list[tuple[int, int, int] | None]], int], float]] = {
-    "dellacherie": evaluate,
+    "modern": evaluate,
     "legacy": legacy_evaluate,
 }
 
@@ -295,7 +295,7 @@ def get_strategy(
 class Bot:
     """自动方块机器人：2-ply 前瞻求解，逐帧执行计划。
 
-    :param strategy: 评估策略名（见 STRATEGIES），默认 dellacherie。
+    :param strategy: 评估策略名（见 STRATEGIES），默认 modern。
     """
 
     def __init__(self, strategy: str = DEFAULT_STRATEGY) -> None:

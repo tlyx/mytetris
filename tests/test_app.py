@@ -43,7 +43,7 @@ def test_fall_timer_ignored_when_bot_enabled() -> None:
 def test_cycle_bot_strategy() -> None:
     """循环切换 bot 策略：顺序遍历注册表并重置当前计划。"""
     app = TetrisApp()
-    assert app.bot.strategy == "dellacherie"
+    assert app.bot.strategy == "modern"
     # 制造一个待执行计划
     app.game.reset()
     app.bot.update(app.game)
@@ -52,7 +52,7 @@ def test_cycle_bot_strategy() -> None:
     assert app.bot.strategy == "legacy"
     assert app.bot._plan is None  # pyright: ignore[reportPrivateUsage] 计划已作废
     app.cycle_bot_strategy()
-    assert app.bot.strategy == "dellacherie"
+    assert app.bot.strategy == "modern"
 
 
 def test_fall_timer_locks_when_bot_disabled() -> None:

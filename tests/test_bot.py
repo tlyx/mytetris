@@ -204,7 +204,7 @@ def test_board_features_counts() -> None:
     assert evaluate(grid, 7) == evaluate(grid, 0) - 7
 
 
-def test_dellacherie_changes_decision() -> None:
+def test_modern_changes_decision() -> None:
     """对照：同一盘面，Dellacherie 与 legacy 策略的落点不同（换血保护）。"""
     eng = make_engine(well_board(), "T", "I")
     new = solve_engine(eng)
@@ -215,7 +215,7 @@ def test_dellacherie_changes_decision() -> None:
 
 def test_strategies_registry_and_selection() -> None:
     """策略注册表完整、可切换、未知名称报错；两种策略决策确有差异。"""
-    assert set(STRATEGIES) == {"dellacherie", "legacy"}
+    assert set(STRATEGIES) == {"modern", "legacy"}
 
     eng = make_engine(well_board(), "T", "I")
     plans = {
@@ -227,10 +227,10 @@ def test_strategies_registry_and_selection() -> None:
 
     bot = Bot(strategy="legacy")
     assert bot.strategy == "legacy"
-    bot.set_strategy("dellacherie")
-    assert bot.strategy == "dellacherie"
-    assert bot.cycle_strategy() == "legacy"  # dellacherie -> legacy
-    assert bot.cycle_strategy() == "dellacherie"
+    bot.set_strategy("modern")
+    assert bot.strategy == "modern"
+    assert bot.cycle_strategy() == "legacy"  # modern -> legacy
+    assert bot.cycle_strategy() == "modern"
     with pytest.raises(ValueError):
         Bot(strategy="nope")
     with pytest.raises(ValueError):
