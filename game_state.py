@@ -48,3 +48,7 @@ class GameState:
     # 消行动画相关
     clearing_rows: list[int]
     clear_anim_enabled: bool
+
+    # Bot 相关（策略名仅 bot 开启时有意义）
+    bot_enabled: bool
+    bot_strategy: str | None

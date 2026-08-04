@@ -258,6 +258,11 @@ class TetrisApp:
         self.bot_enabled = False
         self._bot_was_enabled = False
 
+    def cycle_bot_strategy(self) -> None:
+        """循环切换 bot 评估策略（experimental，同 bot 开关）。"""
+        name = self.bot.cycle_strategy()
+        print("BOT strategy:", name)
+
     # ---- 音频控制（直接操作 config，委托给 AudioManager） ----
     def _toggle_music(self) -> None:
         """切换背景音乐的开关（M键）。"""
@@ -439,6 +444,8 @@ class TetrisApp:
             ghost_enabled=self.ghost_enabled,
             clearing_rows=self.game.poll_cleared_rows(),
             clear_anim_enabled=self.clear_anim_enabled,
+            bot_enabled=self.bot_enabled,
+            bot_strategy=self.bot.strategy if self.bot_enabled else None,
         )
 
     # ---- 新拆分的方法：字体加载与鼠标隐藏 ----
@@ -552,6 +559,14 @@ class TetrisApp:
                 if self.bot_enabled:
                     self._bot_was_enabled = True  # 记录 bot 曾启用
                 print("BOT:", "ON" if self.bot_enabled else "OFF")
+                continue
+
+            # BOT STRATEGY – 仅当 experimental 模式启用时才允许
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_v:
+                if not self.config.experimental:
+                    print("BOT: experimental mode is disabled, cannot change strategy")
+                    continue
+                self.cycle_bot_strategy()
                 continue
 
             if event.type == pygame.QUIT:

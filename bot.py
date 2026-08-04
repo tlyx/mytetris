@@ -4,9 +4,19 @@
 # 决策：2-ply 前瞻，一次性求解（无跨帧状态）。对当前块的每个
 # (rotation, x) 候选，先把候选落定到盘面快照上形成 post 盘面，再在
 # post 盘面上搜索下一块的最佳落点（copy-on-write：写入 → 求值 → 撤销，
-# 避免内层深拷贝）。评分 = 当前块落定得分 + 0.5 × 下一块最佳得分，
-# 评估采用 Pierre Dellacherie 特征（landing height / 消行 / 行过渡 /
-# 列过渡 / 空洞 / 井深和，见 evaluate）。
+# 避免内层深拷贝）。评分 = 当前块落定得分 + 0.5 × 下一块最佳得分。
+#
+# 评估策略可选用（STRATEGIES 注册表，Bot 构造参数或 set_strategy /
+# cycle_strategy 切换）：
+#   - dellacherie（默认）：经典特征（landing height / 消行 / 行过渡 /
+#     列过渡 / 空洞 / 井深和），重存活、稳如老狗；
+#   - legacy：Dellacherie 之前的手调启发式，清行更大胆（Tetris 略多
+#     但更早顶死）。
+#
+# 注：曾尝试"挖井攒 Tetris"（hunter）策略——任何井奖励（井深和/最大
+# 井深/锚定井深）都会在 2-ply 内层搜索中把空盘决策翻成靠边竖放，级联
+# 成乱堆秒死。挖井策略本质需要知道 I 何时到来（bag 前瞻），单格预览
+# 的加法特征表达不了，故不提供该策略。
 #
 # 求解基于盘面快照与 engine 的共享几何原语（rotate_shape / spawn_y /
 # collides / drop_y / cells_in_bounds），碰撞检查作用于模拟盘面而非
@@ -16,6 +26,7 @@
 from __future__ import annotations
 
 import copy
+from collections.abc import Callable
 
 from engine import (
     GRID_HEIGHT,
@@ -32,11 +43,15 @@ from engine import (
 # 模拟落子时的占位颜色（启发式只关心单元格是否被占用）
 _OCCUPIED: tuple[int, int, int] = (1, 1, 1)
 
+# 默认评估策略（见 STRATEGIES 注册表）
+DEFAULT_STRATEGY = "dellacherie"
+
 
 def best_move(
     grid: list[list[tuple[int, int, int] | None]],
     shape: list[tuple[int, int]],
     next_shape: list[tuple[int, int]] | None,
+    strategy: str = DEFAULT_STRATEGY,
 ) -> tuple[int, int] | None:
     """2-ply 前瞻求解：返回当前块最优 (rotation, target_x)，无合法落点返回 None。
 
@@ -44,7 +59,10 @@ def best_move(
       1. 将候选落定到盘面快照，得到 post 盘面（每候选一次深拷贝）；
       2. 在 post 盘面上穷举下一块的最佳落点（copy-on-write，免内层深拷贝）；
       3. 按 score1 + 0.5 * best_next 选取最优候选。
+
+    :param strategy: 评估策略名（见 STRATEGIES），默认 dellacherie。
     """
+    scorer = get_strategy(strategy)
     best_score = float("-inf")
     best: tuple[int, int] | None = None
     for rotation in range(4):
@@ -58,9 +76,9 @@ def best_move(
             post = copy.deepcopy(grid)
             for gx, gy in cells_in_bounds(x, y, piece):
                 post[gy][gx] = _OCCUPIED
-            score = evaluate(post, landing_height)
+            score = scorer(post, landing_height)
             if next_shape is not None:
-                score += 0.5 * best_next(post, next_shape)
+                score += 0.5 * best_next(post, next_shape, scorer)
             if score > best_score:
                 best_score = score
                 best = (rotation, x)
@@ -70,6 +88,7 @@ def best_move(
 def best_next(
     grid: list[list[tuple[int, int, int] | None]],
     shape: list[tuple[int, int]],
+    scorer: Callable[[list[list[tuple[int, int, int] | None]], int], float],
 ) -> float:
     """在 grid（post 盘面）上穷举下一块的最佳落点得分（copy-on-write）。
 
@@ -87,7 +106,7 @@ def best_next(
             saved = [grid[gy][gx] for gx, gy in cells]
             for gx, gy in cells:
                 grid[gy][gx] = _OCCUPIED
-            score = evaluate(grid, landing_height)
+            score = scorer(grid, landing_height)
             for (gx, gy), prev in zip(cells, saved):
                 grid[gy][gx] = prev
             best = max(best, score)
@@ -207,48 +226,105 @@ def evaluate(
     )
 
 
-# 旧版评估（被 Dellacherie 替换，保留供对照）：
-#
-#     heights: list[int] = []
-#     holes = 0
-#     bumpiness = 0
-#     lines = 0
-#     for y in range(GRID_HEIGHT):
-#         if all(cell is not None for cell in grid[y]):
-#             lines += 1
-#     for x in range(GRID_WIDTH):
-#         col_height = 0
-#         block_found = False
-#         for y in range(GRID_HEIGHT - 1, -1, -1):
-#             if grid[y][x] is not None:
-#                 if not block_found:
-#                     col_height = y + 1
-#                     block_found = True
-#             else:
-#                 if block_found:
-#                     holes += 1
-#         heights.append(col_height)
-#     for i in range(GRID_WIDTH - 1):
-#         bumpiness += abs(heights[i] - heights[i + 1])
-#     aggregate_height = sum(heights)
-#     max_height = max(heights)
-#     return (
-#         lines * 800
-#         - aggregate_height * 6
-#         - holes * 120
-#         - bumpiness * 4
-#         - max_height * 2
-#         - abs(GRID_WIDTH // 2 - heights.index(max(heights))) * 3
-#     )
+def column_heights(
+    grid: list[list[tuple[int, int, int] | None]],
+) -> list[int]:
+    """返回每列高度（底部原点，空列高度为 0）。"""
+    return [
+        max(
+            (y + 1 for y in range(GRID_HEIGHT) if grid[y][x] is not None),
+            default=0,
+        )
+        for x in range(GRID_WIDTH)
+    ]
+
+
+def legacy_evaluate(
+    grid: list[list[tuple[int, int, int] | None]],
+    landing_height: int,
+) -> float:
+    """旧版启发式（Dellacherie 替换前的公式，保留为可选策略）。
+
+    与 Dellacherie 不同：无落点高度惩罚（参数保留以统一签名，未使用），
+    权重手调，中间堆高倾向明显、清行更大胆（Tetris 略多但更早顶死）。
+    """
+    heights = column_heights(grid)
+    holes = 0
+    lines = 0
+    for y in range(GRID_HEIGHT):
+        if all(cell is not None for cell in grid[y]):
+            lines += 1
+    for x in range(GRID_WIDTH):
+        block_found = False
+        for y in range(GRID_HEIGHT - 1, -1, -1):
+            if grid[y][x] is not None:
+                block_found = True
+            elif block_found:
+                holes += 1
+
+    bumpiness = sum(abs(heights[i] - heights[i + 1]) for i in range(GRID_WIDTH - 1))
+    aggregate_height = sum(heights)
+    max_height = max(heights)
+    return (
+        lines * 800
+        - aggregate_height * 6
+        - holes * 120
+        - bumpiness * 4
+        - max_height * 2
+        - abs(GRID_WIDTH // 2 - heights.index(max_height)) * 3
+    )
+
+
+# 评估策略注册表：名称 -> 评分函数 (grid, landing_height) -> float
+STRATEGY_ORDER: tuple[str, ...] = ("dellacherie", "legacy")
+STRATEGIES: dict[str, Callable[[list[list[tuple[int, int, int] | None]], int], float]] = {
+    "dellacherie": evaluate,
+    "legacy": legacy_evaluate,
+}
+
+
+def get_strategy(
+    name: str,
+) -> Callable[[list[list[tuple[int, int, int] | None]], int], float]:
+    """按名称取评估策略；未知名称抛 ValueError。"""
+    if name not in STRATEGIES:
+        raise ValueError(f"未知 bot 策略: {name!r}，可用: {sorted(STRATEGIES)}")
+    return STRATEGIES[name]
 
 
 class Bot:
-    """自动方块机器人：2-ply 前瞻求解，逐帧执行计划。"""
+    """自动方块机器人：2-ply 前瞻求解，逐帧执行计划。
 
-    def __init__(self) -> None:
+    :param strategy: 评估策略名（见 STRATEGIES），默认 dellacherie。
+    """
+
+    def __init__(self, strategy: str = DEFAULT_STRATEGY) -> None:
+        if strategy not in STRATEGIES:
+            raise ValueError(f"未知 bot 策略: {strategy!r}，可用: {sorted(STRATEGIES)}")
+        self._strategy = strategy
         self._plan: tuple[int, int] | None = None  # (rotation, target_x)
         self._step: int = 0
         self._last_piece_type: str | None = None
+
+    @property
+    def strategy(self) -> str:
+        """当前评估策略名。"""
+        return self._strategy
+
+    def set_strategy(self, strategy: str) -> None:
+        """切换评估策略；当前计划作废，下一帧按新策略重解。"""
+        if strategy not in STRATEGIES:
+            raise ValueError(f"未知 bot 策略: {strategy!r}，可用: {sorted(STRATEGIES)}")
+        if strategy != self._strategy:
+            self._strategy = strategy
+            self._plan = None
+            self._step = 0
+
+    def cycle_strategy(self) -> str:
+        """按 STRATEGY_ORDER 循环切换策略，返回新策略名。"""
+        order = STRATEGY_ORDER
+        self.set_strategy(order[(order.index(self._strategy) + 1) % len(order)])
+        return self._strategy
 
     def reset(self) -> None:
         """重置内部状态（当游戏重新开始时调用）。"""
@@ -271,7 +347,7 @@ class Bot:
             # 生成新计划（一次性求解，约 20~100ms，单帧内完成）
             shape = SHAPES_DATA[engine.current_type]
             next_shape = SHAPES_DATA.get(engine.next_type)
-            self._plan = best_move(engine.grid, shape, next_shape)
+            self._plan = best_move(engine.grid, shape, next_shape, self._strategy)
             if self._plan is None:
                 # 无合法放置；放弃当前尝试，下一帧重试（由重力下落接管）
                 return

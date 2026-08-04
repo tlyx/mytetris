@@ -17,7 +17,9 @@ from __future__ import annotations
 
 import copy
 
-from bot import Bot, best_move, board_features, evaluate, landing_y
+import pytest
+
+from bot import Bot, STRATEGIES, best_move, board_features, evaluate, landing_y
 from engine import (
     GRID_HEIGHT,
     GRID_WIDTH,
@@ -202,97 +204,37 @@ def test_board_features_counts() -> None:
     assert evaluate(grid, 7) == evaluate(grid, 0) - 7
 
 
-def _legacy_evaluate(
-    grid: list[list[tuple[int, int, int] | None]],
-) -> float:
-    """旧版启发式（被 Dellacherie 替换前），用于对照决策差异。"""
-    heights: list[int] = []
-    holes = 0
-    bumpiness = 0
-    lines = 0
-    for y in range(GRID_HEIGHT):
-        if all(cell is not None for cell in grid[y]):
-            lines += 1
-    for x in range(GRID_WIDTH):
-        col_height = 0
-        block_found = False
-        for y in range(GRID_HEIGHT - 1, -1, -1):
-            if grid[y][x] is not None:
-                if not block_found:
-                    col_height = y + 1
-                    block_found = True
-            else:
-                if block_found:
-                    holes += 1
-        heights.append(col_height)
-    for i in range(GRID_WIDTH - 1):
-        bumpiness += abs(heights[i] - heights[i + 1])
-    aggregate_height = sum(heights)
-    max_height = max(heights)
-    return (
-        lines * 800
-        - aggregate_height * 6
-        - holes * 120
-        - bumpiness * 4
-        - max_height * 2
-        - abs(GRID_WIDTH // 2 - heights.index(max(heights))) * 3
-    )
-
-
-def _legacy_best(
-    grid: list[list[tuple[int, int, int] | None]],
-    shape: list[tuple[int, int]],
-    next_shape: list[tuple[int, int]] | None,
-) -> tuple[int, int] | None:
-    """用旧启发式 + 朴素深拷贝跑 2-ply，与 Dellacherie 版对照。"""
-    best = float("-inf")
-    best_move_: tuple[int, int] | None = None
-    for r1 in range(4):
-        for x1 in range(GRID_WIDTH):
-            res = _naive_place_legacy(grid, shape, r1, x1)
-            if res is None:
-                continue
-            s1, post = res
-            if next_shape is None:
-                total = s1
-            else:
-                best_next_ = float("-inf")
-                for r2 in range(4):
-                    for x2 in range(GRID_WIDTH):
-                        r2v = _naive_place_legacy(post, next_shape, r2, x2)
-                        if r2v is not None:
-                            best_next_ = max(best_next_, r2v[0])
-                total = s1 + 0.5 * best_next_
-            if total > best:
-                best = total
-                best_move_ = (r1, x1)
-    return best_move_
-
-
-def _naive_place_legacy(
-    grid: list[list[tuple[int, int, int] | None]],
-    shape: list[tuple[int, int]],
-    rotation: int,
-    x: int,
-) -> tuple[float, list[list[tuple[int, int, int] | None]]] | None:
-    """旧启发式版落定模拟（仅用于 _legacy_best 对照）。"""
-    piece = rotate_shape(shape, rotation)
-    y = landing_y(grid, piece, x)
-    if y is None:
-        return None
-    post = copy.deepcopy(grid)
-    for gx, gy in cells_in_bounds(x, y, piece):
-        post[gy][gx] = (1, 1, 1)
-    return _legacy_evaluate(post), post
-
-
 def test_dellacherie_changes_decision() -> None:
-    """对照：同一盘面，Dellacherie 与旧启发式的落点不同（换血保护）。"""
+    """对照：同一盘面，Dellacherie 与 legacy 策略的落点不同（换血保护）。"""
     eng = make_engine(well_board(), "T", "I")
     new = solve_engine(eng)
-    legacy = _legacy_best(eng.grid, SHAPES_DATA["T"], SHAPES_DATA["I"])
+    legacy = best_move(eng.grid, SHAPES_DATA["T"], SHAPES_DATA["I"], strategy="legacy")
     assert new != legacy
-    assert legacy == (0, 8)  # 旧启发式把 T 平放留井给 I
+    assert legacy == (0, 8)  # legacy 把 T 平放留井给 I
+
+
+def test_strategies_registry_and_selection() -> None:
+    """策略注册表完整、可切换、未知名称报错；两种策略决策确有差异。"""
+    assert set(STRATEGIES) == {"dellacherie", "legacy"}
+
+    eng = make_engine(well_board(), "T", "I")
+    plans = {
+        name: best_move(eng.grid, SHAPES_DATA["T"], SHAPES_DATA["I"], strategy=name)
+        for name in STRATEGIES
+    }
+    assert all(p is not None for p in plans.values())
+    assert len(set(plans.values())) > 1  # 两种策略落点不全相同
+
+    bot = Bot(strategy="legacy")
+    assert bot.strategy == "legacy"
+    bot.set_strategy("dellacherie")
+    assert bot.strategy == "dellacherie"
+    assert bot.cycle_strategy() == "legacy"  # dellacherie -> legacy
+    assert bot.cycle_strategy() == "dellacherie"
+    with pytest.raises(ValueError):
+        Bot(strategy="nope")
+    with pytest.raises(ValueError):
+        bot.set_strategy("nope")
 
 
 

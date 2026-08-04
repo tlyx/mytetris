@@ -72,6 +72,8 @@ HELP_LINES = [
     "M      Toggle music",
     "S      Toggle sound effects",
     "G      Toggle ghost piece",
+    "A      Toggle bot (experimental)",
+    "V      Cycle bot strategy (experimental)",
     "F1/?   Show this help",
     "",
     "Press any key to close.",
@@ -559,6 +561,14 @@ class Renderer:
         time_y = logical_h - right_bottom_margin - row_height
         high_y = time_y - row_height - right_gap
         lines_y = high_y - row_height - right_gap
+
+        # bot 策略行（Lines 统计上方，仅 bot 开启时显示）
+        if state.bot_enabled and state.bot_strategy:
+            bot_surf = self._get_cached_text(
+                "BOT: " + state.bot_strategy, self.font_small, (255, 200, 80)
+            )
+            bot_y = lines_y - bot_surf.get_height() - right_gap
+            ds.blit(bot_surf, (sidebar_content_left, bot_y))
 
         ds.blit(label_surfs["lines_label"], (sidebar_content_left, lines_y))
         ds.blit(lines_val_surf,
