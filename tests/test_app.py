@@ -14,7 +14,7 @@ import os
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
-from tetris import TetrisApp
+from tetris import LOCK_DELAY_MS, TetrisApp
 from input_handler import Action
 
 
@@ -75,10 +75,34 @@ def test_drop_actions_score_points() -> None:
 
 
 def test_fall_timer_locks_when_bot_disabled() -> None:
-    """bot 关闭时定时器照常锁定贴底方块（门控不影响正常路径）。"""
+    """bot 关闭时定时器按锁定延迟锁定贴底方块（门控不影响正常路径）。"""
     app = _app_with_piece_at_bottom()
     piece_before = app.game.current_type
     lines_before = app.game.total_lines
-    app.handle_fall_timer()
+    app._now = 0
+    app.handle_fall_timer()                      # 首 tick：进入贴地窗口，不锁定
+    assert app.game.current_type == piece_before
+    app._now = LOCK_DELAY_MS + 100
+    app.handle_fall_timer()                      # 窗口已满 → 锁定
     assert app.game.current_type != piece_before  # 已锁定并生成新块
     assert app.game.total_lines == lines_before   # 空盘无消行
+
+
+def test_lock_delay_holds_and_resets_on_move() -> None:
+    """锁定延迟：贴地后 500ms 内可操作；成功移动重置计时。"""
+    app = _app_with_piece_at_bottom()
+    piece_before = app.game.current_type
+
+    app._now = 0
+    app.handle_fall_timer()               # 开始贴地计时
+    app._now = 300
+    app._on_input_action(Action.MOVE_LEFT)  # 移动成功 → 重置计时
+    app._now = 400
+    app.handle_fall_timer()               # 重新开始计时（t=400）
+    app._now = 800
+    app.handle_fall_timer()               # 400ms < 500ms → 仍不锁定
+    assert app.game.current_type == piece_before
+
+    app._now = 400 + LOCK_DELAY_MS + 100  # 已超窗口
+    app.handle_fall_timer()
+    assert app.game.current_type != piece_before  # 锁定并生成新块
