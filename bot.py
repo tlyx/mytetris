@@ -385,8 +385,7 @@ class Bot:
             return
 
         # ---- 硬降 ----
-        while engine.move(0, -1):
-            pass
+        engine.hard_drop()
 
         # ---- 锁定并消除行 ----
         engine.lock_and_clear_lines()

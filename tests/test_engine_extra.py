@@ -1,6 +1,7 @@
 from engine import (
     GRID_HEIGHT,
     GRID_WIDTH,
+    MAX_SCORE,
     SHAPES_DATA,
     WALL_KICKS_I,
     WALL_KICKS_OTHERS,
@@ -189,3 +190,27 @@ def test_cells_in_bounds_filters_out_of_bounds():
     ]
     # 生成区允许 y 超出顶部：这些单元格不写入
     assert cells_in_bounds(0, GRID_HEIGHT, [(0, 1)]) == []
+
+
+def test_hard_drop_returns_distance_to_bottom():
+    """硬降返回落下的格数，块确实贴底（O/S/Z 因含 py=-1 单元停于 anchor y=1）。"""
+    eng = TetrisEngine()
+    eng.reset()
+    start_y = eng.y
+    start_x = eng.x
+    distance = eng.hard_drop()
+    assert distance == start_y - eng.y  # 距离 = 起降位置差
+    assert not eng.move(0, -1)          # 确实贴底：不能再下
+    assert eng.x == start_x             # 水平位置不变
+
+
+def test_add_score_caps_at_max():
+    """add_score 累加并封顶到 MAX_SCORE。"""
+    eng = TetrisEngine()
+    eng.reset()
+    eng.add_score(100)
+    assert eng.score == 100
+    eng.add_score(MAX_SCORE)
+    assert eng.score == MAX_SCORE
+    eng.add_score(1)
+    assert eng.score == MAX_SCORE

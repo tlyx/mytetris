@@ -297,12 +297,14 @@ class TetrisApp:
             self.game.move(1, 0)
 
         elif action == Action.SOFT_DROP:
-            if not self.game.move(0, -1):
+            if self.game.move(0, -1):
+                self.game.add_score(1)  # 软降每格 +1（指南标准）
+            else:
                 self._lock_and_update()
 
         elif action == Action.HARD_DROP:
-            while self.game.move(0, -1):
-                pass
+            distance = self.game.hard_drop()
+            self.game.add_score(2 * distance)  # 硬降每格 +2（指南标准）
             self._lock_and_update()
 
         elif action == Action.ROTATE:

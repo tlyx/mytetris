@@ -231,6 +231,17 @@ class TetrisEngine:
             return True
         return False
 
+    def hard_drop(self) -> int:
+        """硬降：将当前块垂直落到底部，返回落下的格数（计分用）。"""
+        distance = 0
+        while self.move(0, -1):
+            distance += 1
+        return distance
+
+    def add_score(self, points: int) -> None:
+        """增加分数并封顶到 MAX_SCORE。"""
+        self.score = min(self.score + points, MAX_SCORE)
+
     def rotate(self) -> bool:
         """Rotate current piece (no-op for O) and attempt wall-kicks.
 
@@ -291,8 +302,7 @@ class TetrisEngine:
         self.total_lines = min(self.total_lines, MAX_TOTAL_LINES)
 
         # 使用类常量 SCORE_TABLE
-        self.score += TetrisEngine.SCORE_TABLE.get(lines_cleared, 800) * self.level
-        self.score = min(self.score, MAX_SCORE)
+        self.add_score(TetrisEngine.SCORE_TABLE.get(lines_cleared, 800) * self.level)
 
         # 更新等级
         potential_level = (self.total_lines // 10) + 1

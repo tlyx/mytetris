@@ -15,6 +15,7 @@ os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
 from tetris import TetrisApp
+from input_handler import Action
 
 
 def _app_with_piece_at_bottom() -> TetrisApp:
@@ -53,6 +54,24 @@ def test_cycle_bot_strategy() -> None:
     assert app.bot._plan is None  # pyright: ignore[reportPrivateUsage] 计划已作废
     app.cycle_bot_strategy()
     assert app.bot.strategy == "modern"
+
+
+def test_drop_actions_score_points() -> None:
+    """软降每格 +1、硬降每格 +2（指南标准计分）。"""
+    app = TetrisApp()
+    app.game.reset()
+
+    score_before = app.game.score
+    app._on_input_action(Action.SOFT_DROP)
+    assert app.game.score == score_before + 1  # 软降一格
+
+    # 硬降：I 块空盘从生成位落到底（距离 = 生成 y），每格 +2
+    app.game.reset()
+    app.game.next_type = "I"
+    app.game._spawn_piece()  # pyright: ignore[reportPrivateUsage]
+    d_before = app.game.y    # I 的 max_py=0，生成在顶行 y=19
+    app._on_input_action(Action.HARD_DROP)
+    assert app.game.score == 2 * d_before  # I 落到底，距离恰为 d_before
 
 
 def test_fall_timer_locks_when_bot_disabled() -> None:
