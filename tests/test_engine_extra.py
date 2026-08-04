@@ -214,3 +214,32 @@ def test_add_score_caps_at_max():
     assert eng.score == MAX_SCORE
     eng.add_score(1)
     assert eng.score == MAX_SCORE
+
+
+def test_combo_bonus_accumulates_and_resets():
+    """连击（指南标准）：连续消行第 2 次起 +50×(N-1)×level；不消行则清零。"""
+    eng = TetrisEngine()
+    eng.reset()
+    eng.score = 0
+
+    # 两次连续消 1 行：row0 只缺 x0,x1，O 块补满
+    for _ in range(2):
+        eng.grid[0] = [(1, 1, 1)] * GRID_WIDTH
+        eng.grid[0][0] = None
+        eng.grid[0][1] = None
+        helpers.spawn_piece_for_test(eng, "O")
+        eng.x = 0
+        eng.y = 1
+        eng.lock_and_clear_lines()
+
+    assert eng.combo == 2
+    # 第 1 次：100×1 + 0；第 2 次：100×1 + 50×(2-1)×1
+    assert eng.score == 250
+
+    # 放一个不消行的块 → 连击清零
+    helpers.spawn_piece_for_test(eng, "O")
+    eng.x = 3
+    eng.y = 1
+    eng.lock_and_clear_lines()
+    assert eng.combo == 0
+    assert eng.score == 250  # 该块无消行，不加分

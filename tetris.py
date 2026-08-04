@@ -434,6 +434,7 @@ class TetrisApp:
             score=self.game.score,
             level=self.game.level,
             total_lines=self.game.total_lines,
+            combo=self.game.combo,
             high_score=self.high_score,
             game_start_ticks=self.game_start_ticks,
             game_over=self.game.game_over,

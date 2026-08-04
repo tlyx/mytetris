@@ -24,6 +24,7 @@ class GameState:
     score: int
     level: int
     total_lines: int
+    combo: int
 
     # 最高分（持久化）
     high_score: int

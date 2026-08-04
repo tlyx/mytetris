@@ -171,6 +171,7 @@ class TetrisEngine:
     score: int
     level: int
     total_lines: int
+    combo: int
     game_over: bool
     next_type: str
     current_type: str
@@ -190,6 +191,7 @@ class TetrisEngine:
         self.score = 0
         self.level = 1
         self.total_lines = 0
+        self.combo = 0
         self.game_over = False
         self.next_type = ""
         self.current_type = ""
@@ -209,6 +211,7 @@ class TetrisEngine:
         self.score = 0
         self.level = 1
         self.total_lines = 0
+        self.combo = 0
         self.game_over = False
         # 清空 bag 并重新填充
         self._bag = []
@@ -301,8 +304,18 @@ class TetrisEngine:
         self.total_lines += lines_cleared
         self.total_lines = min(self.total_lines, MAX_TOTAL_LINES)
 
+        # 连击（指南标准）：连续消行的第 N 次额外 +50×(N-1)×level，未消行则清零
+        if lines_cleared > 0:
+            self.combo += 1
+            combo_bonus = 50 * (self.combo - 1) * self.level
+        else:
+            self.combo = 0
+            combo_bonus = 0
+
         # 使用类常量 SCORE_TABLE
-        self.add_score(TetrisEngine.SCORE_TABLE.get(lines_cleared, 800) * self.level)
+        self.add_score(
+            TetrisEngine.SCORE_TABLE.get(lines_cleared, 800) * self.level + combo_bonus
+        )
 
         # 更新等级
         potential_level = (self.total_lines // 10) + 1

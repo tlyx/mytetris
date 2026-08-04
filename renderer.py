@@ -492,6 +492,15 @@ class Renderer:
         ds.blit(score_val_surf,
                 (sidebar_content_right - score_val_surf.get_width(), row3_y))
 
+        # ---- Combo 连击显示（连续消行 ≥2 次时，SCORE 数值下方右对齐） ----
+        if state.combo >= 2:
+            combo_surf = self._get_cached_text(
+                f"COMBO x{state.combo}", self.font_small, (255, 90, 90)
+            )
+            combo_y = row3_y + score_val_surf.get_height() + row_gap
+            ds.blit(combo_surf,
+                    (sidebar_content_right - combo_surf.get_width(), combo_y))
+
         # ---------- 预览框（下一个方块） ----------
         bs = int(BLOCK_SIZE * scale)
         preview_size = PREVIEW_SIZE * bs
