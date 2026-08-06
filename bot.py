@@ -1,12 +1,13 @@
 # bot.py — 自动游戏机器人，独立于 TetrisApp
-# 使用 TetrisEngine 提供的接口进行规划、移动与锁定。
 #
-# 决策：2-ply 前瞻，一次性求解（无跨帧状态）。对当前块的每个
-# (rotation, x) 候选，先把候选落定到盘面快照上形成 post 盘面，再在
-# post 盘面上搜索下一块的最佳落点（copy-on-write：写入 → 求值 → 撤销，
-# 避免内层深拷贝）。评分 = 当前块落定得分 + 0.5 × 下一块最佳得分。
+# 公平性设计：bot 不再直连引擎。主线程每帧把只读快照（BotSnapshot）投递
+# 给 bot 线程；bot 线程对新块求解（无时间预算，2-ply 前瞻），把计划翻译
+# 成按键动作（Action）序列写回队列；主线程按人类节奏（每帧 ≤1 个）把
+# 动作喂进与人类键盘完全相同的输入路径（TetrisApp._apply_action）。
+# 重力、锁定延迟、计分对 bot 一视同仁；求解期间若块已被重力锁定，
+# 放弃结果对新块重算——像真正的人一样：想太久，方块自己掉下去锁掉。
 #
-# 评估策略可选用（STRATEGIES 注册表，Bot 构造参数或 set_strategy /
+# 评估策略可选用（STRATEGIES 注册表，构造参数或 set_strategy /
 # cycle_strategy 切换）：
 #   - modern（默认）：经典 Dellacherie 特征（landing height / 消行 /
 #     行过渡 / 列过渡 / 空洞 / 井深和），重存活、稳如老狗；
@@ -26,19 +27,23 @@
 from __future__ import annotations
 
 import copy
+import queue
+import threading
 from collections.abc import Callable
+from dataclasses import dataclass
+from typing import final
 
 from engine import (
     GRID_HEIGHT,
     GRID_WIDTH,
     SHAPES_DATA,
-    TetrisEngine,
     cells_in_bounds,
     collides,
     drop_y,
     rotate_shape,
     spawn_y,
 )
+from input_handler import Action
 
 # 模拟落子时的占位颜色（启发式只关心单元格是否被占用）
 _OCCUPIED: tuple[int, int, int] = (1, 1, 1)
@@ -241,12 +246,13 @@ def column_heights(
 
 def legacy_evaluate(
     grid: list[list[tuple[int, int, int] | None]],
-    landing_height: int,
+    _landing_height: int,
 ) -> float:
     """旧版启发式（Dellacherie 替换前的公式，保留为可选策略）。
 
-    与 Dellacherie 不同：无落点高度惩罚（参数保留以统一签名，未使用），
-    权重手调，中间堆高倾向明显、清行更大胆（Tetris 略多但更早顶死）。
+    与 Dellacherie 不同：无落点高度惩罚（参数保留以统一 STRATEGIES 签名，
+    未使用，故以下划线命名），权重手调，中间堆高倾向明显、清行更大胆
+    （Tetris 略多但更早顶死）。
     """
     heights = column_heights(grid)
     holes = 0
@@ -292,33 +298,121 @@ def get_strategy(
     return STRATEGIES[name]
 
 
-class Bot:
-    """自动方块机器人：2-ply 前瞻求解，逐帧执行计划。
+@dataclass(frozen=True)
+class BotSnapshot:
+    """主线程每帧投递给 bot 线程的只读游戏状态（grid 为行拷贝）。"""
+
+    grid: list[list[tuple[int, int, int] | None]]
+    current_type: str
+    current_shape: list[tuple[int, int]]
+    current_x: int
+    current_y: int
+    next_type: str
+    level: int
+    game_over: bool
+
+
+def plan_to_actions(
+    plan: tuple[int, int], current_x: int
+) -> list[Action]:
+    """把 (rotation, target_x) 计划翻译成按键动作序列（旋转→水平→硬降）。
+
+    :param current_x: 快照中当前块的 engine-local x，用于计算水平移动量。
+    """
+    rotation, target_x = plan
+    actions: list[Action] = [Action.ROTATE] * rotation
+    dx = target_x - current_x
+    if dx > 0:
+        actions.extend([Action.MOVE_RIGHT] * dx)
+    elif dx < 0:
+        actions.extend([Action.MOVE_LEFT] * (-dx))
+    actions.append(Action.HARD_DROP)
+    return actions
+
+
+@final
+class _Mailbox:
+    """单槽快照信箱：主线程投递，bot 线程阻塞等待新一代快照。
+
+    generation 随每次投递递增，用于检测"求解期间状态已变"。
+    """
+
+    _cond: threading.Condition
+    _latest: BotSnapshot | None
+    _generation: int
+
+    def __init__(self) -> None:
+        self._cond = threading.Condition()
+        self._latest = None
+        self._generation = 0
+
+    def post(self, snap: BotSnapshot) -> None:
+        """投递最新快照（主线程调用，覆盖旧值）。"""
+        with self._cond:
+            self._latest = snap
+            self._generation += 1
+            self._cond.notify_all()
+
+    def latest(self) -> BotSnapshot | None:
+        """返回当前最新快照（bot 线程调用）。"""
+        with self._cond:
+            return self._latest
+
+    def generation(self) -> int:
+        with self._cond:
+            return self._generation
+
+    def wait_new(self, seen: int, timeout: float = 0.05) -> BotSnapshot | None:
+        """阻塞直到出现 generation > seen 的新快照；超时返回 None。"""
+        with self._cond:
+            while self._latest is None or self._generation <= seen:
+                if not self._cond.wait(timeout):
+                    return None
+            return self._latest
+
+
+@final
+class BotRunner:
+    """公平 bot：独立线程，只读快照，输出按键动作（与人类同一输入路径）。
+
+    主线程每帧 post_snapshot；bot 线程对新块求解（无时间预算），把计划
+    翻译成动作序列写入队列；主线程 drain 后按 piece 戳校验再应用。
+    求解期间若块已被重力锁定（快照换块），放弃结果重算——像真正的人
+    一样：想太久，方块自己掉下去锁掉，换新块重新想。
 
     :param strategy: 评估策略名（见 STRATEGIES），默认 modern。
     """
+
+    _strategy: str
+    _mailbox: _Mailbox
+    _out: queue.Queue[tuple[str, Action]]
+    _stop: threading.Event
+    _thread: threading.Thread | None
+    _plan_piece: str | None  # 当前计划针对的方块类型
 
     def __init__(self, strategy: str = DEFAULT_STRATEGY) -> None:
         if strategy not in STRATEGIES:
             raise ValueError(f"未知 bot 策略: {strategy!r}，可用: {sorted(STRATEGIES)}")
         self._strategy = strategy
-        self._plan: tuple[int, int] | None = None  # (rotation, target_x)
-        self._step: int = 0
-        self._last_piece_type: str | None = None
+        self._mailbox = _Mailbox()
+        self._out = queue.Queue()
+        self._stop = threading.Event()
+        self._thread = None
+        self._plan_piece = None
 
+    # ---------- 策略管理（主线程调用） ----------
     @property
     def strategy(self) -> str:
         """当前评估策略名。"""
         return self._strategy
 
     def set_strategy(self, strategy: str) -> None:
-        """切换评估策略；当前计划作废，下一帧按新策略重解。"""
+        """切换评估策略；作废当前计划，下块按新策略重解。"""
         if strategy not in STRATEGIES:
             raise ValueError(f"未知 bot 策略: {strategy!r}，可用: {sorted(STRATEGIES)}")
         if strategy != self._strategy:
             self._strategy = strategy
-            self._plan = None
-            self._step = 0
+            self._plan_piece = None  # 跨线程赋值，GIL 下原子，竞态无碍
 
     def cycle_strategy(self) -> str:
         """按 STRATEGY_ORDER 循环切换策略，返回新策略名。"""
@@ -326,69 +420,78 @@ class Bot:
         self.set_strategy(order[(order.index(self._strategy) + 1) % len(order)])
         return self._strategy
 
-    def reset(self) -> None:
-        """重置内部状态（当游戏重新开始时调用）。"""
-        self._plan = None
-        self._step = 0
-        self._last_piece_type = None
-
-    def update(self, engine: TetrisEngine) -> None:
-        """每帧调用一次，驱动机器人的决策与动作。"""
-        if engine.game_over:
+    # ---------- 生命周期 ----------
+    def start(self) -> None:
+        """启动 bot 线程（幂等）。"""
+        if self._thread is not None and self._thread.is_alive():
             return
+        self._stop.clear()
+        self._thread = threading.Thread(
+            target=self._loop, name="mytetris-bot", daemon=True
+        )
+        self._thread.start()
 
-        # 检测方块类型变化，重置计划
-        if engine.current_type != self._last_piece_type:
-            self._plan = None
-            self._step = 0
-            self._last_piece_type = engine.current_type
+    def stop(self, timeout: float = 1.0) -> None:
+        """停止 bot 线程并等待退出（幂等）。"""
+        self._stop.set()
+        if self._thread is not None:
+            self._thread.join(timeout)
+            self._thread = None
 
-        if self._plan is None:
-            # 生成新计划（一次性求解，约 20~100ms，单帧内完成）
-            shape = SHAPES_DATA[engine.current_type]
-            next_shape = SHAPES_DATA.get(engine.next_type)
-            self._plan = best_move(engine.grid, shape, next_shape, self._strategy)
-            if self._plan is None:
-                # 无合法放置；放弃当前尝试，下一帧重试（由重力下落接管）
-                return
+    # ---------- 主线程接口 ----------
+    def post_snapshot(self, snap: BotSnapshot) -> None:
+        """投递当前游戏状态（主线程每帧调用）。"""
+        self._mailbox.post(snap)
 
-        rotation, target_x = self._plan
+    def drain(self, limit: int = 1) -> list[tuple[str, Action]]:
+        """取出 bot 已产出的动作（默认 ≤1，节流为人类按键节奏）。
 
-        # ---- 旋转阶段 ----
-        if self._step < rotation:
-            rotated = engine.rotate()
-            if rotated:
-                self._step += 1
-            else:
-                # rotation failed (kicks couldn't resolve) — abandon plan and
-                # replan immediately next frame.
-                self._plan = None
-                self._step = 0
-            return
+        返回 [(piece_type, action), ...]；调用方必须校验 piece_type
+        仍等于引擎当前块，否则丢弃（动作可能已过期）。
+        """
+        items: list[tuple[str, Action]] = []
+        while len(items) < limit:
+            try:
+                items.append(self._out.get_nowait())
+            except queue.Empty:
+                break
+        return items
 
-        # ---- 水平移动阶段 ----
-        # compute delta in engine-local x (plan stores the desired engine.x)
-        # Previously we compared against the piece's min absolute x which caused
-        # an off-by-min_px error when min_px != 0. Use engine.x directly.
-        dx = target_x - engine.x
+    # ---------- bot 线程 ----------
+    def _loop(self) -> None:
+        seen = 0
+        while not self._stop.is_set():
+            snap = self._mailbox.wait_new(seen)
+            if snap is None:
+                continue
+            seen = self._mailbox.generation()
+            for item in self._decide(snap):
+                self._out.put(item)
 
-        if dx > 0:
-            if not engine.move(1, 0):
-                # blocked; abandon plan and replan immediately next frame
-                self._plan = None
-            return
+    def _decide(self, snap: BotSnapshot) -> list[tuple[str, Action]]:
+        """对快照决定动作序列（纯逻辑，可单测；空列表 = 无需处理）。
 
-        if dx < 0:
-            if not engine.move(-1, 0):
-                # blocked; abandon plan and replan immediately next frame
-                self._plan = None
-            return
-
-        # ---- 硬降 ----
-        engine.hard_drop()
-
-        # ---- 锁定并消除行 ----
-        engine.lock_and_clear_lines()
-
-        self._plan = None
-        self._step = 0
+        - 同一块已决策过 → 不重复求解（动作已在队列里被主线程逐帧消费）；
+        - 求解完成时若快照已换块（求解期间被重力锁定）→ 放弃，下轮重算；
+        - 无合法落点 → 放弃本块，等它被重力锁掉，新块再算。
+        """
+        if snap.game_over:
+            return []
+        if snap.current_type == self._plan_piece:
+            return []
+        plan = best_move(
+            snap.grid,
+            SHAPES_DATA[snap.current_type],
+            SHAPES_DATA.get(snap.next_type),
+            self._strategy,
+        )
+        latest = self._mailbox.latest()
+        if latest is not None and latest.current_type != snap.current_type:
+            return []  # 求解期间换块：结果作废，下一轮对最新块重算
+        self._plan_piece = snap.current_type
+        if plan is None:
+            return []
+        return [
+            (snap.current_type, action)
+            for action in plan_to_actions(plan, snap.current_x)
+        ]

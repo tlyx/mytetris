@@ -1,5 +1,5 @@
 # pyright: reportPrivateUsage=false
-"""Bot 2-ply 前瞻求解器的回归测试。
+"""Bot 2-ply 前瞻求解器与公平运行器的回归测试。
 
 历史 bug：best_next 在“当前块落定前”的原始盘面上计算，对每个候选是
 常数，因此 0.5 * next 项从不影响决策（前瞻是死代码），且每次落子白付
@@ -10,16 +10,29 @@
   2. 在构造的盘面上决策 != 纯贪心（前瞻确实影响决策）；
   3. 求解不修改外部盘面（COW 撤销正确）；
   4. 无合法落点时返回 None；
-  5. bot.update 端到端驱动引擎完成一次落子锁定。
+  5. 计划 → 动作序列 → 引擎机械，与人类按键等价（旋转/移动/硬降/锁定）；
+  6. BotRunner 决策语义：同块不重解、求解期间换块则作废重算；
+  7. 信箱 generation / 动作节流 / 线程生命周期。
 """
 
 from __future__ import annotations
 
 import copy
+import time
 
 import pytest
 
-from bot import STRATEGIES, Bot, best_move, board_features, evaluate, landing_y
+from bot import (
+    STRATEGIES,
+    BotRunner,
+    BotSnapshot,
+    _Mailbox,
+    best_move,
+    board_features,
+    evaluate,
+    landing_y,
+    plan_to_actions,
+)
 from engine import (
     GRID_HEIGHT,
     GRID_WIDTH,
@@ -28,6 +41,7 @@ from engine import (
     cells_in_bounds,
     rotate_shape,
 )
+from input_handler import Action
 
 # ----------------------------------------------------------------------
 # 测试盘面构造
@@ -225,14 +239,14 @@ def test_strategies_registry_and_selection() -> None:
     assert all(p is not None for p in plans.values())
     assert len(set(plans.values())) > 1  # 两种策略落点不全相同
 
-    bot = Bot(strategy="legacy")
+    bot = BotRunner(strategy="legacy")
     assert bot.strategy == "legacy"
     bot.set_strategy("modern")
     assert bot.strategy == "modern"
     assert bot.cycle_strategy() == "legacy"  # modern -> legacy
     assert bot.cycle_strategy() == "modern"
     with pytest.raises(ValueError):
-        Bot(strategy="nope")
+        BotRunner(strategy="nope")
     with pytest.raises(ValueError):
         bot.set_strategy("nope")
 
@@ -249,22 +263,136 @@ def test_no_legal_placement_returns_none() -> None:
     assert solve_engine(eng) is None
 
 
-def test_bot_update_executes_plan_to_lock() -> None:
-    """端到端：bot.update 逐帧驱动 求解→旋转→水平移动→硬降→锁定。
+def make_snapshot(eng: TetrisEngine) -> BotSnapshot:
+    """从引擎构造投递给 bot 线程的只读快照。"""
+    return BotSnapshot(
+        grid=[row[:] for row in eng.grid],
+        current_type=eng.current_type,
+        current_shape=eng.current_shape.copy(),
+        current_x=eng.x,
+        current_y=eng.y,
+        next_type=eng.next_type,
+        level=eng.level,
+        game_over=eng.game_over,
+    )
 
-    执行阶段每帧只推进一格（旋转/移动），锁定发生在最后的硬降帧。
-    """
+
+def apply_actions(eng: TetrisEngine, actions: list[Action]) -> None:
+    """模拟主线程逐动作应用（与 TetrisApp._apply_action 的引擎机械一致）。"""
+    for action in actions:
+        if action == Action.MOVE_LEFT:
+            eng.move(-1, 0)
+        elif action == Action.MOVE_RIGHT:
+            eng.move(1, 0)
+        elif action == Action.ROTATE:
+            eng.rotate()
+        elif action == Action.HARD_DROP:
+            eng.hard_drop()
+    eng.lock_and_clear_lines()  # _apply_action 硬降路径同此
+
+
+def test_plan_to_actions_locks_piece() -> None:
+    """计划 → 动作序列 → 引擎机械，与人类按键等价（旋转/移动/硬降/锁定）。"""
     eng = TetrisEngine()
     eng.reset()
-    bot = Bot()
-    locked_before = sum(
-        cell is not None for row in eng.grid for cell in row
+    plan = best_move(
+        eng.grid,
+        SHAPES_DATA[eng.current_type],
+        SHAPES_DATA.get(eng.next_type),
     )
-    for _ in range(200):
-        bot.update(eng)
-        locked_now = sum(cell is not None for row in eng.grid for cell in row)
-        if locked_now > locked_before:
-            break
-    assert bot._plan is None
+    assert plan is not None
+    actions = plan_to_actions(plan, eng.x)
+    # 动作序列 = 旋转×n + 水平移动 + 硬降
+    assert actions[-1] == Action.HARD_DROP
+    assert actions.count(Action.HARD_DROP) == 1
+    locked_before = sum(cell is not None for row in eng.grid for cell in row)
+    apply_actions(eng, actions)
     locked_after = sum(cell is not None for row in eng.grid for cell in row)
     assert locked_after == locked_before + 4  # 空盘无消行，锁定 4 格
+
+
+def test_plan_to_actions_sequence() -> None:
+    """动作序列方向与数量正确：target_x 偏右→MOVE_RIGHT，偏左→MOVE_LEFT。"""
+    assert plan_to_actions((2, 6), 3) == [
+        Action.ROTATE, Action.ROTATE,
+        Action.MOVE_RIGHT, Action.MOVE_RIGHT, Action.MOVE_RIGHT,
+        Action.HARD_DROP,
+    ]
+    assert plan_to_actions((0, 2), 6) == [
+        Action.MOVE_LEFT, Action.MOVE_LEFT, Action.MOVE_LEFT, Action.MOVE_LEFT,
+        Action.HARD_DROP,
+    ]
+    assert plan_to_actions((1, 4), 4) == [Action.ROTATE, Action.HARD_DROP]
+
+
+def test_decide_same_piece_no_replan() -> None:
+    """同一块已决策过 → 不再重复求解（动作已在队列里逐帧消费）。"""
+    runner = BotRunner()
+    snap = make_snapshot(make_engine(well_board(), "T", "I"))
+    first = runner._decide(snap)
+    assert first  # 产生了动作
+    assert all(piece == "T" for piece, _ in first)
+    assert runner._decide(snap) == []
+
+
+def test_decide_invalidated_when_locked_during_think() -> None:
+    """求解期间块被重力锁定（快照换块）→ 结果作废，下一轮对最新块重算。"""
+    runner = BotRunner()
+    snap_a = make_snapshot(make_engine(well_board(), "T", "I"))
+    runner.post_snapshot(snap_a)
+    snap_b = make_snapshot(make_engine(well_board(), "O", "I"))  # 求解期间换块
+    runner.post_snapshot(snap_b)
+    assert runner._decide(snap_a) == []  # 结果作废
+    out = runner._decide(snap_b)
+    assert out
+    assert all(piece == "O" for piece, _ in out)
+
+
+def test_decide_no_placement_abandons_piece() -> None:
+    """无合法落点 → 放弃本块（不重试求解），等重力锁掉后新块再算。"""
+    runner = BotRunner()
+    snap = make_snapshot(make_engine(no_placement_board(), "O", "I"))
+    assert runner._decide(snap) == []
+    assert runner._decide(snap) == []  # 不再重复求解
+
+
+def test_mailbox_generation_and_wait() -> None:
+    """信箱：阻塞等待新一代快照；generation 随投递递增。"""
+    mb = _Mailbox()
+    assert mb.wait_new(0, timeout=0.01) is None
+    snap = make_snapshot(make_engine(well_board(), "T", "I"))
+    mb.post(snap)
+    assert mb.wait_new(0, timeout=0.01) is snap
+    assert mb.generation() == 1
+    assert mb.wait_new(1, timeout=0.01) is None  # 无新代 → 超时
+
+
+def test_drain_limits() -> None:
+    """drain 节流：默认每帧最多 1 个动作。"""
+    runner = BotRunner()
+    for _ in range(3):
+        runner._out.put(("T", Action.ROTATE))
+    assert len(runner.drain(1)) == 1
+    assert len(runner.drain(10)) == 2
+    assert runner.drain(10) == []
+
+
+def test_runner_thread_emits_actions_and_stops() -> None:
+    """真线程冒烟：投递快照后产出动作；stop 能干净退出。"""
+    runner = BotRunner()
+    runner.start()
+    try:
+        eng = TetrisEngine()
+        eng.reset()
+        runner.post_snapshot(make_snapshot(eng))
+        deadline = time.monotonic() + 2.0
+        while runner._out.empty() and time.monotonic() < deadline:
+            time.sleep(0.005)
+        assert not runner._out.empty()
+        piece, action = runner._out.get_nowait()
+        assert piece == eng.current_type
+        assert action in (Action.ROTATE, Action.MOVE_LEFT, Action.MOVE_RIGHT,
+                          Action.HARD_DROP)
+    finally:
+        runner.stop()
+        assert runner._thread is None

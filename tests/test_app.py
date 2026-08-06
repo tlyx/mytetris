@@ -1,9 +1,8 @@
 # tests/test_app.py — App 层行为测试
 """App 层回归测试。
 
-重点覆盖 bot 模式与重力定时器的竞态修复：bot 启用时重力定时器不得
-移动/锁定当前块（高等级或帧卡顿时，定时器可能抢在 bot 计划前把方块
-直落锁定）。
+重点覆盖公平性：bot 模式与人类模式共用同一套重力/锁定延迟/计分机制
+（bot 只是另一个输入源），以及软降/硬降计分等指南标准行为。
 """
 
 from __future__ import annotations
@@ -27,31 +26,31 @@ def _app_with_piece_at_bottom() -> TetrisApp:
     return app
 
 
-def test_fall_timer_ignored_when_bot_enabled() -> None:
-    """bot 模式下重力定时器不得移动/锁定当前块（竞态修复）。
+def test_fall_timer_applies_when_bot_enabled() -> None:
+    """bot 模式下重力/锁定延迟照常生效（公平性：bot 只是另一个输入源）。
 
     复现路径：贴底方块 + bot 开启 + 触发 handle_fall_timer。
-    修复前定时器会把方块直接锁定（直落、不按 bot 计划）。
+    修复前 bot 模式吞掉定时器事件（防重力后门）；现在与 bot 关闭时
+    行为完全一致：首 tick 进入贴地窗口，窗口满后锁定。
     """
     app = _app_with_piece_at_bottom()
     app.bot_enabled = True
-    before = (app.game.current_type, app.game.x, app.game.y)
-    app.handle_fall_timer()
-    assert (app.game.current_type, app.game.x, app.game.y) == before
+    piece_before = app.game.current_type
+    app._now = 0
+    app.handle_fall_timer()  # 首 tick：进入贴地窗口，不锁定
+    assert app.game.current_type == piece_before
+    app._now = LOCK_DELAY_MS + 100
+    app.handle_fall_timer()  # 窗口已满 → 锁定
+    assert app.game.current_type != piece_before  # 与 bot 关闭时一致
     assert not app.game.game_over
 
 
 def test_cycle_bot_strategy() -> None:
-    """循环切换 bot 策略：顺序遍历注册表并重置当前计划。"""
+    """循环切换 bot 策略：顺序遍历注册表。"""
     app = TetrisApp()
     assert app.bot.strategy == "modern"
-    # 制造一个待执行计划
-    app.game.reset()
-    app.bot.update(app.game)
-    assert app.bot._plan is not None  # pyright: ignore[reportPrivateUsage]
     app.cycle_bot_strategy()
     assert app.bot.strategy == "legacy"
-    assert app.bot._plan is None  # pyright: ignore[reportPrivateUsage] 计划已作废
     app.cycle_bot_strategy()
     assert app.bot.strategy == "modern"
 

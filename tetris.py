@@ -21,7 +21,7 @@ from typing import final
 import pygame  # via pygame-ce
 
 from audio_manager import AudioManager
-from bot import Bot
+from bot import BotRunner, BotSnapshot
 from config_manager import ConfigManager
 from engine import GRID_HEIGHT, GRID_WIDTH, MAX_SCORE, TetrisEngine
 from game_state import GameState
@@ -111,7 +111,7 @@ class TetrisApp:
     _now: int  # 每帧更新，存储当前时间戳
 
     # ---- bot 相关 ----
-    bot: Bot
+    bot: BotRunner
     bot_enabled: bool
     _bot_was_enabled: bool  # 标记 bot 是否曾被启用过（用于决定是否保存配置）
 
@@ -258,8 +258,11 @@ class TetrisApp:
 
     # ---- BOT 初始化 ----
     def _init_bot(self) -> None:
-        """创建新的 Bot 实例（默认关闭）。"""
-        self.bot = Bot()
+        """创建新的 bot 运行器（默认关闭，线程未启动）。"""
+        old = getattr(self, "bot", None)
+        if old is not None:
+            old.stop()
+        self.bot = BotRunner()
         self.bot_enabled = False
         self._bot_was_enabled = False
 
@@ -292,9 +295,16 @@ class TetrisApp:
     # ---- 输入动作回调（由 InputHandler 调用） ----
 
     def _on_input_action(self, action: Action) -> None:
+        """人类键盘输入回调（InputHandler 调用）；bot 模式下忽略人类按键。"""
         if self.bot_enabled:
             return
+        self._apply_action(action)
 
+    def _apply_action(self, action: Action) -> None:
+        """执行一个游戏动作（人类与 bot 共用同一路径）。
+
+        含软降/硬降计分、锁定延迟重置/触发——与按键语义完全一致。
+        """
         if action == Action.MOVE_LEFT:
             if self.game.move(-1, 0):
                 self._reset_lock_delay()  # 贴地窗口内移动 → 重置计时
@@ -337,12 +347,8 @@ class TetrisApp:
     def handle_fall_timer(self) -> None:
         """处理下落定时器事件（被状态类调用）。
 
-        bot 模式下重力由 bot 自行驱动（求解→移动→硬降→锁定），定时器
-        不得介入：否则高等级/帧卡顿时可能抢在 bot 计划前把当前块直落
-        锁定（不旋转、不按计划）。
+        重力对所有模式一视同仁：bot 只是另一个输入源，同样受下落约束。
         """
-        if self.bot_enabled:
-            return
         if not self.game.move(0, -1):
             self._handle_resting_piece()
 
@@ -393,6 +399,7 @@ class TetrisApp:
         # 只有 bot 从未被启用时才保存配置（bot 运行后的数据不算）
         if not self._bot_was_enabled:
             self.config.save()
+        self.bot.stop()
         self.audio.shutdown()
         pygame.mouse.set_visible(True)
         pygame.quit()
@@ -478,6 +485,19 @@ class TetrisApp:
             bot_strategy=self.bot.strategy if self.bot_enabled else None,
         )
 
+    def _build_bot_snapshot(self) -> BotSnapshot:
+        """构造投递给 bot 线程的只读快照（grid 行拷贝，线程安全）。"""
+        return BotSnapshot(
+            grid=[row[:] for row in self.game.grid],
+            current_type=self.game.current_type,
+            current_shape=self.game.current_shape.copy(),
+            current_x=self.game.x,
+            current_y=self.game.y,
+            next_type=self.game.next_type,
+            level=self.game.level,
+            game_over=self.game.game_over,
+        )
+
     # ---- 新拆分的方法：字体加载与鼠标隐藏 ----
 
     def _ensure_fonts(self, scale: float) -> None:
@@ -547,14 +567,18 @@ class TetrisApp:
             else:
                 self.input_handler.reset()
 
-            # bot runs independently
-            if self.bot_enabled and not self.game.game_over and not self.paused:
-                prev_total_lines = self.game.total_lines
-                self.bot.update(self.game)
-                if self.game.total_lines > prev_total_lines:
-                    self.audio.play_sfx("clear")
-                self._update_high_score()
-                self._check_level_upgrade()
+            # bot 公平接管：投递快照 → 每帧 ≤1 个动作 → 走人类同路径。
+            # 动作带 piece 戳，块已换（重力抢先锁定）则丢弃。
+            if self.bot_enabled and not (
+                self.game.game_over
+                or self.paused
+                or self.confirm_quit
+                or self._help_active
+            ):
+                self.bot.post_snapshot(self._build_bot_snapshot())
+                for piece, action in self.bot.drain(limit=1):
+                    if piece == self.game.current_type:
+                        self._apply_action(action)
 
             self._render_game_scene()
             self.clock.tick(60)
@@ -589,6 +613,9 @@ class TetrisApp:
                 self._piece_resting = None  # 切换接管/交还时清掉贴地计时
                 if self.bot_enabled:
                     self._bot_was_enabled = True  # 记录 bot 曾启用
+                    self.bot.start()
+                else:
+                    self.bot.stop()
                 print("BOT:", "ON" if self.bot_enabled else "OFF")
                 continue
 
