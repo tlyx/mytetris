@@ -263,8 +263,14 @@ def test_no_legal_placement_returns_none() -> None:
     assert solve_engine(eng) is None
 
 
-def make_snapshot(eng: TetrisEngine) -> BotSnapshot:
-    """从引擎构造投递给 bot 线程的只读快照。"""
+def make_snapshot(
+    eng: TetrisEngine, piece_id: int | None = None
+) -> BotSnapshot:
+    """从引擎构造投递给 bot 线程的只读快照。
+
+    :param piece_id: 显式指定方块实例 id（默认取引擎当前值；构造
+        同类型多块场景时需要不同的 id 来区分）。
+    """
     return BotSnapshot(
         grid=[row[:] for row in eng.grid],
         current_type=eng.current_type,
@@ -274,6 +280,7 @@ def make_snapshot(eng: TetrisEngine) -> BotSnapshot:
         next_type=eng.next_type,
         level=eng.level,
         game_over=eng.game_over,
+        piece_id=eng.piece_id if piece_id is None else piece_id,
     )
 
 
@@ -326,26 +333,45 @@ def test_plan_to_actions_sequence() -> None:
 
 
 def test_decide_same_piece_no_replan() -> None:
-    """同一块已决策过 → 不再重复求解（动作已在队列里逐帧消费）。"""
+    """同一块实例已决策过 → 不再重复求解（动作已在队列里逐帧消费）。"""
     runner = BotRunner()
     snap = make_snapshot(make_engine(well_board(), "T", "I"))
     first = runner._decide(snap)
     assert first  # 产生了动作
-    assert all(piece == "T" for piece, _ in first)
+    assert all(piece == snap.piece_id for piece, _ in first)
     assert runner._decide(snap) == []
+
+
+def test_decide_resolves_same_type_new_piece() -> None:
+    """同类型连块（7-bag 边界）必须重新求解——历史卡死 bug 回归。
+
+    复现：块 A(T) 计划已产出并被消费锁定，新块恰好也是 T。旧实现按
+    方块类型判断"换块"，漏掉同型新块 → bot 对它不动作，干等重力把整块
+    掉完才继续。piece_id 每次生成 +1，换块判断必须用它。
+    """
+    runner = BotRunner()
+    snap_a = make_snapshot(make_engine(well_board(), "T", "I"), piece_id=1)
+    first = runner._decide(snap_a)
+    assert first
+    assert all(piece == 1 for piece, _ in first)
+    # 同类型、新实例：必须重新求解，不能静默跳过
+    snap_a2 = make_snapshot(make_engine(well_board(), "T", "I"), piece_id=2)
+    second = runner._decide(snap_a2)
+    assert second
+    assert all(piece == 2 for piece, _ in second)
 
 
 def test_decide_invalidated_when_locked_during_think() -> None:
     """求解期间块被重力锁定（快照换块）→ 结果作废，下一轮对最新块重算。"""
     runner = BotRunner()
-    snap_a = make_snapshot(make_engine(well_board(), "T", "I"))
+    snap_a = make_snapshot(make_engine(well_board(), "T", "I"), piece_id=1)
     runner.post_snapshot(snap_a)
-    snap_b = make_snapshot(make_engine(well_board(), "O", "I"))  # 求解期间换块
+    snap_b = make_snapshot(make_engine(well_board(), "O", "I"), piece_id=2)
     runner.post_snapshot(snap_b)
     assert runner._decide(snap_a) == []  # 结果作废
     out = runner._decide(snap_b)
     assert out
-    assert all(piece == "O" for piece, _ in out)
+    assert all(piece == 2 for piece, _ in out)
 
 
 def test_decide_no_placement_abandons_piece() -> None:
@@ -371,7 +397,7 @@ def test_drain_limits() -> None:
     """drain 节流：默认每帧最多 1 个动作。"""
     runner = BotRunner()
     for _ in range(3):
-        runner._out.put(("T", Action.ROTATE))
+        runner._out.put((1, Action.ROTATE))
     assert len(runner.drain(1)) == 1
     assert len(runner.drain(10)) == 2
     assert runner.drain(10) == []
@@ -390,7 +416,7 @@ def test_runner_thread_emits_actions_and_stops() -> None:
             time.sleep(0.005)
         assert not runner._out.empty()
         piece, action = runner._out.get_nowait()
-        assert piece == eng.current_type
+        assert piece == eng.piece_id
         assert action in (Action.ROTATE, Action.MOVE_LEFT, Action.MOVE_RIGHT,
                           Action.HARD_DROP)
     finally:

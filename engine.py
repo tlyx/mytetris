@@ -179,6 +179,9 @@ class TetrisEngine:
     x: int
     y: int
     rotation: int
+    # 当前方块的唯一实例 id：每次生成新块 +1。
+    # 用于区分"同类型但不同的块"（bot 靠它识别换块，而非方块类型）。
+    piece_id: int
     # 7-bag 相关
     _bag: list[str]
 
@@ -201,6 +204,7 @@ class TetrisEngine:
         # rotation state 0..3 (0 = spawn orientation). Stored to allow
         # future SRS-style kick tables and deterministic rotation behavior.
         self.rotation = 0
+        self.piece_id = 0
         self._bag = []
         self._last_cleared_rows = []
         self.reset()
@@ -335,6 +339,7 @@ class TetrisEngine:
         self.current_type = self.next_type
         self.current_shape = list(SHAPES_DATA[self.current_type])
         self.next_type = self._draw_from_bag()
+        self.piece_id += 1
 
         # 水平居中 spawn（基于 piece 的 bounding box）
         min_px = min(px for px, _ in self.current_shape)

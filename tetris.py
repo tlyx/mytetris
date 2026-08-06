@@ -496,6 +496,7 @@ class TetrisApp:
             next_type=self.game.next_type,
             level=self.game.level,
             game_over=self.game.game_over,
+            piece_id=self.game.piece_id,
         )
 
     # ---- 新拆分的方法：字体加载与鼠标隐藏 ----
@@ -568,7 +569,7 @@ class TetrisApp:
                 self.input_handler.reset()
 
             # bot 公平接管：投递快照 → 每帧 ≤1 个动作 → 走人类同路径。
-            # 动作带 piece 戳，块已换（重力抢先锁定）则丢弃。
+            # 动作带方块实例 id 戳，块已换（重力抢先锁定）则丢弃。
             if self.bot_enabled and not (
                 self.game.game_over
                 or self.paused
@@ -577,7 +578,7 @@ class TetrisApp:
             ):
                 self.bot.post_snapshot(self._build_bot_snapshot())
                 for piece, action in self.bot.drain(limit=1):
-                    if piece == self.game.current_type:
+                    if piece == self.game.piece_id:
                         self._apply_action(action)
 
             self._render_game_scene()

@@ -137,6 +137,16 @@ def test_game_over_on_spawn_if_collides():
     assert eng.game_over is True
 
 
+def test_piece_id_increments_on_each_spawn():
+    """每次生成新块 piece_id 单调递增；同类型连块也区分（bot 换块依据）。"""
+    eng = make_empty_engine()
+    id1 = eng.piece_id
+    helpers.spawn_piece_for_test(eng, "T")
+    assert eng.piece_id == id1 + 1
+    helpers.spawn_piece_for_test(eng, "T")
+    assert eng.piece_id == id1 + 2  # 同类型新块 id 也不同
+
+
 # ----------------------------------------------------------------------
 # 共享纯几何原语（engine 模块级函数，供引擎方法与 bot 模拟共用）
 # ----------------------------------------------------------------------

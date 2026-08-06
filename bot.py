@@ -310,6 +310,9 @@ class BotSnapshot:
     next_type: str
     level: int
     game_over: bool
+    # 当前方块实例 id（引擎每次生成新块 +1）：同一类型但不同的块 id 不同，
+    # 是 bot 识别"换块了"的可靠依据（方块类型可能连续相同）。
+    piece_id: int
 
 
 def plan_to_actions(
@@ -385,10 +388,10 @@ class BotRunner:
 
     _strategy: str
     _mailbox: _Mailbox
-    _out: queue.Queue[tuple[str, Action]]
+    _out: queue.Queue[tuple[int, Action]]
     _stop: threading.Event
     _thread: threading.Thread | None
-    _plan_piece: str | None  # 当前计划针对的方块类型
+    _plan_piece_id: int | None  # 当前计划针对的方块实例 id
 
     def __init__(self, strategy: str = DEFAULT_STRATEGY) -> None:
         if strategy not in STRATEGIES:
@@ -398,7 +401,7 @@ class BotRunner:
         self._out = queue.Queue()
         self._stop = threading.Event()
         self._thread = None
-        self._plan_piece = None
+        self._plan_piece_id = None
 
     # ---------- 策略管理（主线程调用） ----------
     @property
@@ -412,7 +415,7 @@ class BotRunner:
             raise ValueError(f"未知 bot 策略: {strategy!r}，可用: {sorted(STRATEGIES)}")
         if strategy != self._strategy:
             self._strategy = strategy
-            self._plan_piece = None  # 跨线程赋值，GIL 下原子，竞态无碍
+            self._plan_piece_id = None  # 跨线程赋值，GIL 下原子，竞态无碍
 
     def cycle_strategy(self) -> str:
         """按 STRATEGY_ORDER 循环切换策略，返回新策略名。"""
@@ -443,13 +446,13 @@ class BotRunner:
         """投递当前游戏状态（主线程每帧调用）。"""
         self._mailbox.post(snap)
 
-    def drain(self, limit: int = 1) -> list[tuple[str, Action]]:
+    def drain(self, limit: int = 1) -> list[tuple[int, Action]]:
         """取出 bot 已产出的动作（默认 ≤1，节流为人类按键节奏）。
 
-        返回 [(piece_type, action), ...]；调用方必须校验 piece_type
-        仍等于引擎当前块，否则丢弃（动作可能已过期）。
+        返回 [(piece_id, action), ...]；调用方必须校验 piece_id 仍等于
+        引擎当前块实例，否则丢弃（动作可能已过期）。
         """
-        items: list[tuple[str, Action]] = []
+        items: list[tuple[int, Action]] = []
         while len(items) < limit:
             try:
                 items.append(self._out.get_nowait())
@@ -468,16 +471,20 @@ class BotRunner:
             for item in self._decide(snap):
                 self._out.put(item)
 
-    def _decide(self, snap: BotSnapshot) -> list[tuple[str, Action]]:
+    def _decide(self, snap: BotSnapshot) -> list[tuple[int, Action]]:
         """对快照决定动作序列（纯逻辑，可单测；空列表 = 无需处理）。
 
-        - 同一块已决策过 → 不重复求解（动作已在队列里被主线程逐帧消费）；
+        - 同一块实例已决策过 → 不重复求解（动作已在队列里被主线程逐帧消费）；
         - 求解完成时若快照已换块（求解期间被重力锁定）→ 放弃，下轮重算；
         - 无合法落点 → 放弃本块，等它被重力锁掉，新块再算。
+
+        换块判断用 piece_id（引擎每次生成新块 +1），而不是方块类型——
+        7-bag 边界处可能连续出现同类型方块，按类型判断会漏掉换块，
+        导致 bot 对整块新方块不动作、干等重力把它掉完（历史 bug）。
         """
         if snap.game_over:
             return []
-        if snap.current_type == self._plan_piece:
+        if snap.piece_id == self._plan_piece_id:
             return []
         plan = best_move(
             snap.grid,
@@ -486,12 +493,12 @@ class BotRunner:
             self._strategy,
         )
         latest = self._mailbox.latest()
-        if latest is not None and latest.current_type != snap.current_type:
+        if latest is not None and latest.piece_id != snap.piece_id:
             return []  # 求解期间换块：结果作废，下一轮对最新块重算
-        self._plan_piece = snap.current_type
+        self._plan_piece_id = snap.piece_id
         if plan is None:
             return []
         return [
-            (snap.current_type, action)
+            (snap.piece_id, action)
             for action in plan_to_actions(plan, snap.current_x)
         ]
