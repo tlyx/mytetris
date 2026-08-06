@@ -14,6 +14,7 @@ dev = [
     "pillow>=12.2.0",
     "pyinstaller>=6.21.0",
     "pytest>=9.1.1",
+    "ruff>=0.9",
 ]
 
 # 最小 ruff 配置：固定项目根目录，使 import 分类不随运行目录变化
