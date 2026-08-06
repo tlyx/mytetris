@@ -393,6 +393,29 @@ def test_mailbox_generation_and_wait() -> None:
     assert mb.wait_new(1, timeout=0.01) is None  # 无新代 → 超时
 
 
+def test_decide_drops_stale_actions_on_new_piece() -> None:
+    """换块时清空队列里上一块残留的动作（省去主线程逐帧丢弃）。
+
+    旧行为：上一块锁定后，队列里剩余动作由主线程一帧一个地按戳丢弃；
+    新行为：bot 检测到换块即清空，队列只含新块的动作。
+    """
+    runner = BotRunner()
+    snap_a = make_snapshot(make_engine(well_board(), "T", "I"), piece_id=1)
+    first = runner._decide(snap_a)
+    assert first
+    for item in first:
+        runner._out.put(item)  # 模拟 _loop 入队
+    runner._out.get_nowait()  # 消费一个，队列还残留旧块动作
+    assert runner._out.qsize() > 0
+    snap_b = make_snapshot(make_engine(well_board(), "O", "I"), piece_id=2)
+    second = runner._decide(snap_b)
+    assert second
+    assert all(piece == 2 for piece, _ in second)
+    for item in second:
+        runner._out.put(item)
+    assert runner._out.qsize() == len(second)  # 旧动作已清空
+
+
 def test_drain_limits() -> None:
     """drain 节流：默认每帧最多 1 个动作。"""
     runner = BotRunner()

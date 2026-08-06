@@ -481,11 +481,15 @@ class BotRunner:
         换块判断用 piece_id（引擎每次生成新块 +1），而不是方块类型——
         7-bag 边界处可能连续出现同类型方块，按类型判断会漏掉换块，
         导致 bot 对整块新方块不动作、干等重力把它掉完（历史 bug）。
+
+        换块时顺带清空队列里上一块残留的动作（上一块已锁定/被重力带
+        走）：主线程不必再逐帧丢弃过期动作；piece_id 戳校验仍保留兜底。
         """
         if snap.game_over:
             return []
         if snap.piece_id == self._plan_piece_id:
             return []
+        self._drop_pending()
         plan = best_move(
             snap.grid,
             SHAPES_DATA[snap.current_type],
@@ -502,3 +506,14 @@ class BotRunner:
             (snap.piece_id, action)
             for action in plan_to_actions(plan, snap.current_x)
         ]
+
+    def _drop_pending(self) -> None:
+        """清空尚未被主线程消费的动作（换块时调用）。
+
+        队列里只会存在针对 _plan_piece_id 的动作；换块后它们全部过期。
+        """
+        while True:
+            try:
+                self._out.get_nowait()
+            except queue.Empty:
+                return
