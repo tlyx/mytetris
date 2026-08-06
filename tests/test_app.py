@@ -1,3 +1,4 @@
+# pyright: reportPrivateUsage=false
 # tests/test_app.py — App 层行为测试
 """App 层回归测试。
 

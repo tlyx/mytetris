@@ -170,7 +170,9 @@ def test_spawn_y_aligns_top():
 
 def test_collides_contract():
     """边界/占用规则：越界、低于底部、占用均冲突；高于顶部放行。"""
-    grid = [[None] * GRID_WIDTH for _ in range(GRID_HEIGHT)]
+    grid: list[list[tuple[int, int, int] | None]] = [
+        [None for _ in range(GRID_WIDTH)] for _ in range(GRID_HEIGHT)
+    ]
     one = [(0, 0)]
     assert collides(grid, 0, 0, one) is False
     assert collides(grid, -1, 0, one) is True          # 左越界
@@ -183,7 +185,9 @@ def test_collides_contract():
 
 def test_drop_y_lands_on_bottom_or_stack():
     """垂直下落：空盘落到底部，遇到已锁定方块则停在其上。"""
-    grid = [[None] * GRID_WIDTH for _ in range(GRID_HEIGHT)]
+    grid: list[list[tuple[int, int, int] | None]] = [
+        [None for _ in range(GRID_WIDTH)] for _ in range(GRID_HEIGHT)
+    ]
     i = SHAPES_DATA["I"]  # 水平 I，max_py=0，生成 y=19
     y = drop_y(grid, i, 3, spawn_y(i))
     assert y == 0  # 空盘直落到底
