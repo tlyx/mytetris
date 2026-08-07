@@ -92,7 +92,7 @@ _WALL_KICKS_I: list[tuple[int, int]] = [
 #
 # 所有函数使用内部底部原点坐标（y 向上为正）。提取为模块级函数，
 # 使 bot 的模拟与引擎实际规则使用同一份实现，避免两处各自维护导致
-# 语义漂移（bot 不能直接调 engine.can_place，它检查的是引擎实时网格，
+# 语义漂移（bot 不能直接调引擎的实时网格碰撞检查，
 # 而模拟必须作用在模拟盘面上）。
 # ---------------------------------------------------------------------
 
@@ -383,20 +383,6 @@ class TetrisEngine:
     def get_piece_cells(self):
         """Return absolute positions of current piece blocks using internal coords (bottom-origin)."""
         return [(self.x + dx, self.y + dy) for dx, dy in self.current_shape]
-
-    def can_place(
-        self,
-        nx: int,
-        ny: int,
-        shape: list[tuple[int, int]] | None = None,
-    ) -> bool:
-        """Public helper: return True iff placing `shape` at (nx, ny) would NOT collide.
-
-        This is a thin, readable wrapper around the internal _check_collision
-        (which returns True on collision). Callers that need to query validity
-        of a placement should use this rather than duplicating collision logic.
-        """
-        return not self._check_collision(nx, ny, shape)
 
     # ---------- 7-bag 随机生成器 ----------
     def _refill_bag(self) -> None:

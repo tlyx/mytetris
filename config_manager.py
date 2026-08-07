@@ -85,18 +85,6 @@ class ConfigManager:
         except OSError as exc:
             print(f"WARNING: Failed to save config: {exc}")
 
-    # ---------- 读取配置项 ----------
-    def get(self, key: str) -> _ConfigValue:
-        """返回指定配置项的当前值。"""
-        # 字典中所有键始终存在（加载时已确保），无需 cast
-        return self._data.get(key, ConfigManager._defaults[key])
-
-    # ---------- 设置配置项 ----------
-    def set(self, key: str, value: _ConfigValue) -> None:
-        """设置指定配置项的值，不会立即写入文件（需调用 save）。"""
-        if key in self._data:
-            self._data[key] = value
-
     # ---------- 便捷属性访问（与原有 TetrisApp 属性名一致） ----------
     # （按 _defaults 中 bool 在前字母顺序，数字在后）
     @property
