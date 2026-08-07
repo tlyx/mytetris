@@ -11,8 +11,6 @@
 （bot 只是另一个输入源），以及软降/硬降计分等指南标准行为。
 """
 
-from __future__ import annotations
-
 import os
 
 # pygame 无头环境：必须在构造 TetrisApp（初始化显示/音频）之前设置

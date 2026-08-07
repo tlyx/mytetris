@@ -4,8 +4,6 @@
 # 此文件主要负责：
 #  - 定义 Action 动作枚举（输入层与 bot 的公共词汇）
 
-from __future__ import annotations
-
 from enum import Enum, auto
 
 

@@ -6,8 +6,6 @@
 #  - 音乐播放、暂停、恢复与开关
 #  - 退出时资源清理
 
-from __future__ import annotations
-
 from pathlib import Path
 from typing import final
 

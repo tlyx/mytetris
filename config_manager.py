@@ -5,8 +5,6 @@
 #  - 配置文件加载 / 保存（platformdirs 用户数据目录）
 #  - 配置项读写与上限检查（最高分等）
 
-from __future__ import annotations
-
 import json
 from pathlib import Path
 from typing import ClassVar, final

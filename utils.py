@@ -3,8 +3,6 @@
 # 此文件主要负责：
 #  - resource_path：兼容 PyInstaller 打包的资源路径解析
 
-from __future__ import annotations
-
 import sys
 from pathlib import Path
 

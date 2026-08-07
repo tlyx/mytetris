@@ -30,8 +30,9 @@ the code so that the style stays consistent.
 - Line length follows ruff's default (88 columns); the project only pins
   `src = ["."]` in `[tool.ruff]` and relies on ruff's defaults otherwise.
 - Import order is enforced by ruff (`I001`): standard library → third-party →
-  first-party, each group separated by a blank line. `from __future__ import
-  annotations` always comes first.
+  first-party, each group separated by a blank line. If a file carries a
+  `from __future__` import, it always comes first (see §4 for when that is
+  needed at all).
 - One logical concern per module; see
   [Module Architecture](#2-module-architecture).
 - Comments and docstrings are written in Chinese, matching the existing code.
@@ -107,7 +108,13 @@ Rules:
 - **Annotate everything**: parameters, return values, module- and class-level
   attributes, and container element types (`list[list[tuple[int, int, int] | None]]`,
   not bare `list`).
-- Use `from __future__ import annotations` in every module.
+- Use `from __future__ import annotations` only where annotations reference
+  names that are not available at runtime: forward references or
+  `TYPE_CHECKING`-only imports (the one case in this repo is
+  `state_handlers.py`, which annotates with a `TYPE_CHECKING`-imported
+  `TetrisEngine` and needs it for Python 3.13). Do not add it everywhere:
+  on Python 3.14+ (PEP 649) annotations are lazy by default, so it is a
+  no-op there anyway.
 - Use `@final` on classes that are not meant to be subclassed
   (`TetrisEngine`, `TetrisApp`, `BotRunner`, `Renderer`, …).
 - Use `Protocol` for interface contracts (`BotInterface`, `AppInterface`);
@@ -135,7 +142,7 @@ Every `.py` file starts with a comment header in this shape:
 #  - <bullet item>
 #  - <bullet item>
 
-from __future__ import annotations
+imports…
 ```
 
 - The first line always uses `<name>.py — …` with an em dash.
@@ -152,8 +159,12 @@ from __future__ import annotations
 - **Depend on interfaces, not implementations.** `TetrisApp` holds
   `bot: BotInterface`; the concrete `BotRunner` is created only in
   `_init_bot`.
-- **No pygame in non-UI modules.** `actions.py` and `bot.py` never import
-  pygame; the shared `Action` vocabulary lives in `actions.py`.
+- **No pygame in logic modules.** pygame is confined to the integration
+  layer — `tetris.py`, `renderer.py`, `state_handlers.py`,
+  `input_handler.py`, `audio_manager.py`. Logic modules (`engine.py`,
+  `bot.py`, `actions.py`, `game_state.py`, `config_manager.py`,
+  `utils.py`) never import pygame; the shared `Action` vocabulary lives
+  in `actions.py`.
 - **The renderer is read-only.** It takes a `GameState` snapshot, holds no
   reference to `TetrisApp`/`TetrisEngine`, and renders a generic
   `status_line` instead of knowing about "the bot".
@@ -219,7 +230,10 @@ from __future__ import annotations
 - Commit messages are written in **English**, short (≤ ~72-char subject)
   with a conventional prefix: `feat:`, `fix:`, `refactor:`, `style:`,
   `perf:`, `ci:`, `chore:`, `docs:`, `ui:`.
-- When AI tooling contributed to the change, add a trailer:
+- When AI tooling contributed to the change, add a trailer naming the
+  agent and the model it ran on:
+  `Co-authored-by: <AI-Agent-Name> (<LLM Model Name>)`. The current
+  project uses e.g.
   `Co-authored-by: oh-my-pi (deepseek/deepseek-v4-flash)`.
 - Version lives in `pyproject.toml`; releases are tagged `vX.Y.Z` on `main`.
 - Keep related changes in a single commit; squash noisy intermediate commits

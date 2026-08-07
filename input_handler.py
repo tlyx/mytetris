@@ -7,8 +7,6 @@
 #  - DAS/ARR 自动重复（长按方向键）
 #  - 按键状态清理（暂停 / 重启时重置）
 
-from __future__ import annotations
-
 from collections.abc import Callable
 from typing import final
 

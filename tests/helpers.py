@@ -14,8 +14,6 @@ name as requested. Tests can import these helpers via
 and use the utilities to set up deterministic engine scenarios.
 """
 
-from __future__ import annotations
-
 from engine import TetrisEngine
 
 

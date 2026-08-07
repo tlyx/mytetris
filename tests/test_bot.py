@@ -21,8 +21,6 @@
   7. 信箱 generation / 动作节流 / 线程生命周期。
 """
 
-from __future__ import annotations
-
 import copy
 import time
 

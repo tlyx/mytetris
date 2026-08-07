@@ -38,8 +38,6 @@
 # 引擎实时网格，保证 2-ply 模拟语义正确（历史 bug：旧版内层模拟用
 # engine.can_place 检查实时网格，与 post 盘面不一致）。
 
-from __future__ import annotations
-
 import copy
 import queue
 import threading
