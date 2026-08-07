@@ -15,7 +15,7 @@ os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
 from actions import Action
-from tetris import LOCK_DELAY_MS, TetrisApp
+from tetris import _LOCK_DELAY_MS, TetrisApp
 
 
 def _app_with_piece_at_bottom() -> TetrisApp:
@@ -40,7 +40,7 @@ def test_fall_timer_applies_when_bot_enabled() -> None:
     app._now = 0
     app.handle_fall_timer()  # 首 tick：进入贴地窗口，不锁定
     assert app.game.current_type == piece_before
-    app._now = LOCK_DELAY_MS + 100
+    app._now = _LOCK_DELAY_MS + 100
     app.handle_fall_timer()  # 窗口已满 → 锁定
     assert app.game.current_type != piece_before  # 与 bot 关闭时一致
     assert not app.game.game_over
@@ -82,7 +82,7 @@ def test_fall_timer_locks_when_bot_disabled() -> None:
     app._now = 0
     app.handle_fall_timer()                      # 首 tick：进入贴地窗口，不锁定
     assert app.game.current_type == piece_before
-    app._now = LOCK_DELAY_MS + 100
+    app._now = _LOCK_DELAY_MS + 100
     app.handle_fall_timer()                      # 窗口已满 → 锁定
     assert app.game.current_type != piece_before  # 已锁定并生成新块
     assert app.game.total_lines == lines_before   # 空盘无消行
@@ -103,6 +103,6 @@ def test_lock_delay_holds_and_resets_on_move() -> None:
     app.handle_fall_timer()               # 400ms < 500ms → 仍不锁定
     assert app.game.current_type == piece_before
 
-    app._now = 400 + LOCK_DELAY_MS + 100  # 已超窗口
+    app._now = 400 + _LOCK_DELAY_MS + 100  # 已超窗口
     app.handle_fall_timer()
     assert app.game.current_type != piece_before  # 锁定并生成新块

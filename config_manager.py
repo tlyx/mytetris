@@ -13,7 +13,7 @@ import platformdirs
 from engine import MAX_SCORE
 
 # 配置值的类型：bool 或 int
-ConfigValue = bool | int
+_ConfigValue = bool | int
 
 
 @final
@@ -21,7 +21,7 @@ class ConfigManager:
     """管理游戏配置（音乐、音效、消行动画、最高分）的加载与保存。"""
 
     # 配置字段默认值（bool 在前按字母顺序，数字在后）
-    _defaults: ClassVar[dict[str, ConfigValue]] = {
+    _defaults: ClassVar[dict[str, _ConfigValue]] = {
         "clear_anim_enabled": True,
         "experimental": True,                     # 实验性功能开关，默认为 True
         "music_enabled": True,
@@ -86,13 +86,13 @@ class ConfigManager:
             print(f"WARNING: Failed to save config: {exc}")
 
     # ---------- 读取配置项 ----------
-    def get(self, key: str) -> ConfigValue:
+    def get(self, key: str) -> _ConfigValue:
         """返回指定配置项的当前值。"""
         # 字典中所有键始终存在（加载时已确保），无需 cast
         return self._data.get(key, ConfigManager._defaults[key])
 
     # ---------- 设置配置项 ----------
-    def set(self, key: str, value: ConfigValue) -> None:
+    def set(self, key: str, value: _ConfigValue) -> None:
         """设置指定配置项的值，不会立即写入文件（需调用 save）。"""
         if key in self._data:
             self._data[key] = value

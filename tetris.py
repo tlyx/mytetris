@@ -44,23 +44,23 @@ from utils import resource_path
 
 # 最小窗口尺寸（小于此值会被强制拉伸到该最小尺寸）
 # 增加50像素避免黑边过窄
-MIN_WINDOW_WIDTH = max(
+_MIN_WINDOW_WIDTH = max(
     400,
     LEFT_WIDTH + GRID_WIDTH * BLOCK_SIZE + RIGHT_WIDTH + 50,
 )
 
 # 锁定延迟（毫秒，指南标准）：方块贴地后仍可移动/旋转的操作窗口。
 # 每次成功移动/旋转重置计时；硬降立即锁定，不吃延迟。
-LOCK_DELAY_MS = 500
-MIN_WINDOW_HEIGHT = 400
+_LOCK_DELAY_MS = 500
+_MIN_WINDOW_HEIGHT = 400
 
 # ---- 应用图标路径 ----
-LOGO_FILE = resource_path("assets/logo.png")
+_LOGO_FILE = resource_path("assets/logo.png")
 # -----------------------
 
 # ---- 字体文件路径（使用统一常量便于替换） ----
-FONT_FILE = resource_path("assets/fonts/DejaVuSans-Bold.ttf")
-HELP_FONT_FILE = resource_path("assets/fonts/DejaVuSansMono.ttf")
+_FONT_FILE = resource_path("assets/fonts/DejaVuSans-Bold.ttf")
+_HELP_FONT_FILE = resource_path("assets/fonts/DejaVuSansMono.ttf")
 # ---------------------------------------------
 
 @final
@@ -232,14 +232,14 @@ class TetrisApp:
     @staticmethod
     def _init_icon() -> None:
         """设置窗口图标。"""
-        if Path(LOGO_FILE).is_file():
+        if Path(_LOGO_FILE).is_file():
             try:
-                icon_surf = pygame.image.load(LOGO_FILE).convert_alpha()
+                icon_surf = pygame.image.load(_LOGO_FILE).convert_alpha()
                 pygame.display.set_icon(icon_surf)
             except pygame.error as exc:
                 print(f"WARNING: Failed to set window icon: {exc}")
         else:
-            print(f"WARNING: Icon file not found, skipping: {LOGO_FILE}")
+            print(f"WARNING: Icon file not found, skipping: {_LOGO_FILE}")
 
     def _init_config(self) -> None:
         """加载配置管理器并覆盖默认设置（音乐、音效、消行动画、最高分）。"""
@@ -354,13 +354,13 @@ class TetrisApp:
             self._handle_resting_piece()
 
     def _handle_resting_piece(self) -> None:
-        """当前块贴地时管理锁定延迟：贴地满 LOCK_DELAY_MS 才锁定。
+        """当前块贴地时管理锁定延迟：贴地满 _LOCK_DELAY_MS 才锁定。
 
         贴地后移动/旋转会重置计时（_reset_lock_delay），硬降不受影响。
         """
         if self._piece_resting is None:
             self._piece_resting = self._now
-        elif self._now - self._piece_resting >= LOCK_DELAY_MS:
+        elif self._now - self._piece_resting >= _LOCK_DELAY_MS:
             self._piece_resting = None
             self._lock_and_update()
 
@@ -411,7 +411,7 @@ class TetrisApp:
     @staticmethod
     def _clamp_size(w: int, h: int) -> tuple[int, int]:
         """返回不小于最小尺寸的窗口宽高。"""
-        return max(w, MIN_WINDOW_WIDTH), max(h, MIN_WINDOW_HEIGHT)
+        return max(w, _MIN_WINDOW_WIDTH), max(h, _MIN_WINDOW_HEIGHT)
 
     def _enforce_min_size(self) -> None:
         """确保当前窗口不小于最小尺寸。"""
@@ -509,20 +509,20 @@ class TetrisApp:
                 or self._help_font is None
                 or abs(scale - self._current_scale) > 1e-9):
             # 检查必选字体文件是否存在
-            if not Path(FONT_FILE).is_file():
-                print(f"FATAL: Required font file not found: {FONT_FILE}")
+            if not Path(_FONT_FILE).is_file():
+                print(f"FATAL: Required font file not found: {_FONT_FILE}")
                 sys.exit(1)
-            if not Path(HELP_FONT_FILE).is_file():
-                print(f"FATAL: Required font file not found: {HELP_FONT_FILE}")
+            if not Path(_HELP_FONT_FILE).is_file():
+                print(f"FATAL: Required font file not found: {_HELP_FONT_FILE}")
                 sys.exit(1)
 
             self._current_scale = scale
             font_size = max(10, int(32 * scale))
             small_font_size = max(8, int(20 * scale))
             help_font_size = max(8, int(20 * scale))
-            self._font_big = pygame.font.Font(FONT_FILE, font_size)
-            self._font_small = pygame.font.Font(FONT_FILE, small_font_size)
-            self._help_font = pygame.font.Font(HELP_FONT_FILE, help_font_size)
+            self._font_big = pygame.font.Font(_FONT_FILE, font_size)
+            self._font_small = pygame.font.Font(_FONT_FILE, small_font_size)
+            self._help_font = pygame.font.Font(_HELP_FONT_FILE, help_font_size)
 
             self.renderer.update_fonts(
                 scale, self._font_big, self._font_small, self._help_font,

@@ -8,15 +8,15 @@ GRID_WIDTH, GRID_HEIGHT = 10, 20
 
 # ---------- 上限常量 ----------
 MAX_SCORE = 999999
-MAX_TOTAL_LINES = 999999
+_MAX_TOTAL_LINES = 999999
 # -----------------------------
 
 # ---------- 速度与级别相关常量 ----------
-MAX_INITIAL_SPEED = 500          # 初始下落间隔（毫秒）
-SPEED_DECREASE = 30              # 每升一级减少的毫秒数
-MIN_SPEED = 100                  # 速度下限（最快）
+_MAX_INITIAL_SPEED = 500          # 初始下落间隔（毫秒）
+_SPEED_DECREASE = 30              # 每升一级减少的毫秒数
+_MIN_SPEED = 100                  # 速度下限（最快）
 # 根据线性公式计算最大级别：当 500 - (level-1)*30 <= 100 时，level >= 14
-MAX_LEVEL = (MAX_INITIAL_SPEED - MIN_SPEED) // SPEED_DECREASE + 1   # =14
+_MAX_LEVEL = (_MAX_INITIAL_SPEED - _MIN_SPEED) // _SPEED_DECREASE + 1   # =14
 # ---------------------------------------
 
 COLORS: dict[str, tuple[int, int, int]] = {
@@ -45,7 +45,7 @@ SHAPES_DATA: dict[str, list[tuple[int, int]]] = {
 }
 
 # 七种标准方块类型列表（用于7-bag随机生成）
-ALL_PIECES: list[str] = ["I", "O", "T", "L", "J", "S", "Z"]
+_ALL_PIECES: list[str] = ["I", "O", "T", "L", "J", "S", "Z"]
 
 # ----------------- Wall kick / spawn related constants -----------------
 # These are a compact, pragmatic set of kick offsets to try when a rotation
@@ -53,7 +53,7 @@ ALL_PIECES: list[str] = ["I", "O", "T", "L", "J", "S", "Z"]
 # and easier to maintain than an ad-hoc inline list.
 # I-piece generally needs wider horizontal kicks, so we provide a separate
 # set for it.
-WALL_KICKS_OTHERS: list[tuple[int, int]] = [
+_WALL_KICKS_OTHERS: list[tuple[int, int]] = [
     (0, 0),
     (1, 0),
     (-1, 0),
@@ -65,7 +65,7 @@ WALL_KICKS_OTHERS: list[tuple[int, int]] = [
     (0, 2),
 ]
 
-WALL_KICKS_I: list[tuple[int, int]] = [
+_WALL_KICKS_I: list[tuple[int, int]] = [
     (0, 0),
     (1, 0),
     (-1, 0),
@@ -273,7 +273,7 @@ class TetrisEngine:
             return True
 
         # choose appropriate kick set
-        kicks = WALL_KICKS_I if self.current_type == "I" else WALL_KICKS_OTHERS
+        kicks = _WALL_KICKS_I if self.current_type == "I" else _WALL_KICKS_OTHERS
 
         for ox, oy in kicks:
             if not self._check_collision(self.x + ox, self.y + oy, new_shape):
@@ -306,7 +306,7 @@ class TetrisEngine:
 
         lines_cleared = len(cleared_rows)
         self.total_lines += lines_cleared
-        self.total_lines = min(self.total_lines, MAX_TOTAL_LINES)
+        self.total_lines = min(self.total_lines, _MAX_TOTAL_LINES)
 
         # 连击（指南标准）：连续消行的第 N 次额外 +50×(N-1)×level，未消行则清零
         if lines_cleared > 0:
@@ -323,7 +323,7 @@ class TetrisEngine:
 
         # 更新等级
         potential_level = (self.total_lines // 10) + 1
-        self.level = min(potential_level, MAX_LEVEL)
+        self.level = min(potential_level, _MAX_LEVEL)
 
         # 从网格中删除满行（从高索引到低索引删除以避免索引错乱），再在顶部插入空行
         if lines_cleared > 0:
@@ -396,7 +396,7 @@ class TetrisEngine:
     # ---------- 7-bag 随机生成器 ----------
     def _refill_bag(self) -> None:
         """用全部七种方块填充 bag 并随机打乱。"""
-        self._bag = list(ALL_PIECES)   # 浅拷贝即可，元素为不可变字符串
+        self._bag = list(_ALL_PIECES)   # 浅拷贝即可，元素为不可变字符串
         shuffle(self._bag)
 
     def _draw_from_bag(self) -> str:
@@ -431,13 +431,13 @@ class TetrisEngine:
         # Convert to cells-per-second for interpolation to keep linear
         # progression in terms of falling speed (cells/sec), then convert
         # back to a millisecond interval.
-        cells_per_sec_min = 1000.0 / MAX_INITIAL_SPEED   # e.g. 2.0 cells/sec
-        cells_per_sec_max = 1000.0 / MIN_SPEED           # e.g. 10.0 cells/sec
+        cells_per_sec_min = 1000.0 / _MAX_INITIAL_SPEED   # e.g. 2.0 cells/sec
+        cells_per_sec_max = 1000.0 / _MIN_SPEED           # e.g. 10.0 cells/sec
 
         # linear interpolation of cells/sec across levels
         cells_per_sec = (
             cells_per_sec_min
-            + (cells_per_sec_max - cells_per_sec_min) * (level - 1) / (MAX_LEVEL - 1)
+            + (cells_per_sec_max - cells_per_sec_min) * (level - 1) / (_MAX_LEVEL - 1)
         )
 
         # convert to milliseconds per cell (interval)

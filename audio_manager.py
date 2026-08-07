@@ -12,9 +12,9 @@ import pygame  # via pygame-ce
 from utils import resource_path
 
 # 音频文件路径（使用 resource_path 以适应打包环境）
-BG_MUSIC_FILE = resource_path("assets/bg_music.mp3")
-CLEAR_SOUND_FILE = resource_path("assets/clear.wav")
-GAME_OVER_SOUND_FILE = resource_path("assets/game_over.mp3")
+_BG_MUSIC_FILE = resource_path("assets/bg_music.mp3")
+_CLEAR_SOUND_FILE = resource_path("assets/clear.wav")
+_GAME_OVER_SOUND_FILE = resource_path("assets/game_over.mp3")
 
 
 @final
@@ -44,16 +44,16 @@ class AudioManager:
             if not pygame.mixer.get_init():
                 pygame.mixer.init()
 
-            if Path(BG_MUSIC_FILE).is_file():
-                pygame.mixer.music.load(BG_MUSIC_FILE)
+            if Path(_BG_MUSIC_FILE).is_file():
+                pygame.mixer.music.load(_BG_MUSIC_FILE)
 
-            if Path(CLEAR_SOUND_FILE).is_file():
-                self.sounds["clear"] = pygame.mixer.Sound(CLEAR_SOUND_FILE)
+            if Path(_CLEAR_SOUND_FILE).is_file():
+                self.sounds["clear"] = pygame.mixer.Sound(_CLEAR_SOUND_FILE)
 
-            if Path(GAME_OVER_SOUND_FILE).is_file():
-                self.sounds["game_over"] = pygame.mixer.Sound(GAME_OVER_SOUND_FILE)
+            if Path(_GAME_OVER_SOUND_FILE).is_file():
+                self.sounds["game_over"] = pygame.mixer.Sound(_GAME_OVER_SOUND_FILE)
 
-            if Path(BG_MUSIC_FILE).is_file() or self.sounds:
+            if Path(_BG_MUSIC_FILE).is_file() or self.sounds:
                 self.audio_enabled = True
 
             # 不再在此处自动播放音乐，由外部在 set_music_enabled 中处理

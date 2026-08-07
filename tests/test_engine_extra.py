@@ -1,10 +1,11 @@
+# pyright: reportPrivateUsage=false
 from engine import (
+    _WALL_KICKS_I,
+    _WALL_KICKS_OTHERS,
     GRID_HEIGHT,
     GRID_WIDTH,
     MAX_SCORE,
     SHAPES_DATA,
-    WALL_KICKS_I,
-    WALL_KICKS_OTHERS,
     TetrisEngine,
     cells_in_bounds,
     collides,
@@ -33,7 +34,7 @@ def test_rotate_fails_when_blocked():
     new_shape = [(-dy, dx) for dx, dy in eng.current_shape]
 
     # choose kick set
-    kicks = WALL_KICKS_I if eng.current_type == "I" else WALL_KICKS_OTHERS
+    kicks = _WALL_KICKS_I if eng.current_type == "I" else _WALL_KICKS_OTHERS
 
     # Fill the grid at all candidate positions for the rotated shape with each kick
     for ox, oy in kicks:

@@ -31,36 +31,36 @@ SCREEN_HEIGHT = GRID_HEIGHT * BLOCK_SIZE
 
 # ---- 布局常量（纯数字，绘制时乘以 scale） ----
 # 左侧面板
-LEFT_PADDING = 10                       # 左侧文字距面板左边缘
-TITLE_Y = 20                            # "MyTetris" 标题的 y 坐标
-TITLE_SEP_LINE_Y = 70                   # 标题下方分隔线 y 坐标
-BOTTOM_MARGIN = 60                      # 底部留白（音乐/音效距离底部）
-AUDIO_GAP = 10                          # 音乐行与音效行间距
+_LEFT_PADDING = 10                       # 左侧文字距面板左边缘
+_TITLE_Y = 20                            # "MyTetris" 标题的 y 坐标
+_TITLE_SEP_LINE_Y = 70                   # 标题下方分隔线 y 坐标
+_BOTTOM_MARGIN = 60                      # 底部留白（音乐/音效距离底部）
+_AUDIO_GAP = 10                          # 音乐行与音效行间距
 
 # 右侧面板
-CONTENT_PADDING = 20                    # 右侧文字距面板左/右内边距
-LV_LABEL_Y = 20                         # "LEVEL" 标签 y 坐标
-LV_VALUE_Y = 45                         # 等级数值 y 坐标
-SCORE_LABEL_Y = 20                      # "SCORE" 标签 y 坐标（与 LV_Y 相同）
-SCORE_VALUE_Y = 45                      # 分数数值 y 坐标
-SEP_LINE_Y = 85                         # LEVEL/SCORE 下方分隔线 y 坐标
-PREVIEW_Y = 130                         # 预览框顶部 y 坐标
-RIGHT_BOTTOM_MARGIN = 60                # 底部统计信息距底部留白
-RIGHT_GAP = 10                          # 底部统计行间距
+_CONTENT_PADDING = 20                    # 右侧文字距面板左/右内边距
+_LV_LABEL_Y = 20                         # "LEVEL" 标签 y 坐标
+_LV_VALUE_Y = 45                         # 等级数值 y 坐标
+_SCORE_LABEL_Y = 20                      # "SCORE" 标签 y 坐标（与 LV_Y 相同）
+_SCORE_VALUE_Y = 45                      # 分数数值 y 坐标
+_SEP_LINE_Y = 85                         # LEVEL/SCORE 下方分隔线 y 坐标
+_PREVIEW_Y = 130                         # 预览框顶部 y 坐标
+_RIGHT_BOTTOM_MARGIN = 60                # 底部统计信息距底部留白
+_RIGHT_GAP = 10                          # 底部统计行间距
 
 # 预览框尺寸（逻辑块数，最大形状宽度为4）
-PREVIEW_SIZE = 4
+_PREVIEW_SIZE = 4
 
 # 覆盖层
-OVERLAY_GAP = 15                        # 覆盖层各行间距
-HELP_GAP = 12                           # 帮助覆盖层各行间距
+_OVERLAY_GAP = 15                        # 覆盖层各行间距
+_HELP_GAP = 12                           # 帮助覆盖层各行间距
 # -----------------------------------------
 
 # ---- 消行动画持续时间（毫秒） ----
-CLEAR_ANIM_DURATION = 200
+_CLEAR_ANIM_DURATION = 200
 
 # 帮助文本常量
-HELP_LINES = [
+_HELP_LINES = [
     "HOW TO PLAY",
     "",
     "← →    Move left/right",
@@ -256,15 +256,15 @@ class Renderer:
         # ---- 左侧面板背景 ----
         left_panel_rect = pygame.Rect(0, 0, left_width_px, logical_h)
         pygame.draw.rect(ds, (40, 45, 55), left_panel_rect)
-        left_padding = int(LEFT_PADDING * scale)
+        left_padding = int(_LEFT_PADDING * scale)
         left_content_x = left_padding
         left_content_width = left_width_px - 2 * left_padding
         # 游戏名称（居中）
         title_surf = self.font_big.render("MyTetris", True, (255, 255, 255))
         title_x = left_content_x + (left_content_width - title_surf.get_width()) // 2
-        ds.blit(title_surf, (title_x, int(TITLE_Y * scale)))
+        ds.blit(title_surf, (title_x, int(_TITLE_Y * scale)))
         # 分隔线（标题下方）
-        sep_line_y = int(TITLE_SEP_LINE_Y * scale)
+        sep_line_y = int(_TITLE_SEP_LINE_Y * scale)
         pygame.draw.line(ds, (60, 60, 70),
                          (left_content_x, sep_line_y),
                          (left_content_x + left_content_width, sep_line_y), 1)
@@ -273,13 +273,13 @@ class Renderer:
         panel_rect = pygame.Rect(sidebar_left, 0,
                                  logical_w - sidebar_left, logical_h)
         pygame.draw.rect(ds, (40, 45, 55), panel_rect)
-        content_padding = int(CONTENT_PADDING * scale)
+        content_padding = int(_CONTENT_PADDING * scale)
         sidebar_content_left = sidebar_left + content_padding
         sidebar_content_right = sidebar_left + right_width_px - content_padding
 
         # LEVEL 与 SCORE 标签（静态文字）—— 已移至动态绘制，此处不再渲染
         # 分隔线（LEVEL/SCORE 下方）
-        sep_y1 = int(SEP_LINE_Y * scale)
+        sep_y1 = int(_SEP_LINE_Y * scale)
         pygame.draw.line(ds, (60, 60, 70),
                          (sidebar_content_left, sep_y1),
                          (sidebar_content_right, sep_y1), 1)
@@ -353,12 +353,12 @@ class Renderer:
             # 如果当前有动画进行中
             if self._anim_clearing_rows:
                 elapsed = now - self._anim_start_ticks
-                if elapsed >= CLEAR_ANIM_DURATION:
+                if elapsed >= _CLEAR_ANIM_DURATION:
                     # 动画结束
                     self._anim_clearing_rows = []
                 else:
                     # 计算当前 alpha (从 255 渐变为 0)
-                    alpha = int(255 * (1 - elapsed / CLEAR_ANIM_DURATION))
+                    alpha = int(255 * (1 - elapsed / _CLEAR_ANIM_DURATION))
                     for row in self._anim_clearing_rows:
                         # 创建半透明白色矩形
                         flash_surf = pygame.Surface((_board_w, bs), pygame.SRCALPHA)
@@ -389,7 +389,7 @@ class Renderer:
 
         if left_width_px <= 0:
             return
-        left_padding = int(LEFT_PADDING * scale)
+        left_padding = int(_LEFT_PADDING * scale)
         left_content_x = left_padding
 
         # 音乐状态（使用缓存）
@@ -406,8 +406,8 @@ class Renderer:
             sfx_str, self.font_small, sfx_color
         )
 
-        bottom_margin = int(BOTTOM_MARGIN * scale)
-        gap_between = int(AUDIO_GAP * scale)
+        bottom_margin = int(_BOTTOM_MARGIN * scale)
+        gap_between = int(_AUDIO_GAP * scale)
 
         sfx_y = logical_h - bottom_margin - sfx_surf.get_height()
         music_y = sfx_y - music_surf.get_height() - gap_between
@@ -433,14 +433,14 @@ class Renderer:
         assert self.font_big is not None
         assert self.font_small is not None
 
-        content_padding = int(CONTENT_PADDING * scale)
+        content_padding = int(_CONTENT_PADDING * scale)
         sidebar_content_left = sidebar_left + content_padding
         sidebar_content_right = sidebar_left + right_width_px - content_padding
         sidebar_content_width = sidebar_content_right - sidebar_content_left
 
         # ---------- 新布局：三行文字 ----------
-        # 行间距（统一使用 RIGHT_GAP）
-        row_gap = int(RIGHT_GAP * scale)
+        # 行间距（统一使用 _RIGHT_GAP）
+        row_gap = int(_RIGHT_GAP * scale)
 
         # ---- Row1: "LEVEL" 标签 + 等级数值（标签左对齐，数值右对齐） ----
         lv_label_color = (150, 150, 160)   # 与 SCORE 标签颜色相同
@@ -456,7 +456,7 @@ class Renderer:
             lv_val_text,   self.font_small, lv_val_color
         )
 
-        row1_y = int(LV_LABEL_Y * scale)
+        row1_y = int(_LV_LABEL_Y * scale)
         ds.blit(lv_label_surf, (sidebar_content_left, row1_y))
         # 数值右对齐
         ds.blit(lv_val_surf,
@@ -494,9 +494,9 @@ class Renderer:
 
         # ---------- 预览框（下一个方块） ----------
         bs = int(BLOCK_SIZE * scale)
-        preview_size = PREVIEW_SIZE * bs
+        preview_size = _PREVIEW_SIZE * bs
         preview_x = sidebar_content_left + (sidebar_content_width - preview_size) // 2
-        preview_y = int(PREVIEW_Y * scale)
+        preview_y = int(_PREVIEW_Y * scale)
         # 预览背景
         preview_rect_inner = pygame.Rect(preview_x, preview_y, preview_size, preview_size)
         pygame.draw.rect(ds, (40, 45, 55), preview_rect_inner)
@@ -559,8 +559,8 @@ class Renderer:
                 txt, self.font_small, clr
             )
 
-        right_bottom_margin = int(RIGHT_BOTTOM_MARGIN * scale)
-        right_gap = int(RIGHT_GAP * scale)
+        right_bottom_margin = int(_RIGHT_BOTTOM_MARGIN * scale)
+        right_gap = int(_RIGHT_GAP * scale)
 
         temp_height = max(label_surfs["lines_label"].get_height(),
                           lines_val_surf.get_height())
@@ -618,7 +618,7 @@ class Renderer:
             overlay.fill((0, 0, 0))
         surface.blit(overlay, (0, 0))
 
-        gap = int(OVERLAY_GAP * scale)
+        gap = int(_OVERLAY_GAP * scale)
         title_surf = self._get_cached_text(
             title, self.font_big, title_color
         )
@@ -663,8 +663,8 @@ class Renderer:
         overlay.fill((0, 0, 0))
         surface.blit(overlay, (0, 0))
 
-        title_line = HELP_LINES[0] if HELP_LINES else ""
-        body_lines = HELP_LINES[1:] if len(HELP_LINES) > 1 else []
+        title_line = _HELP_LINES[0] if _HELP_LINES else ""
+        body_lines = _HELP_LINES[1:] if len(_HELP_LINES) > 1 else []
 
         title_color = (255, 200, 0)
         body_color = (255, 255, 255)
@@ -674,7 +674,7 @@ class Renderer:
             title_line, self.help_font, title_color
         )
         tx = (logical_w - title_surf.get_width()) // 2
-        gap = int(HELP_GAP * scale)
+        gap = int(_HELP_GAP * scale)
 
         body_surfaces: list[pygame.Surface] = []
         for line in body_lines:
