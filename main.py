@@ -1,3 +1,8 @@
+# main.py — 程序入口
+#
+# 此文件主要负责：
+#  - 创建 TetrisApp 并启动主事件循环
+
 from tetris import TetrisApp
 
 

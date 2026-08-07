@@ -1,3 +1,9 @@
+# helpers.py — 测试辅助函数（公开命名，供各测试模块复用）
+# 封装引擎私有成员的访问，保持测试场景构造的确定性。
+#
+# 此文件主要负责：
+#  - 生成指定方块 / 设置 bag / 碰撞检查等测试原语
+
 """Public-named test helpers for TetrisEngine.
 
 This module mirrors the previous `_helpers.py` but uses a non-underscore

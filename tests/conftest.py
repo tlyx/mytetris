@@ -1,3 +1,9 @@
+# conftest.py — pytest 全局配置
+# 确保项目根目录可被测试模块导入（引擎等应用代码）。
+#
+# 此文件主要负责：
+#  - 将项目根目录加入 sys.path
+
 """Pytest configuration helpers.
 
 This file centralizes test-time configuration and fixtures. Currently it

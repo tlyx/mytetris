@@ -1,6 +1,9 @@
 # config_manager.py — 配置管理器（读取/写入 config.json）
 # 负责管理游戏配置的持久化，仅在值发生变化时写入文件。
-# 使用平台无关的用户数据目录（通过 platformdirs）。
+#
+# 此文件主要负责：
+#  - 配置文件加载 / 保存（platformdirs 用户数据目录）
+#  - 配置项读写与上限检查（最高分等）
 
 from __future__ import annotations
 

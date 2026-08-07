@@ -1,5 +1,10 @@
 # pyright: reportPrivateUsage=false
-# tests/test_app.py — App 层行为测试
+# test_app.py — App 层行为测试
+# 覆盖公平性（bot 与人类共用重力/锁定延迟/计分）与指南标准计分。
+#
+# 此文件主要负责：
+#  - App 层公平性与计分行为回归测试
+
 """App 层回归测试。
 
 重点覆盖公平性：bot 模式与人类模式共用同一套重力/锁定延迟/计分机制

@@ -1,6 +1,10 @@
 # state_handlers.py — 基于状态模式的事件分发处理器
 # 每个游戏状态（playing、paused、game over、confirm quit、help）对应一个类，
 # 负责处理该状态下的键盘事件，并返回下一个状态（如果需要）。
+#
+# 此文件主要负责：
+#  - 状态机：Playing / Paused / GameOver / ConfirmQuit / Help
+#  - 各状态下的按键分发与状态转换
 
 from __future__ import annotations
 

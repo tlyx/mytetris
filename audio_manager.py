@@ -1,6 +1,10 @@
 # audio_manager.py — 音频管理器
 # 负责所有音频相关的加载、播放、暂停、切换，与 TetrisApp 解耦。
-# 使用 resource_path 获取资产文件的绝对路径（支持开发环境和 PyInstaller 打包）。
+#
+# 此文件主要负责：
+#  - 背景音乐 / 音效加载（资源缺失时静默降级）
+#  - 音乐播放、暂停、恢复与开关
+#  - 退出时资源清理
 
 from __future__ import annotations
 

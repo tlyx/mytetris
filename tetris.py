@@ -13,6 +13,7 @@
 #  - 将渲染委托给 Renderer 类（renderer.py）
 #  - 创建 GameState 快照传递给 Renderer
 #  - 输入处理（委托给 InputHandler）
+#  - 构造 BotSnapshot 并驱动公平 bot（委托给 BotRunner）
 
 import sys
 from pathlib import Path

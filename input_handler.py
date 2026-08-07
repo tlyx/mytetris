@@ -1,6 +1,11 @@
 # input_handler.py — 输入处理器
 # 负责处理键盘输入事件和自动重复（DAS/ARR），并通过回调将动作传递给应用层。
 # 解耦后 TetrisApp 无需直接管理按键重复逻辑。
+#
+# 此文件主要负责：
+#  - 按键 → Action 的映射
+#  - DAS/ARR 自动重复（长按方向键）
+#  - 按键状态清理（暂停 / 重启时重置）
 
 from __future__ import annotations
 

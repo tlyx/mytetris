@@ -1,4 +1,10 @@
 # pyright: reportPrivateUsage=false
+# test_engine_extra.py — 引擎扩展行为与共享几何原语契约测试
+# 覆盖 wall-kick、多行消分、Game Over、纯几何函数契约。
+#
+# 此文件主要负责：
+#  - 引擎扩展行为与共享几何原语回归测试
+
 from engine import (
     _WALL_KICKS_I,
     _WALL_KICKS_OTHERS,

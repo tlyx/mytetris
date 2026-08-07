@@ -1,7 +1,8 @@
-"""游戏动作词汇表：人类输入与 bot 共用，不依赖 pygame。
-
-独立成模块，使 bot 侧（决策与调度）完全不触碰 pygame 相关代码。
-"""
+# actions.py — 游戏动作词汇表（人类输入与 bot 共用）
+# 独立成模块，使 bot 侧（决策与调度）完全不触碰 pygame 相关代码。
+#
+# 此文件主要负责：
+#  - 定义 Action 动作枚举（输入层与 bot 的公共词汇）
 
 from __future__ import annotations
 

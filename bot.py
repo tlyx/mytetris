@@ -16,6 +16,11 @@
 # 其余模块级求解函数均为私有（_ 前缀）实现细节，仅供 BotRunner 内部
 # 与白盒测试使用，不属于对外接口。
 #
+# 此文件主要负责：
+#  - 2-ply 前瞻求解与评估策略注册表
+#  - BotRunner 独立线程调度（快照信箱 / 动作队列 / 生命周期）
+#  - 对外接口（BotInterface / BotSnapshot / BotRunner）
+#
 # 评估策略可选用（STRATEGIES 注册表，构造参数或 set_strategy /
 # cycle_strategy 切换）：
 #   - modern（默认）：经典 Dellacherie 特征（landing height / 消行 /

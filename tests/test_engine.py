@@ -1,3 +1,9 @@
+# test_engine.py — 引擎核心逻辑测试
+# 覆盖生成对齐、移动边界、旋转、消行计分、Ghost、下落速度、7-bag。
+#
+# 此文件主要负责：
+#  - 引擎行为回归测试
+
 from engine import GRID_HEIGHT, GRID_WIDTH, SHAPES_DATA, TetrisEngine
 from tests import helpers
 

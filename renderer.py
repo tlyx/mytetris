@@ -5,6 +5,11 @@
 #  1. 接收 GameState 对象（只读快照）作为输入。
 #  2. 不持有任何 TetrisApp 或 TetrisEngine 的引用。
 #  3. 只负责将状态绘制到给定的 Pygame Surface 上。
+#
+# 此文件主要负责：
+#  - 棋盘、方块、Ghost piece、消行动画绘制
+#  - 左右面板 HUD 与实时状态行
+#  - 覆盖层（暂停 / Game Over / 退出确认 / 帮助）
 
 from typing import final
 

@@ -1,4 +1,7 @@
 # utils.py — 通用工具函数
+#
+# 此文件主要负责：
+#  - resource_path：兼容 PyInstaller 打包的资源路径解析
 
 from __future__ import annotations
 

@@ -1,5 +1,12 @@
 # engine.py — 我的方块核心引擎
-# 负责网格、方块生成、移动、旋转、消行、计分等逻辑
+# 负责网格、方块生成、移动、旋转、消行、计分等游戏规则逻辑，
+# 不依赖任何图形库（纯逻辑，可独立测试）。
+#
+# 此文件主要负责：
+#  - 10×20 网格与七种标准方块（7-bag 随机生成）
+#  - 移动、旋转（wall-kick）、碰撞检测、锁定
+#  - 消行、计分、连击、等级与下落速度
+#  - 共享几何原语（rotate_shape / collides / drop_y / …，供 bot 复用）
 
 from random import shuffle
 from typing import ClassVar, final
