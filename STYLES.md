@@ -246,7 +246,7 @@ Before submitting a change:
 - [ ] Header comment updated if the file's responsibilities changed.
 - [ ] New module-level names are `_`-private unless another module imports them.
 - [ ] Full annotations; no `Any`-leak; strict check passes.
-- [ ] No new coupling: no pygame in non-UI modules, no renderer knowing
+- [ ] No new coupling: no pygame in logic modules, no renderer knowing
       about the app/bot.
 - [ ] `ruff check .` clean, `uv run pytest -q` green.
 - [ ] Commit message in English with an appropriate prefix (+ `Co-authored-by`
