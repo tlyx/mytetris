@@ -20,12 +20,13 @@ from typing import final
 
 import pygame  # via pygame-ce
 
+from actions import Action
 from audio_manager import AudioManager
-from bot import BotRunner, BotSnapshot
+from bot import BotInterface, BotRunner, BotSnapshot
 from config_manager import ConfigManager
 from engine import GRID_HEIGHT, GRID_WIDTH, MAX_SCORE, TetrisEngine
 from game_state import GameState
-from input_handler import Action, InputHandler
+from input_handler import InputHandler
 from renderer import (
     BLOCK_SIZE,
     LEFT_WIDTH,
@@ -111,10 +112,9 @@ class TetrisApp:
     _now: int  # 每帧更新，存储当前时间戳
 
     # ---- bot 相关 ----
-    bot: BotRunner
+    bot: BotInterface
     bot_enabled: bool
     _bot_was_enabled: bool  # 标记 bot 是否曾被启用过（用于决定是否保存配置）
-    _last_bot_piece_id: int | None  # 上次投递给 bot 的方块实例 id（换块才投递）
 
     @property
     def now(self) -> int:
@@ -266,7 +266,6 @@ class TetrisApp:
         self.bot = BotRunner()
         self.bot_enabled = False
         self._bot_was_enabled = False
-        self._last_bot_piece_id = None
 
     def cycle_bot_strategy(self) -> None:
         """循环切换 bot 评估策略（experimental，同 bot 开关）。"""
@@ -570,21 +569,18 @@ class TetrisApp:
             else:
                 self.input_handler.reset()
 
-            # bot 公平接管：仅换块时投递新快照（盘面/当前块/下一块只在
-            # 生成新块时变化，下落期间投递是冗余拷贝）；每帧 ≤1 个动作
-            # 走人类同路径，动作带实例 id 戳，块已换则丢弃。
+            # bot 公平接管：每帧一个窄调用，内部处理换块投递与过期丢弃，
+            # 返回的动作走与人类按键完全相同的应用路径。
             if self.bot_enabled and not (
                 self.game.game_over
                 or self.paused
                 or self.confirm_quit
                 or self._help_active
             ):
-                if self.game.piece_id != self._last_bot_piece_id:
-                    self._last_bot_piece_id = self.game.piece_id
-                    self.bot.post_snapshot(self._build_bot_snapshot())
-                for piece, action in self.bot.drain(limit=1):
-                    if piece == self.game.piece_id:
-                        self._apply_action(action)
+                for action in self.bot.tick(
+                    self.game.piece_id, self._build_bot_snapshot
+                ):
+                    self._apply_action(action)
 
             self._render_game_scene()
             self.clock.tick(60)

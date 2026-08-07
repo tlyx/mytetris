@@ -5,19 +5,11 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from enum import Enum, auto
 from typing import final
 
 import pygame
 
-
-class Action(Enum):
-    """游戏操控动作枚举。"""
-    MOVE_LEFT = auto()
-    MOVE_RIGHT = auto()
-    SOFT_DROP = auto()
-    HARD_DROP = auto()
-    ROTATE = auto()
+from actions import Action
 
 
 @final

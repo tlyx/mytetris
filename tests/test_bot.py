@@ -22,6 +22,7 @@ import time
 
 import pytest
 
+from actions import Action
 from bot import (
     STRATEGIES,
     BotRunner,
@@ -41,7 +42,6 @@ from engine import (
     cells_in_bounds,
     rotate_shape,
 )
-from input_handler import Action
 
 # ----------------------------------------------------------------------
 # 测试盘面构造
@@ -414,6 +414,47 @@ def test_decide_drops_stale_actions_on_new_piece() -> None:
     for item in second:
         runner._out.put(item)
     assert runner._out.qsize() == len(second)  # 旧动作已清空
+
+
+def test_tick_posts_only_on_piece_change() -> None:
+    """tick 仅在换块时构造并投递快照（省逐帧拷贝与线程唤醒）。"""
+    runner = BotRunner()
+    calls: list[int] = []
+    snap = make_snapshot(make_engine(well_board(), "T", "I"), piece_id=1)
+
+    def make() -> BotSnapshot:
+        calls.append(1)
+        return snap
+
+    runner.tick(1, make)
+    assert len(calls) == 1
+    runner.tick(1, make)  # 同块：不再构造快照
+    assert len(calls) == 1
+    runner.tick(2, make)  # 换块：构造一次
+    assert len(calls) == 2
+    assert runner._mailbox.generation() == 2  # 只投递了两次
+
+
+def test_tick_skips_stale_actions() -> None:
+    """tick 跳过过期动作，当帧直接取到当前块的动作（不浪费帧）。"""
+    runner = BotRunner()
+    runner._out.put((1, Action.ROTATE))      # 过期（旧块）
+    runner._out.put((2, Action.MOVE_RIGHT))  # 当前块
+    snap = make_snapshot(make_engine(well_board(), "T", "I"), piece_id=2)
+    assert runner.tick(2, lambda: snap) == [Action.MOVE_RIGHT]
+    assert runner.tick(2, lambda: snap) == []  # 队列已空
+
+
+def test_tick_throttles_one_action_per_frame() -> None:
+    """节流：每帧最多返回 1 个动作，剩余留到后续帧。"""
+    runner = BotRunner()
+    snap = make_snapshot(make_engine(well_board(), "T", "I"), piece_id=1)
+    for _ in range(3):
+        runner._out.put((1, Action.ROTATE))
+    assert len(runner.tick(1, lambda: snap)) == 1
+    assert len(runner.tick(1, lambda: snap)) == 1
+    assert len(runner.tick(1, lambda: snap)) == 1
+    assert runner.tick(1, lambda: snap) == []
 
 
 def test_drain_limits() -> None:

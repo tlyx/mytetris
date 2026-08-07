@@ -31,8 +31,9 @@ import queue
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import final
+from typing import Protocol, final
 
+from actions import Action
 from engine import (
     GRID_HEIGHT,
     GRID_WIDTH,
@@ -43,7 +44,6 @@ from engine import (
     rotate_shape,
     spawn_y,
 )
-from input_handler import Action
 
 # 模拟落子时的占位颜色（启发式只关心单元格是否被占用）
 _OCCUPIED: tuple[int, int, int] = (1, 1, 1)
@@ -374,14 +374,33 @@ class _Mailbox:
             return self._latest
 
 
+class BotInterface(Protocol):
+    """游戏主体依赖的 bot 接口（可整体替换实现）。
+
+    TetrisApp 只依赖此协议：换 bot 实现（如深度强化学习版）时，
+    提供同接口即可，游戏代码零改动。
+    """
+
+    @property
+    def strategy(self) -> str: ...
+
+    def start(self) -> None: ...
+    def stop(self, timeout: float = 1.0) -> None: ...
+    def cycle_strategy(self) -> str: ...
+    def tick(
+        self,
+        current_piece_id: int,
+        make_snapshot: Callable[[], BotSnapshot],
+    ) -> list[Action]: ...
+
+
 @final
 class BotRunner:
     """公平 bot：独立线程，只读快照，输出按键动作（与人类同一输入路径）。
 
-    主线程每帧 post_snapshot；bot 线程对新块求解（无时间预算），把计划
-    翻译成动作序列写入队列；主线程 drain 后按 piece 戳校验再应用。
-    求解期间若块已被重力锁定（快照换块），放弃结果重算——像真正的人
-    一样：想太久，方块自己掉下去锁掉，换新块重新想。
+    游戏侧每帧只调用 tick()：传入当前方块 id 与快照工厂，取回可应用
+    的动作。换块投递、队列消费、过期动作丢弃等内部机制全部封装在
+    runner 内部，TetrisApp 不感知。
 
     :param strategy: 评估策略名（见 STRATEGIES），默认 modern。
     """
@@ -392,6 +411,7 @@ class BotRunner:
     _stop: threading.Event
     _thread: threading.Thread | None
     _plan_piece_id: int | None  # 当前计划针对的方块实例 id
+    _last_posted_id: int | None  # 上次投递给 bot 的方块实例 id（换块才投递）
 
     def __init__(self, strategy: str = DEFAULT_STRATEGY) -> None:
         if strategy not in STRATEGIES:
@@ -402,6 +422,7 @@ class BotRunner:
         self._stop = threading.Event()
         self._thread = None
         self._plan_piece_id = None
+        self._last_posted_id = None
 
     # ---------- 策略管理（主线程调用） ----------
     @property
@@ -443,7 +464,7 @@ class BotRunner:
 
     # ---------- 主线程接口 ----------
     def post_snapshot(self, snap: BotSnapshot) -> None:
-        """投递当前游戏状态（主线程每帧调用）。"""
+        """投递当前游戏状态（供测试与 tick 内部使用）。"""
         self._mailbox.post(snap)
 
     def drain(self, limit: int = 1) -> list[tuple[int, Action]]:
@@ -459,6 +480,36 @@ class BotRunner:
             except queue.Empty:
                 break
         return items
+
+    def tick(
+        self,
+        current_piece_id: int,
+        make_snapshot: Callable[[], BotSnapshot],
+    ) -> list[Action]:
+        """游戏主循环每帧调用一次：取回可应用的动作（≤1 个）。
+
+        内部封装：
+          - 换块（current_piece_id 变化）才构造并投递快照，避免逐帧拷贝与
+            线程唤醒；
+          - 丢弃针对已消失方块（piece_id 戳不匹配）的过期动作。
+
+        :param current_piece_id: 引擎当前方块实例 id。
+        :param make_snapshot: 快照工厂（仅换块时调用一次）。
+        :return: 保证针对当前方块的动作列表（长度 ≤1）。
+        """
+        if current_piece_id != self._last_posted_id:
+            self._last_posted_id = current_piece_id
+            self._mailbox.post(make_snapshot())
+        actions: list[Action] = []
+        while len(actions) < 1:  # 节流：每帧最多 1 个可应用动作
+            try:
+                piece, action = self._out.get_nowait()
+            except queue.Empty:
+                break
+            if piece == current_piece_id:
+                actions.append(action)
+            # 过期动作直接丢弃，继续取下一个，不浪费本帧
+        return actions
 
     # ---------- bot 线程 ----------
     def _loop(self) -> None:
