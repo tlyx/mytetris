@@ -18,8 +18,6 @@ from engine import (
 )
 
 # SHAPES_DATA was previously imported but is not needed here
-from tests import helpers
-
 
 def make_empty_engine():
     eng = TetrisEngine()
@@ -29,7 +27,8 @@ def make_empty_engine():
 
 def test_rotate_fails_when_blocked():
     eng = make_empty_engine()
-    helpers.spawn_piece_for_test(eng, "T")
+    eng.next_type = "T"
+    eng._spawn_piece()
     old_shape = list(eng.current_shape)
     old_rot = eng.rotation
 
@@ -55,7 +54,8 @@ def test_rotate_fails_when_blocked():
 
 def test_rotation_uses_kicks_to_succeed():
     eng = make_empty_engine()
-    helpers.spawn_piece_for_test(eng, "J")
+    eng.next_type = "J"
+    eng._spawn_piece()
     old_x = eng.x
     old_rot = eng.rotation
 
@@ -107,7 +107,8 @@ def test_lock_and_clear_multiple_lines_scoring():
 
 def test_get_piece_cells_after_move_and_rotate():
     eng = make_empty_engine()
-    helpers.spawn_piece_for_test(eng, "L")
+    eng.next_type = "L"
+    eng._spawn_piece()
     eng.move(1, 0)
     eng.rotate()
     cells = eng.get_piece_cells()
@@ -119,15 +120,16 @@ def test_get_piece_cells_after_move_and_rotate():
 
 def test_check_collision_out_of_bounds_public():
     eng = make_empty_engine()
-    helpers.spawn_piece_for_test(eng, "I")
-    assert helpers.check_collision(eng, -100, eng.y) is True
+    eng.next_type = "I"
+    eng._spawn_piece()
+    assert eng._check_collision(-100, eng.y) is True
     # engine allows pieces above the top during spawn, so very large y should not be a collision
-    assert helpers.check_collision(eng, eng.x, GRID_HEIGHT + 10) is False
+    assert eng._check_collision(eng.x, GRID_HEIGHT + 10) is False
 
 
 def test_poll_cleared_rows_clears_record():
     eng = make_empty_engine()
-    helpers.set_last_cleared_rows(eng, [0, 1])
+    eng._last_cleared_rows = [0, 1]
     out = eng.poll_cleared_rows()
     assert out == [0, 1]
     assert eng.poll_cleared_rows() == []
@@ -137,7 +139,8 @@ def test_game_over_on_spawn_if_collides():
     eng = make_empty_engine()
     # fill top row so spawn likely collides
     eng.grid[GRID_HEIGHT - 1] = [(2, 2, 2)] * GRID_WIDTH
-    helpers.spawn_piece_for_test(eng, "I")
+    eng.next_type = "I"
+    eng._spawn_piece()
     assert eng.game_over is True
 
 
@@ -145,9 +148,11 @@ def test_piece_id_increments_on_each_spawn():
     """每次生成新块 piece_id 单调递增；同类型连块也区分（bot 换块依据）。"""
     eng = make_empty_engine()
     id1 = eng.piece_id
-    helpers.spawn_piece_for_test(eng, "T")
+    eng.next_type = "T"
+    eng._spawn_piece()
     assert eng.piece_id == id1 + 1
-    helpers.spawn_piece_for_test(eng, "T")
+    eng.next_type = "T"
+    eng._spawn_piece()
     assert eng.piece_id == id1 + 2  # 同类型新块 id 也不同
 
 
@@ -245,7 +250,8 @@ def test_combo_bonus_accumulates_and_resets():
         eng.grid[0] = [(1, 1, 1)] * GRID_WIDTH
         eng.grid[0][0] = None
         eng.grid[0][1] = None
-        helpers.spawn_piece_for_test(eng, "O")
+        eng.next_type = "O"
+        eng._spawn_piece()
         eng.x = 0
         eng.y = 1
         eng.lock_and_clear_lines()
@@ -255,7 +261,8 @@ def test_combo_bonus_accumulates_and_resets():
     assert eng.score == 250
 
     # 放一个不消行的块 → 连击清零
-    helpers.spawn_piece_for_test(eng, "O")
+    eng.next_type = "O"
+    eng._spawn_piece()
     eng.x = 3
     eng.y = 1
     eng.lock_and_clear_lines()

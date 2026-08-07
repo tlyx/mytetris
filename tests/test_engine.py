@@ -1,8 +1,8 @@
+# pyright: reportPrivateUsage=false
 # test_engine.py — 引擎核心逻辑测试
 # 覆盖生成对齐、移动边界、旋转、消行计分、Ghost、下落速度、7-bag。
 
 from engine import GRID_HEIGHT, GRID_WIDTH, SHAPES_DATA, TetrisEngine
-from tests import helpers
 
 
 def make_empty_engine():
@@ -15,7 +15,8 @@ def make_empty_engine():
 def test_spawn_top_aligned_all_pieces():
     eng = make_empty_engine()
     for piece in SHAPES_DATA:
-        helpers.spawn_piece_for_test(eng, piece)
+        eng.next_type = piece
+        eng._spawn_piece()
         # engine 使用底部原点：grid[0] 为底部，spawn 时最高单元应位于 GRID_HEIGHT-1
         max_py = max(py for _, py in eng.current_shape)
         assert max_py + eng.y == GRID_HEIGHT - 1, (
@@ -26,7 +27,7 @@ def test_spawn_top_aligned_all_pieces():
 def test_move_boundaries():
     eng = make_empty_engine()
     eng.next_type = "O"
-    helpers.spawn_piece_for_test(eng, "O")
+    eng._spawn_piece()
     # move left until boundary
     while eng.move(-1, 0):
         pass
@@ -41,7 +42,7 @@ def test_move_boundaries():
 def test_rotate_changes_rotation_and_shape():
     eng = make_empty_engine()
     eng.next_type = "T"
-    helpers.spawn_piece_for_test(eng, "T")
+    eng._spawn_piece()
     old_shape = list(eng.current_shape)
     old_rotation = eng.rotation
     eng.rotate()
@@ -54,7 +55,7 @@ def test_rotate_changes_rotation_and_shape():
 def test_rotate_o_piece_noop():
     eng = make_empty_engine()
     eng.next_type = "O"
-    helpers.spawn_piece_for_test(eng, "O")
+    eng._spawn_piece()
     old_shape = list(eng.current_shape)
     old_rotation = eng.rotation
     eng.rotate()
@@ -79,7 +80,7 @@ def test_lock_and_clear_lines_updates_score_and_grid():
 def test_get_ghost_y_simple():
     eng = make_empty_engine()
     eng.next_type = "I"
-    helpers.spawn_piece_for_test(eng, "I")
+    eng._spawn_piece()
     # drop current piece to bottom via ghost calculation
     g = eng.get_ghost_y()
     # engine 使用底部原点：落点 y 应小于等于当前 y 且不小于0
@@ -99,11 +100,11 @@ def test_fall_speed_monotonic():
 
 def test_bag_draw_and_refill():
     eng = make_empty_engine()
-    helpers.set_bag(eng, ["I", "O"])
-    a = helpers.draw_from_bag(eng)
-    b = helpers.draw_from_bag(eng)
+    eng._bag = ["I", "O"]
+    a = eng._draw_from_bag()
+    b = eng._draw_from_bag()
     assert a in ["I", "O"]
     assert b in ["I", "O"]
     # bag should be empty now; next draw should refill without error
-    c = helpers.draw_from_bag(eng)
+    c = eng._draw_from_bag()
     assert c in ["I", "O", "T", "L", "J", "S", "Z"]

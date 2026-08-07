@@ -199,10 +199,9 @@ imports…
   (`uv run pytest -q`).
 - One test module per concern: `test_engine.py`, `test_engine_extra.py`,
   `test_bot.py`, `test_app.py`.
-- Use `tests/helpers.py` for engine private-access wrappers
-  (`spawn_piece_for_test`, `set_bag`, …) instead of poking internals inline.
-- White-box tests may touch private members; such files carry
-  `# pyright: reportPrivateUsage=false` on line 1.
+- White-box tests touch engine internals directly; such files carry the
+  file-level `# pyright: reportPrivateUsage=false` directive on line 1 to
+  suppress private-use diagnostics (no helper shim module is kept).
 - Prefer deterministic setups: construct boards explicitly (annotated grids,
   explicit `piece_id`s) instead of depending on the random bag.
 - Tests must be isolated and full-suite safe; no tests depend on real

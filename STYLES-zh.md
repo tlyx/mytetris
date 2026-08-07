@@ -138,8 +138,7 @@ imports…
 
 - 测试位于 `tests/`,从仓库根目录运行 `pytest`(`uv run pytest -q`)。
 - 按职责拆分测试模块:`test_engine.py`、`test_engine_extra.py`、`test_bot.py`、`test_app.py`。
-- 使用 `tests/helpers.py` 封装引擎私有访问(`spawn_piece_for_test`、`set_bag`、…),而不是在测试中内联戳私有成员。
-- 白盒测试可以触碰私有成员;这类文件在第 1 行携带 `# pyright: reportPrivateUsage=false`。
+- 白盒测试直接访问引擎内部;这类文件在第 1 行携带文件级 `# pyright: reportPrivateUsage=false` 指令压制私有访问诊断(不保留辅助 shim 模块)。
 - 优先确定性构造:显式构造盘面(标注类型的 grid、显式 `piece_id`),而不是依赖随机 bag。
 - 测试必须相互隔离、整包安全;不得依赖真实墙钟时序(线程测试使用超时与宽裕的截止时间)。
 - App 层测试以 dummy SDL 驱动无头启动 `TetrisApp`(`SDL_VIDEODRIVER=dummy`、`SDL_AUDIODRIVER=dummy`)。
