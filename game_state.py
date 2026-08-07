@@ -50,6 +50,5 @@ class GameState:
     clearing_rows: list[int]
     clear_anim_enabled: bool
 
-    # Bot 相关（策略名仅 bot 开启时有意义）
-    bot_enabled: bool
-    bot_strategy: str | None
+    # 实时状态行（右侧面板 Time 下方）：非空时显示，渲染器不关心内容含义
+    status_line: str

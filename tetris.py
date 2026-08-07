@@ -482,8 +482,7 @@ class TetrisApp:
             ghost_enabled=self.ghost_enabled,
             clearing_rows=self.game.poll_cleared_rows(),
             clear_anim_enabled=self.clear_anim_enabled,
-            bot_enabled=self.bot_enabled,
-            bot_strategy=self.bot.strategy if self.bot_enabled else None,
+            status_line=f"BOT: {self.bot.strategy}" if self.bot_enabled else "",
         )
 
     def _build_bot_snapshot(self) -> BotSnapshot:

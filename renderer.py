@@ -56,6 +56,9 @@ _OVERLAY_GAP = 15                        # 覆盖层各行间距
 _HELP_GAP = 12                           # 帮助覆盖层各行间距
 # -----------------------------------------
 
+# 实时状态行颜色（右下 Time 下方，如 "BOT: modern"）
+_STATUS_COLOR: tuple[int, int, int] = (255, 200, 80)
+
 # ---- 消行动画持续时间（毫秒） ----
 _CLEAR_ANIM_DURATION = 200
 
@@ -160,6 +163,28 @@ class Renderer:
         assert surface is not None
         self._text_cache[key] = (text, surface)
         return surface
+
+    def _fit_text(
+        self,
+        text: str,
+        font: pygame.font.Font,
+        max_width: int,
+        color: tuple[int, int, int] = _STATUS_COLOR,
+    ) -> pygame.Surface:
+        """渲染文本并限制宽度：超出 max_width 时从尾部截断加省略号。
+
+        用二分查找最长可容纳前缀，避免逐字符线性试探。
+        """
+        if font.size(text)[0] <= max_width:
+            return self._get_cached_text(text, font, color)
+        lo, hi = 0, len(text)
+        while lo < hi:
+            mid = (lo + hi + 1) // 2
+            if font.size(text[:mid] + "…")[0] <= max_width:
+                lo = mid
+            else:
+                hi = mid - 1
+        return self._get_cached_text(text[:lo] + "…", font, color)
 
     # ------------------------------------------------------------------
     # 公开渲染入口
@@ -564,17 +589,19 @@ class Renderer:
                           lines_val_surf.get_height())
         row_height = temp_height
 
-        time_y = logical_h - right_bottom_margin - row_height
+        # 底部统计：Lines / High / Time 上方为状态行（Time 下方显示）。
+        # 状态行始终占位，保证开/关时布局稳定。
+        status_y = logical_h - right_bottom_margin - row_height
+        time_y = status_y - row_height - right_gap
         high_y = time_y - row_height - right_gap
         lines_y = high_y - row_height - right_gap
 
-        # bot 策略行（Lines 统计上方，仅 bot 开启时显示）
-        if state.bot_enabled and state.bot_strategy:
-            bot_surf = self._get_cached_text(
-                "BOT: " + state.bot_strategy, self.font_small, (255, 200, 80)
+        # 实时状态行：内容由上层（_build_game_state）提供，渲染器不关心含义
+        if state.status_line:
+            status_surf = self._fit_text(
+                state.status_line, self.font_small, sidebar_content_width
             )
-            bot_y = lines_y - bot_surf.get_height() - right_gap
-            ds.blit(bot_surf, (sidebar_content_left, bot_y))
+            ds.blit(status_surf, (sidebar_content_left, status_y))
 
         ds.blit(label_surfs["lines_label"], (sidebar_content_left, lines_y))
         ds.blit(lines_val_surf,
