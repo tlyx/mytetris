@@ -589,10 +589,10 @@ class Renderer:
                           lines_val_surf.get_height())
         row_height = temp_height
 
-        # 底部统计：Lines / High / Time 上方为状态行（Time 下方显示）。
-        # 状态行始终占位，保证开/关时布局稳定。
-        status_y = logical_h - right_bottom_margin - row_height
-        time_y = status_y - row_height - right_gap
+        # 底部统计：Lines / High / Time。状态行（Time 下方）非空时三行整体
+        # 上移一行让位；为空时贴底——常态（bot 关闭）布局保持左右平衡。
+        shift = row_height + right_gap if state.status_line else 0
+        time_y = logical_h - right_bottom_margin - row_height - shift
         high_y = time_y - row_height - right_gap
         lines_y = high_y - row_height - right_gap
 
@@ -601,7 +601,10 @@ class Renderer:
             status_surf = self._fit_text(
                 state.status_line, self.font_small, sidebar_content_width
             )
-            ds.blit(status_surf, (sidebar_content_left, status_y))
+            ds.blit(
+                status_surf,
+                (sidebar_content_left, logical_h - right_bottom_margin - row_height),
+            )
 
         ds.blit(label_surfs["lines_label"], (sidebar_content_left, lines_y))
         ds.blit(lines_val_surf,
