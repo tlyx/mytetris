@@ -3,7 +3,7 @@ name: Build
 on:
   push:
     branches:
-      - main     # 🎯 main 分支推送：日常增量测试（ubuntu，公开仓库免费）
+      - main     # 🎯 main 分支推送：ubuntu 测试（免费）+ Nightly DMG（macOS）
     paths-ignore:
       - 'README.md'
       - 'LICENSE'
@@ -37,3 +37,54 @@ jobs:
 
       - name: Lint
         run: uv run ruff check .
+
+  build-macos:
+    name: Nightly macOS DMG
+    runs-on: macos-latest
+    if: github.ref_type != 'tag'   # 发版打包由 release.yml 负责，tag 推送不重复构建
+
+    steps:
+      # 1. 签出代码仓库（保持深度为 0，防止 spec 内部读 Git 哈希崩溃）
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 2. 初始化现代 Python 包管理器 uv
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true  # 开启全局缓存，缩短编译时间
+
+      # 3. 基于 uv.lock 像素级还原依赖环境
+      - name: Install Dependencies
+        run: uv sync
+
+      # 4. 调用 PyInstaller 编译生成标准的 macOS .app 目录结构
+      - name: Build macOS App Bundle
+        run: uv run pyinstaller main.spec
+
+      # 5. 安装 macOS 官方打包工具并一键合成 mytetris.dmg 挂载盘
+      - name: Create DMG Installer
+        run: |
+          brew install create-dmg --quiet
+          # 获取当前提交的 7 位短哈希，用于日常开发版的独立区分命名
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          cd dist
+          create-dmg \
+            --volname "mytetris Installer" \
+            --volicon "../assets/logo.png" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --icon "mytetris.app" 175 190 \
+            --app-drop-link 425 190 \
+            "mytetris-${SHORT_SHA}.dmg" \
+            "mytetris.app"
+
+      # 6. 将生成的日常开发版 .dmg 作为 Actions 附件上传
+      - name: Upload Nightly Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mytetris-macOS-nightly
+          path: dist/*.dmg
