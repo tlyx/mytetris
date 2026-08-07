@@ -72,8 +72,6 @@ _HELP_LINES = [
     "M      Toggle music",
     "S      Toggle sound effects",
     "G      Toggle ghost piece",
-    "A      Toggle bot (experimental)",
-    "V      Cycle bot strategy (experimental)",
     "F1/?   Show this help",
     "",
     "Press any key to close.",
