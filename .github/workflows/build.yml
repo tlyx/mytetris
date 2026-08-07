@@ -5,7 +5,7 @@ on:
     branches:
       - main     # 🎯 main 分支推送：ubuntu 测试（免费）+ Nightly DMG（macOS）
     paths-ignore:
-      - 'README.md'
+      - '**/*.md'   # 文档改动不触发构建（README / STYLES / 任何层级）
       - 'LICENSE'
       - '.gitignore'
       - '.aiderignore'
