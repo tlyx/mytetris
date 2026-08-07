@@ -1,7 +1,7 @@
 # pyright: reportPrivateUsage=false
 """Bot 2-ply 前瞻求解器与公平运行器的回归测试。
 
-历史 bug：best_next 在“当前块落定前”的原始盘面上计算，对每个候选是
+历史 bug：_best_next 在“当前块落定前”的原始盘面上计算，对每个候选是
 常数，因此 0.5 * next 项从不影响决策（前瞻是死代码），且每次落子白付
 40×40 次深拷贝。
 
@@ -27,12 +27,12 @@ from bot import (
     STRATEGIES,
     BotRunner,
     BotSnapshot,
+    _best_move,
+    _board_features,
+    _evaluate,
+    _landing_y,
     _Mailbox,
-    best_move,
-    board_features,
-    evaluate,
-    landing_y,
-    plan_to_actions,
+    _plan_to_actions,
 )
 from engine import (
     GRID_HEIGHT,
@@ -62,7 +62,7 @@ def make_engine(
 
 def solve_engine(eng: TetrisEngine) -> tuple[int, int] | None:
     """对引擎当前块做一次 2-ply 求解。"""
-    return best_move(
+    return _best_move(
         eng.grid,
         SHAPES_DATA[eng.current_type],
         SHAPES_DATA.get(eng.next_type),
@@ -101,14 +101,14 @@ def _naive_place(
 ) -> tuple[float, list[list[tuple[int, int, int] | None]]] | None:
     """落定 shape 并返回 (得分, post 盘面)；无法放置返回 None。"""
     piece = rotate_shape(shape, rotation)
-    y = landing_y(grid, piece, x)
+    y = _landing_y(grid, piece, x)
     if y is None:
         return None
     landing_height = y + min(py for _, py in piece)
     post = copy.deepcopy(grid)
     for gx, gy in cells_in_bounds(x, y, piece):
         post[gy][gx] = (1, 1, 1)
-    return evaluate(post, landing_height), post
+    return _evaluate(post, landing_height), post
 
 
 def _naive_two_ply(
@@ -128,13 +128,13 @@ def _naive_two_ply(
             if next_shape is None:
                 total = s1
             else:
-                best_next = float("-inf")
+                _best_next = float("-inf")
                 for r2 in range(4):
                     for x2 in range(GRID_WIDTH):
                         r2v = _naive_place(post, next_shape, r2, x2)
                         if r2v is not None:
-                            best_next = max(best_next, r2v[0])
-                total = s1 + 0.5 * best_next
+                            _best_next = max(_best_next, r2v[0])
+                total = s1 + 0.5 * _best_next
             if total > best:
                 best = total
                 best_move_ = (r1, x1)
@@ -206,7 +206,7 @@ def test_board_features_counts() -> None:
         if x != 5:
             grid[2][x] = (1, 1, 1)
 
-    rows, holes, row_trans, col_trans, wells = board_features(grid)
+    rows, holes, row_trans, col_trans, wells = _board_features(grid)
     assert rows == 2        # y=0 与 y=3 两行完整
     assert holes == 2       # y=1 x9 与 y=2 x5 上方均有方块
     assert row_trans == 36  # y1:2 + y2:2 + 16 个空行×2
@@ -214,15 +214,15 @@ def test_board_features_counts() -> None:
     assert wells == 1       # y=2 x5 左右均为已填（x9 靠边不计）
 
     # 落点高度线性惩罚：每高 1 行，得分 -1
-    assert evaluate(grid, 0) == rows - row_trans - col_trans - 4 * holes - wells
-    assert evaluate(grid, 7) == evaluate(grid, 0) - 7
+    assert _evaluate(grid, 0) == rows - row_trans - col_trans - 4 * holes - wells
+    assert _evaluate(grid, 7) == _evaluate(grid, 0) - 7
 
 
 def test_modern_changes_decision() -> None:
     """对照：同一盘面，Dellacherie 与 legacy 策略的落点不同（换血保护）。"""
     eng = make_engine(well_board(), "T", "I")
     new = solve_engine(eng)
-    legacy = best_move(eng.grid, SHAPES_DATA["T"], SHAPES_DATA["I"], strategy="legacy")
+    legacy = _best_move(eng.grid, SHAPES_DATA["T"], SHAPES_DATA["I"], strategy="legacy")
     assert new != legacy
     assert legacy == (0, 8)  # legacy 把 T 平放留井给 I
 
@@ -233,7 +233,7 @@ def test_strategies_registry_and_selection() -> None:
 
     eng = make_engine(well_board(), "T", "I")
     plans = {
-        name: best_move(eng.grid, SHAPES_DATA["T"], SHAPES_DATA["I"], strategy=name)
+        name: _best_move(eng.grid, SHAPES_DATA["T"], SHAPES_DATA["I"], strategy=name)
         for name in STRATEGIES
     }
     assert all(p is not None for p in plans.values())
@@ -302,13 +302,13 @@ def test_plan_to_actions_locks_piece() -> None:
     """计划 → 动作序列 → 引擎机械，与人类按键等价（旋转/移动/硬降/锁定）。"""
     eng = TetrisEngine()
     eng.reset()
-    plan = best_move(
+    plan = _best_move(
         eng.grid,
         SHAPES_DATA[eng.current_type],
         SHAPES_DATA.get(eng.next_type),
     )
     assert plan is not None
-    actions = plan_to_actions(plan, eng.x)
+    actions = _plan_to_actions(plan, eng.x)
     # 动作序列 = 旋转×n + 水平移动 + 硬降
     assert actions[-1] == Action.HARD_DROP
     assert actions.count(Action.HARD_DROP) == 1
@@ -320,16 +320,16 @@ def test_plan_to_actions_locks_piece() -> None:
 
 def test_plan_to_actions_sequence() -> None:
     """动作序列方向与数量正确：target_x 偏右→MOVE_RIGHT，偏左→MOVE_LEFT。"""
-    assert plan_to_actions((2, 6), 3) == [
+    assert _plan_to_actions((2, 6), 3) == [
         Action.ROTATE, Action.ROTATE,
         Action.MOVE_RIGHT, Action.MOVE_RIGHT, Action.MOVE_RIGHT,
         Action.HARD_DROP,
     ]
-    assert plan_to_actions((0, 2), 6) == [
+    assert _plan_to_actions((0, 2), 6) == [
         Action.MOVE_LEFT, Action.MOVE_LEFT, Action.MOVE_LEFT, Action.MOVE_LEFT,
         Action.HARD_DROP,
     ]
-    assert plan_to_actions((1, 4), 4) == [Action.ROTATE, Action.HARD_DROP]
+    assert _plan_to_actions((1, 4), 4) == [Action.ROTATE, Action.HARD_DROP]
 
 
 def test_decide_same_piece_no_replan() -> None:

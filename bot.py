@@ -1,11 +1,20 @@
 # bot.py — 自动游戏机器人，独立于 TetrisApp
 #
-# 公平性设计：bot 不再直连引擎。主线程每帧把只读快照（BotSnapshot）投递
-# 给 bot 线程；bot 线程对新块求解（无时间预算，2-ply 前瞻），把计划翻译
-# 成按键动作（Action）序列写回队列；主线程按人类节奏（每帧 ≤1 个）把
-# 动作喂进与人类键盘完全相同的输入路径（TetrisApp._apply_action）。
-# 重力、锁定延迟、计分对 bot 一视同仁；求解期间若块已被重力锁定，
-# 放弃结果对新块重算——像真正的人一样：想太久，方块自己掉下去锁掉。
+# 公平性设计：bot 不再直连引擎。游戏主循环每帧调用一次 BotRunner.tick()
+# 传入当前方块 id 与快照工厂，取回可应用的按键动作（Action）；内部换块
+# 投递、节流、过期丢弃全部封装。动作经 TetrisApp._apply_action 喂进与
+# 人类键盘完全相同的输入路径。重力、锁定延迟、计分对 bot 一视同仁；
+# 求解期间若块已被重力锁定，放弃结果对新块重算——像真正的人一样：
+# 想太久，方块自己掉下去锁掉。
+#
+# 对外 API（游戏主体只依赖这些）：
+#   - BotInterface : TetrisApp 依赖的协议（可整体替换 bot 实现）
+#   - BotRunner    : 具体实现（组合点在 TetrisApp._init_bot）
+#   - BotSnapshot  : 游戏侧构造的只读状态快照
+#   - STRATEGIES / DEFAULT_STRATEGY : 评估策略的可配置行为
+#
+# 其余模块级求解函数均为私有（_ 前缀）实现细节，仅供 BotRunner 内部
+# 与白盒测试使用，不属于对外接口。
 #
 # 评估策略可选用（STRATEGIES 注册表，构造参数或 set_strategy /
 # cycle_strategy 切换）：
@@ -52,7 +61,11 @@ _OCCUPIED: tuple[int, int, int] = (1, 1, 1)
 DEFAULT_STRATEGY = "modern"
 
 
-def best_move(
+# ------------------------------------------------------------------
+# 内部求解器（私有实现细节，仅 BotRunner 内部与白盒测试使用）
+# ------------------------------------------------------------------
+
+def _best_move(
     grid: list[list[tuple[int, int, int] | None]],
     shape: list[tuple[int, int]],
     next_shape: list[tuple[int, int]] | None,
@@ -63,17 +76,17 @@ def best_move(
     对每个 (rotation, x) 候选：
       1. 将候选落定到盘面快照，得到 post 盘面（每候选一次深拷贝）；
       2. 在 post 盘面上穷举下一块的最佳落点（copy-on-write，免内层深拷贝）；
-      3. 按 score1 + 0.5 * best_next 选取最优候选。
+      3. 按 score1 + 0.5 * _best_next 选取最优候选。
 
     :param strategy: 评估策略名（见 STRATEGIES），默认 modern。
     """
-    scorer = get_strategy(strategy)
+    scorer = _get_strategy(strategy)
     best_score = float("-inf")
     best: tuple[int, int] | None = None
     for rotation in range(4):
         piece = rotate_shape(shape, rotation)
         for x in range(GRID_WIDTH):
-            y = landing_y(grid, piece, x)
+            y = _landing_y(grid, piece, x)
             if y is None:
                 continue
             landing_height = y + min(py for _, py in piece)
@@ -83,14 +96,14 @@ def best_move(
                 post[gy][gx] = _OCCUPIED
             score = scorer(post, landing_height)
             if next_shape is not None:
-                score += 0.5 * best_next(post, next_shape, scorer)
+                score += 0.5 * _best_next(post, next_shape, scorer)
             if score > best_score:
                 best_score = score
                 best = (rotation, x)
     return best
 
 
-def best_next(
+def _best_next(
     grid: list[list[tuple[int, int, int] | None]],
     shape: list[tuple[int, int]],
     scorer: Callable[[list[list[tuple[int, int, int] | None]], int], float],
@@ -103,7 +116,7 @@ def best_next(
     for rotation in range(4):
         piece = rotate_shape(shape, rotation)
         for x in range(GRID_WIDTH):
-            y = landing_y(grid, piece, x)
+            y = _landing_y(grid, piece, x)
             if y is None:
                 continue
             landing_height = y + min(py for _, py in piece)
@@ -118,7 +131,7 @@ def best_next(
     return best
 
 
-def landing_y(
+def _landing_y(
     grid: list[list[tuple[int, int, int] | None]],
     piece: list[tuple[int, int]],
     x: int,
@@ -138,7 +151,7 @@ def landing_y(
     return drop_y(grid, piece, x, y)
 
 
-def board_features(
+def _board_features(
     grid: list[list[tuple[int, int, int] | None]],
 ) -> tuple[int, int, int, int, int]:
     """统计盘面特征，返回 (完整行数, 空洞数, 行过渡数, 列过渡数, 井深和)。
@@ -200,7 +213,7 @@ def board_features(
     return rows_cleared, holes, row_transitions, column_transitions, well_sums
 
 
-def evaluate(
+def _evaluate(
     grid: list[list[tuple[int, int, int] | None]],
     landing_height: int,
 ) -> float:
@@ -220,7 +233,7 @@ def evaluate(
     旧版启发式（lines*800 - aggregate_height*6 - holes*120 - bumpiness*4
     - max_height*2 - |中心列偏移|*3）已由本函数替换，原实现保留如下：
     """
-    rows_cleared, holes, row_trans, col_trans, well_sums = board_features(grid)
+    rows_cleared, holes, row_trans, col_trans, well_sums = _board_features(grid)
     return (
         -1.0 * landing_height
         + 1.0 * rows_cleared
@@ -231,7 +244,7 @@ def evaluate(
     )
 
 
-def column_heights(
+def _column_heights(
     grid: list[list[tuple[int, int, int] | None]],
 ) -> list[int]:
     """返回每列高度（底部原点，空列高度为 0）。"""
@@ -244,7 +257,7 @@ def column_heights(
     ]
 
 
-def legacy_evaluate(
+def _legacy_evaluate(
     grid: list[list[tuple[int, int, int] | None]],
     _landing_height: int,
 ) -> float:
@@ -254,7 +267,7 @@ def legacy_evaluate(
     未使用，故以下划线命名），权重手调，中间堆高倾向明显、清行更大胆
     （Tetris 略多但更早顶死）。
     """
-    heights = column_heights(grid)
+    heights = _column_heights(grid)
     holes = 0
     lines = 0
     for y in range(GRID_HEIGHT):
@@ -281,15 +294,18 @@ def legacy_evaluate(
     )
 
 
+# ------------------------------------------------------------------
+# 策略注册表（公开：bot 的可配置行为；BotRunner 构造参数与 cycle_strategy 使用）
+# ------------------------------------------------------------------
 # 评估策略注册表：名称 -> 评分函数 (grid, landing_height) -> float
 STRATEGY_ORDER: tuple[str, ...] = ("modern", "legacy")
 STRATEGIES: dict[str, Callable[[list[list[tuple[int, int, int] | None]], int], float]] = {
-    "modern": evaluate,
-    "legacy": legacy_evaluate,
+    "modern": _evaluate,
+    "legacy": _legacy_evaluate,
 }
 
 
-def get_strategy(
+def _get_strategy(
     name: str,
 ) -> Callable[[list[list[tuple[int, int, int] | None]], int], float]:
     """按名称取评估策略；未知名称抛 ValueError。"""
@@ -298,9 +314,13 @@ def get_strategy(
     return STRATEGIES[name]
 
 
+# ------------------------------------------------------------------
+# 对外接口（游戏主体依赖的部分）
+# ------------------------------------------------------------------
+
 @dataclass(frozen=True)
 class BotSnapshot:
-    """主线程每帧投递给 bot 线程的只读游戏状态（grid 为行拷贝）。"""
+    """游戏侧构造、bot 侧消费的只读游戏状态快照（grid 为行拷贝）。"""
 
     grid: list[list[tuple[int, int, int] | None]]
     current_type: str
@@ -315,7 +335,7 @@ class BotSnapshot:
     piece_id: int
 
 
-def plan_to_actions(
+def _plan_to_actions(
     plan: tuple[int, int], current_x: int
 ) -> list[Action]:
     """把 (rotation, target_x) 计划翻译成按键动作序列（旋转→水平→硬降）。
@@ -541,7 +561,7 @@ class BotRunner:
         if snap.piece_id == self._plan_piece_id:
             return []
         self._drop_pending()
-        plan = best_move(
+        plan = _best_move(
             snap.grid,
             SHAPES_DATA[snap.current_type],
             SHAPES_DATA.get(snap.next_type),
@@ -555,7 +575,7 @@ class BotRunner:
             return []
         return [
             (snap.piece_id, action)
-            for action in plan_to_actions(plan, snap.current_x)
+            for action in _plan_to_actions(plan, snap.current_x)
         ]
 
     def _drop_pending(self) -> None:
