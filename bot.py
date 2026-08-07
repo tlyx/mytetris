@@ -473,10 +473,11 @@ class BotRunner:
         if self._thread is not None and self._thread.is_alive():
             return
         self._stop.clear()
-        self._thread = threading.Thread(
-            target=self._loop, name="mytetris-bot", daemon=True
-        )
-        self._thread.start()
+        # 用局部变量承载线程对象：PyCharm 对实例属性赋值后的收窄不可靠，
+        # 直接 self._thread.start() 会被按 Thread | None 判定告警。
+        thread = threading.Thread(target=self._loop, name="mytetris-bot", daemon=True)
+        self._thread = thread
+        thread.start()
 
     def stop(self, timeout: float = 1.0) -> None:
         """停止 bot 线程并等待退出（幂等）。"""

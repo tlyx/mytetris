@@ -260,7 +260,9 @@ class TetrisApp:
     # ---- BOT 初始化 ----
     def _init_bot(self) -> None:
         """创建新的 bot 运行器（默认关闭，线程未启动）。"""
-        old = getattr(self, "bot", None)
+        # 首次调用时 self.bot 尚不存在，故用 getattr 兜底；
+        # 显式标注让类型检查器正确收窄，避免 Any|None 联合类型警告。
+        old: BotInterface | None = getattr(self, "bot", None)
         if old is not None:
             old.stop()
         self.bot = BotRunner()
