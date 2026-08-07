@@ -39,14 +39,14 @@ class AppInterface(Protocol):
 class StateHandler:
     """状态处理器基类。"""
 
-    def on_enter(self, _app: AppInterface) -> None:
+    def on_enter(self, app: AppInterface) -> None:
         """进入该状态时调用。"""
 
-    def on_exit(self, _app: AppInterface) -> None:
+    def on_exit(self, app: AppInterface) -> None:
         """离开该状态时调用。"""
 
     def handle_event(
-        self, _app: AppInterface, _event: pygame.event.Event
+        self, app: AppInterface, event: pygame.event.Event
     ) -> StateHandler | None:
         """处理事件，返回新的状态处理器（如果状态改变），否则返回 None。"""
         raise NotImplementedError

@@ -111,6 +111,9 @@ class TetrisApp:
     # ---- 统一时间源 ----
     _now: int  # 每帧更新，存储当前时间戳
 
+    # 贴地时刻（ticks），锁定延迟计时；None 表示方块未贴地
+    _piece_resting: int | None
+
     # ---- bot 相关 ----
     bot: BotInterface
     bot_enabled: bool
@@ -219,7 +222,7 @@ class TetrisApp:
         self.confirm_quit = False
         self.high_score = 0
         self.game_start_ticks = pygame.time.get_ticks()
-        self._piece_resting: int | None = None  # 贴地时刻（ticks），锁定延迟计时
+        self._piece_resting = None  # 贴地时刻（ticks），锁定延迟计时（类级已声明类型）
         # 注意：music_enabled/sfx_enabled 已移入 config，不再在此处初始化
         self.clear_anim_enabled = True
         self._game_over_sound_played = False
