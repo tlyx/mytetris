@@ -1,9 +1,6 @@
 # pyright: reportPrivateUsage=false
 # test_bot.py — bot 求解器与公平运行器回归测试
 # 覆盖 2-ply 前瞻、策略注册表、BotRunner 决策语义与线程生命周期。
-#
-# 此文件主要负责：
-#  - 求解器 / 决策 / 信箱 / 节流 / 线程回归测试
 
 """Bot 2-ply 前瞻求解器与公平运行器的回归测试。
 
