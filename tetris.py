@@ -554,7 +554,7 @@ class TetrisApp:
     # ------------------------------------------------------------------
 
     def run(self) -> None:
-        """Main game loop."""
+        """主游戏循环。"""
         while True:
             self._now = pygame.time.get_ticks()
 

@@ -38,8 +38,8 @@ COLORS: dict[str, tuple[int, int, int]] = {
 }
 
 SHAPES_DATA: dict[str, list[tuple[int, int]]] = {
-    # Converted to bottom-origin coordinates: y signs inverted compared to previous top-origin data.
-    # Now each (dx, dy) is relative to bottom-origin (y increases upward).
+    # 已转换为底部原点坐标：相对旧版顶部原点数据，y 符号取反。
+    # 现在每个 (dx, dy) 相对底部原点（y 向上递增）。
     "I": [(-1, 0), (0, 0), (1, 0), (2, 0)],
     "O": [(0, 0), (1, 0), (0, -1), (1, -1)],
     "T": [(0, 1), (-1, 0), (0, 0), (1, 0)],
@@ -62,8 +62,8 @@ _WALL_KICKS_OTHERS: list[tuple[int, int]] = [
     (0, 0),
     (1, 0),
     (-1, 0),
-    # vertical components were inverted when switching to bottom-origin;
-    # use positive values to represent upward kicks in internal coords.
+    # 切换到底部原点时 y 分量取反；
+    # 使用正值表示内部坐标系中的向上踢。
     (0, 1),
     (1, 1),
     (-1, 1),
@@ -234,8 +234,8 @@ class TetrisEngine:
     def move(self, dx: int, dy: int) -> bool:
         """尝试移动当前方块，返回是否成功移动。
 
-        Note: internal coordinates use bottom-origin with y increasing upward,
-        therefore callers that request a downward move should pass dy = -1.
+        注意：内部坐标系为底部原点（y 向上递增），因此向下移动时
+        调用方应传 dy = -1。
         """
         if not self._check_collision(self.x + dx, self.y + dy):
             self.x += dx
@@ -255,19 +255,19 @@ class TetrisEngine:
         self.score = min(self.score + points, MAX_SCORE)
 
     def rotate(self) -> bool:
-        """Rotate current piece (no-op for O) and attempt wall-kicks.
+        """旋转当前方块（O 方块为无操作）并尝试 wall-kick。
 
-        Returns True if the rotation was applied (possibly after a kick),
-        False if no rotation occurred (O-piece or all kicks collided).
+        返回 True 表示旋转已应用（可能经过 kick 位移），
+        False 表示未发生旋转（O 方块或所有 kick 均碰撞）。
 
-        The rotation here uses a 90-degree CLOCKWISE transform in the
-        engine's internal bottom-origin coords: (x, y) -> (y, -x).
+        旋转使用引擎内部底部原点坐标系下的 90° 顺时针变换：
+        (x, y) -> (y, -x)。
         """
         if self.current_type == "O":
             # O-piece rotation is a no-op
             return False
 
-        # rotate 90 deg CLOCKWISE in engine internal coords.
+        # 在引擎内部坐标系中顺时针旋转 90°。
         new_shape = rotate_shape(self.current_shape, 1)
 
         # try without kicks first
@@ -295,8 +295,7 @@ class TetrisEngine:
     def lock_and_clear_lines(self) -> None:
         """锁定当前方块到网格，然后检测并消除满行，更新分数、等级，生成下一个方块。
 
-        Internal grid semantics: self.grid[0] is the bottom row; self.grid[GRID_HEIGHT-1]
-        is the top row.
+        内部网格语义：self.grid[0] 为底行；self.grid[GRID_HEIGHT-1] 为顶行。
         """
         lock_color = COLORS[self.current_type]
         for gx, gy in cells_in_bounds(self.x, self.y, self.current_shape):
@@ -339,64 +338,10 @@ class TetrisEngine:
 
         self._spawn_piece()
 
-    def _spawn_piece(self) -> None:
-        """生成下一个方块到顶部（internal bottom-origin），若碰撞则标记游戏结束。"""
-        self.current_type = self.next_type
-        self.current_shape = list(SHAPES_DATA[self.current_type])
-        self.next_type = self._draw_from_bag()
-        self.piece_id += 1
-
-        # 水平居中 spawn（基于 piece 的 bounding box）
-        min_px = min(px for px, _ in self.current_shape)
-        max_px = max(px for px, _ in self.current_shape)
-        piece_width = max_px - min_px + 1
-        self.x = (GRID_WIDTH - piece_width) // 2 - min_px
-
-        # 将 piece 的最高单元对齐到顶部（internal top row = GRID_HEIGHT - 1）
-        self.y = spawn_y(self.current_shape)
-
-        # reset rotation
-        self.rotation = 0
-
-        if self._check_collision(self.x, self.y):
-            self.game_over = True
-
-    def _check_collision(
-        self,
-        nx: int,
-        ny: int,
-        shape: list[tuple[int, int]] | None = None,
-    ) -> bool:
-        """
-        检查在内部坐标（底部原点）下放置 shape 于 (nx, ny) 是否与边界或已锁定方块冲突。
-
-        规则：
-          - gx 越界 -> collision
-          - gy < 0 -> collision
-          - gy >= GRID_HEIGHT -> allow (spawn above top)
-          - 否则如果 grid[gy][gx] 非 None -> collision
-        """
-        shape = shape if shape is not None else self.current_shape
-
-        return collides(self.grid, nx, ny, shape)
-
-    def get_piece_cells(self):
-        """Return absolute positions of current piece blocks using internal coords (bottom-origin)."""
+    def get_piece_cells(self) -> list[tuple[int, int]]:
+        """返回当前方块各格的绝对坐标（内部底部原点坐标系）。"""
         return [(self.x + dx, self.y + dy) for dx, dy in self.current_shape]
 
-    # ---------- 7-bag 随机生成器 ----------
-    def _refill_bag(self) -> None:
-        """用全部七种方块填充 bag 并随机打乱。"""
-        self._bag = list(_ALL_PIECES)   # 浅拷贝即可，元素为不可变字符串
-        shuffle(self._bag)
-
-    def _draw_from_bag(self) -> str:
-        """从 bag 顶部取一个方块类型，bag 为空时自动重新填充。"""
-        if not self._bag:
-            self._refill_bag()
-        return self._bag.pop()
-
-    # ---------- Ghost piece ----------
     def get_ghost_y(self) -> int:
         """返回当前方块垂直落到底部后的内部 y（底部为 0）。
 
@@ -434,3 +379,55 @@ class TetrisEngine:
         # convert to milliseconds per cell (interval)
         ms_per_cell = 1000.0 / cells_per_sec
         return round(ms_per_cell)
+    def _spawn_piece(self) -> None:
+        """生成下一个方块到顶部（内部底部原点坐标系），若碰撞则标记游戏结束。"""
+        self.current_type = self.next_type
+        self.current_shape = list(SHAPES_DATA[self.current_type])
+        self.next_type = self._draw_from_bag()
+        self.piece_id += 1
+
+        # 水平居中 spawn（基于 piece 的 bounding box）
+        min_px = min(px for px, _ in self.current_shape)
+        max_px = max(px for px, _ in self.current_shape)
+        piece_width = max_px - min_px + 1
+        self.x = (GRID_WIDTH - piece_width) // 2 - min_px
+
+        # 将 piece 的最高单元对齐到顶部（internal top row = GRID_HEIGHT - 1）
+        self.y = spawn_y(self.current_shape)
+
+        # reset rotation
+        self.rotation = 0
+
+        if self._check_collision(self.x, self.y):
+            self.game_over = True
+
+    def _check_collision(
+        self,
+        nx: int,
+        ny: int,
+        shape: list[tuple[int, int]] | None = None,
+    ) -> bool:
+        """
+        检查在内部坐标（底部原点）下放置 shape 于 (nx, ny) 是否与边界或已锁定方块冲突。
+
+        规则：
+          - gx 越界 -> collision
+          - gy < 0 -> collision
+          - gy >= GRID_HEIGHT -> 放行（生成区允许超出顶部）
+          - 否则如果 grid[gy][gx] 非 None -> collision
+        """
+        shape = shape if shape is not None else self.current_shape
+
+        return collides(self.grid, nx, ny, shape)
+
+    # ---------- 7-bag 随机生成器 ----------
+    def _refill_bag(self) -> None:
+        """用全部七种方块填充 bag 并随机打乱。"""
+        self._bag = list(_ALL_PIECES)   # 浅拷贝即可，元素为不可变字符串
+        shuffle(self._bag)
+
+    def _draw_from_bag(self) -> str:
+        """从 bag 顶部取一个方块类型，bag 为空时自动重新填充。"""
+        if not self._bag:
+            self._refill_bag()
+        return self._bag.pop()
