@@ -153,6 +153,39 @@ imports…
 - Test files keep their module docstring (they document the test suite);
   the comment header sits above it, and `# pyright:` file directives stay on
   **line 1** so the type checker still honors them.
+- **Definition order**, as pseudocode:
+
+  ```python
+  # module level
+  """<module header>"""
+  imports …                             # stdlib → third-party → local
+
+
+  MODULE_CONSTANT = ...                 # module constants
+
+
+  def public_helper(): ...              # public helpers first
+
+
+  def _private_helper(): ...            # private helpers after public ones
+
+
+  class Foo: ...                        # classes last
+
+
+  if __name__ == "__main__": ...        # entry module only
+
+
+  # class level
+  class Foo:
+      def __init__(self): ...           # constructor first
+
+      def public_method(self): ...      # public API, grouped by concern
+
+      def _private(self): ...           # private members last
+  ```
+
+  Move a code block together with its section-header comment.
 
 ## 6. Dependency Rules
 

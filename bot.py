@@ -317,6 +317,24 @@ def _get_strategy(
     return STRATEGIES[name]
 
 
+def _plan_to_actions(
+    plan: tuple[int, int], current_x: int
+) -> list[Action]:
+    """把 (rotation, target_x) 计划翻译成按键动作序列（旋转→水平→硬降）。
+
+    :param current_x: 快照中当前块的 engine-local x，用于计算水平移动量。
+    """
+    rotation, target_x = plan
+    actions: list[Action] = [Action.ROTATE] * rotation
+    dx = target_x - current_x
+    if dx > 0:
+        actions.extend([Action.MOVE_RIGHT] * dx)
+    elif dx < 0:
+        actions.extend([Action.MOVE_LEFT] * (-dx))
+    actions.append(Action.HARD_DROP)
+    return actions
+
+
 # ------------------------------------------------------------------
 # 对外接口（游戏主体依赖的部分）
 # ------------------------------------------------------------------
@@ -336,24 +354,6 @@ class BotSnapshot:
     # 当前方块实例 id（引擎每次生成新块 +1）：同一类型但不同的块 id 不同，
     # 是 bot 识别"换块了"的可靠依据（方块类型可能连续相同）。
     piece_id: int
-
-
-def _plan_to_actions(
-    plan: tuple[int, int], current_x: int
-) -> list[Action]:
-    """把 (rotation, target_x) 计划翻译成按键动作序列（旋转→水平→硬降）。
-
-    :param current_x: 快照中当前块的 engine-local x，用于计算水平移动量。
-    """
-    rotation, target_x = plan
-    actions: list[Action] = [Action.ROTATE] * rotation
-    dx = target_x - current_x
-    if dx > 0:
-        actions.extend([Action.MOVE_RIGHT] * dx)
-    elif dx < 0:
-        actions.extend([Action.MOVE_LEFT] * (-dx))
-    actions.append(Action.HARD_DROP)
-    return actions
 
 
 @final

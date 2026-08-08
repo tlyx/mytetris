@@ -38,13 +38,6 @@ class ConfigManager:
         self._data = {}
         self._shadow = {}
 
-    # ---------- 配置文件路径 ----------
-    def _config_file(self) -> Path:
-        """返回配置文件 config.json 的路径，并确保目录存在。"""
-        data_dir = Path(platformdirs.user_data_dir(self._app_name))
-        data_dir.mkdir(parents=True, exist_ok=True)
-        return data_dir / "config.json"
-
     # ---------- 加载配置 ----------
     def load(self) -> None:
         """从配置文件读取所有配置项，若文件不存在或解析失败则使用默认值。"""
@@ -138,6 +131,13 @@ class ConfigManager:
     @high_score.setter
     def high_score(self, value: int) -> None:
         self._data["high_score"] = self._clamp_high_score(value)
+
+    # ---------- 配置文件路径 ----------
+    def _config_file(self) -> Path:
+        """返回配置文件 config.json 的路径，并确保目录存在。"""
+        data_dir = Path(platformdirs.user_data_dir(self._app_name))
+        data_dir.mkdir(parents=True, exist_ok=True)
+        return data_dir / "config.json"
 
     # ---------- 辅助方法 ----------
     @staticmethod

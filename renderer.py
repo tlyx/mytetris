@@ -147,50 +147,6 @@ class Renderer:
             self._static_bg = self._build_static_bg(scale)
 
     # ------------------------------------------------------------------
-    # 文字缓存辅助方法（缓存键包含字体标识，避免不同字体误用）
-    # ------------------------------------------------------------------
-    def _get_cached_text(
-        self,
-        text: str,
-        font: pygame.font.Font,
-        color: tuple[int, int, int],
-    ) -> pygame.Surface:
-        """返回缓存的文字表面，仅在字符串变化时重新渲染。"""
-        key = (text, id(font))
-        cached = self._text_cache.get(key)
-        if cached is not None and cached[0] == text:
-            return cached[1]
-
-        # 重新渲染并缓存
-        surface = font.render(text, True, color)
-        # font.render 不会返回 None，断言消除可选性
-        assert surface is not None
-        self._text_cache[key] = (text, surface)
-        return surface
-
-    def _fit_text(
-        self,
-        text: str,
-        font: pygame.font.Font,
-        max_width: int,
-        color: tuple[int, int, int] = _STATUS_COLOR,
-    ) -> pygame.Surface:
-        """渲染文本并限制宽度：超出 max_width 时从尾部截断加省略号。
-
-        用二分查找最长可容纳前缀，避免逐字符线性试探。
-        """
-        if font.size(text)[0] <= max_width:
-            return self._get_cached_text(text, font, color)
-        lo, hi = 0, len(text)
-        while lo < hi:
-            mid = (lo + hi + 1) // 2
-            if font.size(text[:mid] + "…")[0] <= max_width:
-                lo = mid
-            else:
-                hi = mid - 1
-        return self._get_cached_text(text[:lo] + "…", font, color)
-
-    # ------------------------------------------------------------------
     # 公开渲染入口
     # ------------------------------------------------------------------
     def render(
@@ -251,6 +207,50 @@ class Renderer:
             ds, state, scale, logical.get_width(), logical.get_height(),
             board_left, board_w, board_h,
         )
+
+    # ------------------------------------------------------------------
+    # 文字缓存辅助方法（缓存键包含字体标识，避免不同字体误用）
+    # ------------------------------------------------------------------
+    def _get_cached_text(
+        self,
+        text: str,
+        font: pygame.font.Font,
+        color: tuple[int, int, int],
+    ) -> pygame.Surface:
+        """返回缓存的文字表面，仅在字符串变化时重新渲染。"""
+        key = (text, id(font))
+        cached = self._text_cache.get(key)
+        if cached is not None and cached[0] == text:
+            return cached[1]
+
+        # 重新渲染并缓存
+        surface = font.render(text, True, color)
+        # font.render 不会返回 None，断言消除可选性
+        assert surface is not None
+        self._text_cache[key] = (text, surface)
+        return surface
+
+    def _fit_text(
+        self,
+        text: str,
+        font: pygame.font.Font,
+        max_width: int,
+        color: tuple[int, int, int] = _STATUS_COLOR,
+    ) -> pygame.Surface:
+        """渲染文本并限制宽度：超出 max_width 时从尾部截断加省略号。
+
+        用二分查找最长可容纳前缀，避免逐字符线性试探。
+        """
+        if font.size(text)[0] <= max_width:
+            return self._get_cached_text(text, font, color)
+        lo, hi = 0, len(text)
+        while lo < hi:
+            mid = (lo + hi + 1) // 2
+            if font.size(text[:mid] + "…")[0] <= max_width:
+                lo = mid
+            else:
+                hi = mid - 1
+        return self._get_cached_text(text[:lo] + "…", font, color)
 
     # ------------------------------------------------------------------
     # 静态背景构建（仅在 scale 变化时调用一次）
