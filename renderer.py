@@ -390,7 +390,7 @@ class Renderer:
                         # 创建半透明白色矩形
                         flash_surf = pygame.Surface((_board_w, bs), pygame.SRCALPHA)
                         flash_surf.fill((255, 255, 255, alpha))
-                        # row is internal (0=bottom); map to screen row
+                        # row 为内部索引（0=底部）；映射到屏幕行
                         screen_row = GRID_HEIGHT - 1 - row
                         ds.blit(flash_surf, (board_left, screen_row * bs))
         else:
@@ -545,9 +545,8 @@ class Renderer:
         offset_x = (preview_size - shape_width * bs) // 2
         offset_y = (preview_size - shape_height * bs) // 2
 
-        # Map engine (dx, dy) -> screen pixels. For vertical mapping we use
-        # (max_dy - dy) so that larger dy (higher in engine coords) appears
-        # higher (smaller screen y) in the preview box.
+        # 将引擎 (dx, dy) 映射为屏幕像素。垂直方向用 (max_dy - dy)：
+        # dy 越大（引擎坐标中越高）在预览框中显示得越高（屏幕 y 越小）。
         for dx, dy in next_shape:
             px = preview_x + offset_x + (dx - min_dx) * bs
             py = preview_y + offset_y + (max_dy - dy) * bs

@@ -292,8 +292,6 @@ class TetrisApp:
         self.audio.set_sfx_enabled(new_state)
         # 不在此处 save，退出时自动保存
 
-    # 音效播放方法已移除，统一直接调用 self.audio.play_sfx(name)
-
     def _toggle_ghost(self) -> None:
         """切换 Ghost piece（落点影子）显示开关。"""
         self.ghost_enabled = not self.ghost_enabled
@@ -566,7 +564,7 @@ class TetrisApp:
             self._enforce_min_size()
             self._process_events()
 
-            # ONLY process auto-repeat when player is active
+            # 仅在玩家活跃时处理自动重复
             if not (self.game.game_over or self.paused or self.confirm_quit or self._help_active):
                 if not self.bot_enabled:
                     self.input_handler.process_auto_repeat(self._now)

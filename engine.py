@@ -20,7 +20,7 @@ _MAX_TOTAL_LINES = 999999
 _MAX_INITIAL_SPEED = 500          # 初始下落间隔（毫秒）
 _SPEED_DECREASE = 30              # 每升一级减少的毫秒数
 _MIN_SPEED = 100                  # 速度下限（最快）
-# 根据线性公式计算最大级别：当 500 - (level-1)*30 <= 100 时，level >= 14
+# 最大级别：速度从 500ms 按每级 -30ms 递减，第 14 级为 110ms（下限 100 之上的最后一级）
 _MAX_LEVEL = (_MAX_INITIAL_SPEED - _MIN_SPEED) // _SPEED_DECREASE + 1   # =14
 # ---------------------------------------
 
@@ -53,11 +53,9 @@ SHAPES_DATA: dict[str, list[tuple[int, int]]] = {
 _ALL_PIECES: list[str] = ["I", "O", "T", "L", "J", "S", "Z"]
 
 # ----------------- Wall kick / spawn related constants -----------------
-# These are a compact, pragmatic set of kick offsets to try when a rotation
-# collides. They are not a full SRS implementation but are more explicit
-# and easier to maintain than an ad-hoc inline list.
-# I-piece generally needs wider horizontal kicks, so we provide a separate
-# set for it.
+# 一组紧凑实用的踢位偏移：旋转碰撞时依次尝试。并非完整的 SRS 实现，
+# 但比临时内联列表更明确、更易维护。
+# I 方块通常需要更宽的横向踢位，因此单独提供一组。
 _WALL_KICKS_OTHERS: list[tuple[int, int]] = [
     (0, 0),
     (1, 0),
@@ -76,14 +74,13 @@ _WALL_KICKS_I: list[tuple[int, int]] = [
     (-1, 0),
     (2, 0),
     (-2, 0),
-    # same vertical flip for I-piece special kicks
+    # I 块特殊踢的垂直分量同样取反
     (0, 1),
     (0, 2),
 ]
 
-# Note: spawn behavior will align the top of the piece to row 0 so all
-# piece cells are at ty >= 0 immediately after spawn. This makes spawn
-# deterministic and consistent across piece types.
+# 注意：生成行为会把方块最高单元对齐到顶行，保证所有方块单元
+# 生成后立即满足 ty >= 0，使各类型方块的生成位置确定且一致。
 # ---------------------------------------------------------------------
 
 
@@ -206,8 +203,8 @@ class TetrisEngine:
         self.current_shape = []
         self.x = 0
         self.y = 0
-        # rotation state 0..3 (0 = spawn orientation). Stored to allow
-        # future SRS-style kick tables and deterministic rotation behavior.
+        # 旋转状态 0..3（0 = 生成朝向）。记录下来以备未来
+        # SRS 式踢表与确定性的旋转行为。
         self.rotation = 0
         self.piece_id = 0
         self._bag = []
@@ -227,7 +224,7 @@ class TetrisEngine:
         self._refill_bag()
         # 从 bag 中取出第一个方块作为 next_type
         self.next_type = self._draw_from_bag()
-        # ensure rotation state reset and spawn first piece
+        # 重置旋转状态并生成第一个方块
         self.rotation = 0
         self._spawn_piece()
 
@@ -264,13 +261,13 @@ class TetrisEngine:
         (x, y) -> (y, -x)。
         """
         if self.current_type == "O":
-            # O-piece rotation is a no-op
+            # O 方块旋转是无操作
             return False
 
         # 在引擎内部坐标系中顺时针旋转 90°。
         new_shape = rotate_shape(self.current_shape, 1)
 
-        # try without kicks first
+        # 先尝试不做踢位直接旋转
         if not self._check_collision(self.x, self.y, new_shape):
             self.current_shape = new_shape
             # update rotation state (one step in our clockwise convention)
@@ -289,7 +286,7 @@ class TetrisEngine:
                 self.rotation = (self.rotation + 1) % 4
                 return True
 
-        # rotation failed (all kicks collide)
+        # 旋转失败（所有踢位均碰撞）
         return False
 
     def lock_and_clear_lines(self) -> None:
@@ -363,12 +360,11 @@ class TetrisEngine:
 
         速度范围 2.0～10.0 格/秒，每升一级速度增加量相等。
         """
-        # Interpret the constants as milliseconds-per-cell for endpoints.
-        # Convert to cells-per-second for interpolation to keep linear
-        # progression in terms of falling speed (cells/sec), then convert
-        # back to a millisecond interval.
-        cells_per_sec_min = 1000.0 / _MAX_INITIAL_SPEED   # e.g. 2.0 cells/sec
-        cells_per_sec_max = 1000.0 / _MIN_SPEED           # e.g. 10.0 cells/sec
+        # 将常量解释为端点的每格毫秒数。
+        # 换算为每秒钟数做插值，使下落速度（格/秒）随等级线性递增，
+        # 再换算回毫秒间隔。
+        cells_per_sec_min = 1000.0 / _MAX_INITIAL_SPEED   # 例如 2.0 格/秒
+        cells_per_sec_max = 1000.0 / _MIN_SPEED           # 例如 10.0 格/秒
 
         # linear interpolation of cells/sec across levels
         cells_per_sec = (

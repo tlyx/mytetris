@@ -79,7 +79,6 @@ class ConfigManager:
             print(f"WARNING: Failed to save config: {exc}")
 
     # ---------- 便捷属性访问（与原有 TetrisApp 属性名一致） ----------
-    # （按 _defaults 中 bool 在前字母顺序，数字在后）
     @property
     def clear_anim_enabled(self) -> bool:
         val = self._data["clear_anim_enabled"]

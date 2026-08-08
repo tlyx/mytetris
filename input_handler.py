@@ -17,7 +17,7 @@ from actions import Action
 class InputHandler:
     """管理键盘按键的首次按下和自动重复（DAS/ARR）。"""
 
-    # 自动重复参数（与原来 TetrisApp 保持一致）
+    # DAS/ARR 自动重复参数：首次按下等待 200ms，之后每 50ms 触发一次
     _DAS_INITIAL: int = 200   # 首次触发前等待时间（毫秒）
     _DAS_INTERVAL: int = 50   # 触发间隔（毫秒）
 
