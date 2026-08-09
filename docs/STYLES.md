@@ -229,8 +229,19 @@ imports…
 - Spawn aligns the piece's highest cell to the top row, making spawn
   deterministic across piece types.
 - Random generation uses a **7-bag** over `_ALL_PIECES`.
-- Wall kicks are a pragmatic, non-SRS offset table; rotation state `0..3` is
-  tracked for future SRS work.
+- Rotations use the **official SRS kick tables**, keyed by
+  `(from_rotation, to_rotation)` (5 candidates per transition,
+  `(0,0)` first = in-place), y-flipped into bottom-origin. Only the
+  four clockwise transitions are implemented; the CCW ones wait for
+  future support.
+- **T-spin** (guideline): detection needs both the T piece's 3-corner
+  rule — ≥3 of the 4 diagonals around the T center occupied
+  (`is_t_spin`, rotation-independent since the center is the shape
+  origin) — and `last_was_rotation`: the rotation must be the literal
+  last action, so any successful move/soft drop/hard drop clears the
+  flag. Rotate-then-hard-drop is deliberately NOT a T-spin. Scoring
+  is `T_SPIN_TABLE` (no-clear 100, single 800, double 1200, triple
+  1600, ×level); the combo bonus stacks orthogonally.
 - Every spawn increments `piece_id`; treat it as the identity of a piece
   *instance* (same-type pieces are still distinct instances).
 - New geometry/collision logic must be added as a shared pure function in the
