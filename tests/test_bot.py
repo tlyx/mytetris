@@ -366,9 +366,9 @@ def test_decide_invalidated_when_locked_during_think() -> None:
     """求解期间块被重力锁定（快照换块）→ 结果作废，下一轮对最新块重算。"""
     runner = BotRunner()
     snap_a = make_snapshot(make_engine(well_board(), "T", "I"), piece_id=1)
-    runner.post_snapshot(snap_a)
+    runner._mailbox.post(snap_a)
     snap_b = make_snapshot(make_engine(well_board(), "O", "I"), piece_id=2)
-    runner.post_snapshot(snap_b)
+    runner._mailbox.post(snap_b)
     assert runner._decide(snap_a) == []  # 结果作废
     out = runner._decide(snap_b)
     assert out
@@ -458,16 +458,6 @@ def test_tick_throttles_one_action_per_frame() -> None:
     assert runner.tick(1, lambda: snap) == []
 
 
-def test_drain_limits() -> None:
-    """drain 节流：默认每帧最多 1 个动作。"""
-    runner = BotRunner()
-    for _ in range(3):
-        runner._out.put((1, Action.ROTATE))
-    assert len(runner.drain(1)) == 1
-    assert len(runner.drain(10)) == 2
-    assert runner.drain(10) == []
-
-
 def test_runner_thread_emits_actions_and_stops() -> None:
     """真线程冒烟：投递快照后产出动作；stop 能干净退出。"""
     runner = BotRunner()
@@ -475,7 +465,7 @@ def test_runner_thread_emits_actions_and_stops() -> None:
     try:
         eng = TetrisEngine()
         eng.reset()
-        runner.post_snapshot(make_snapshot(eng))
+        runner._mailbox.post(make_snapshot(eng))
         deadline = time.monotonic() + 2.0
         while runner._out.empty() and time.monotonic() < deadline:
             time.sleep(0.005)

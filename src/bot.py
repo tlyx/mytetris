@@ -487,24 +487,6 @@ class BotRunner:
             self._thread = None
 
     # ---------- 主线程接口 ----------
-    def post_snapshot(self, snap: BotSnapshot) -> None:
-        """投递当前游戏状态（供测试与 tick 内部使用）。"""
-        self._mailbox.post(snap)
-
-    def drain(self, limit: int = 1) -> list[tuple[int, Action]]:
-        """取出 bot 已产出的动作（默认 ≤1，节流为人类按键节奏）。
-
-        返回 [(piece_id, action), ...]；调用方必须校验 piece_id 仍等于
-        引擎当前块实例，否则丢弃（动作可能已过期）。
-        """
-        items: list[tuple[int, Action]] = []
-        while len(items) < limit:
-            try:
-                items.append(self._out.get_nowait())
-            except queue.Empty:
-                break
-        return items
-
     def tick(
         self,
         current_piece_id: int,
