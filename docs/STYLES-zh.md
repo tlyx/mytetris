@@ -63,6 +63,7 @@ renderer.py → game_state.py, engine.py (仅常量/形状)
 - **逻辑不进 UI。** 游戏规则在 `engine.py`;渲染器消费快照;应用负责串联。
 - **bot 是外部智能体,不是游戏功能。** 游戏只通过 `BotInterface` 协议与每帧一次的 `tick()` 调用与它交互;渲染器对它一无所知(只绘制 `status_line`)。
 - **共享规则是刻意为之。** 几何原语(`rotate_shape`、`collides`、`drop_y`、`spawn_y`、`cells_in_bounds`)是 `engine.py` 中的模块级纯函数,引擎与 bot 都从同一处导入,模拟语义永远不会漂移。
+- **`TetrisApp` 按职责分组,且三处顺序一致。** 类注解、`__init__` 调用序列与 `_init_*` 帮手方法的顺序完全一致——配置 → 窗口与显示 → 引擎会话 → UI 流程 → 时间源 → 输入 → 渲染 → 音频 → bot——以 `# ---- … ----` 组头标记。新增成员时三处都要加到对应组;此约定无 lint 强制,靠手动维护。
 
 ## 3. 命名约定
 

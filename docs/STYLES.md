@@ -84,6 +84,12 @@ Guidelines:
   (`rotate_shape`, `collides`, `drop_y`, `spawn_y`, `cells_in_bounds`) are
   module-level pure functions in `engine.py` that both the engine and the bot
   import, so simulation semantics can never drift apart.
+- **`TetrisApp` is organized by responsibility, in one canonical order.**
+  Class annotations, the `__init__` call sequence, and the `_init_*` helper
+  methods all follow the same group order — config → window/display → engine
+  session → UI flow → time source → input → rendering → audio → bot — marked
+  by `# ---- … ----` headers. Add a new member to the matching group in all
+  three places. Nothing enforces this automatically; keep it true by hand.
 
 ## 3. Naming Conventions
 
