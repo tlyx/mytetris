@@ -56,8 +56,8 @@ SHAPES_DATA: dict[str, list[tuple[int, int]]] = {
     "Z": [(-1, 0), (0, 0), (0, -1), (1, -1)],
 }
 
-# 七种标准方块类型列表（用于7-bag随机生成）
-_ALL_PIECES: list[str] = ["I", "O", "T", "L", "J", "S", "Z"]
+# 七种标准方块类型列表（用于7-bag随机生成），派生自 SHAPES_DATA 键（单一来源）
+_ALL_PIECES: list[str] = list(SHAPES_DATA)
 
 # ----------------- Wall kick / spawn related constants -----------------
 # 一组紧凑实用的踢位偏移：旋转碰撞时依次尝试。并非完整的 SRS 实现，
