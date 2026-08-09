@@ -1,4 +1,4 @@
-# state_handlers.py — 基于状态模式的事件分发处理器
+# ui_states.py — UI 流程状态机（状态模式）
 #
 # 此文件主要负责：
 #  - 状态机：Playing / Paused / GameOver / ConfirmQuit / Help

@@ -31,7 +31,7 @@ class GameState:
     # 最高分（持久化）
     high_score: int
 
-    # 游戏开始时刻的ticks，用于计算游戏时长
+    # 游戏开始时刻的 ticks，用于计算游戏时长
     game_start_ticks: int
 
     # 状态标志

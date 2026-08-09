@@ -7,6 +7,8 @@ from engine import (
     _WALL_KICKS_OTHERS,
     GRID_HEIGHT,
     GRID_WIDTH,
+    LOCK_DELAY_MS,
+    LOCK_RESET_LIMIT,
     MAX_SCORE,
     SHAPES_DATA,
     TetrisEngine,
@@ -268,3 +270,53 @@ def test_combo_bonus_accumulates_and_resets():
     eng.lock_and_clear_lines()
     assert eng.combo == 0
     assert eng.score == 250  # 该块无消行，不加分
+
+
+# ----------------------------------------------------------------------
+# 贴地锁定规则（引擎级：窗口时长 / 重置预算 / 下落计分）
+# ----------------------------------------------------------------------
+
+def test_resting_window_locks_on_expiry():
+    """贴地锁定：首次 handle_resting 记录时刻，满 LOCK_DELAY_MS 返回锁定信号。"""
+    eng = TetrisEngine()
+    eng.reset()
+    while eng.move(0, -1):  # 贴底
+        pass
+    assert eng.handle_resting(0) is False
+    assert eng.resting_since == 0
+    assert eng.handle_resting(100) is False  # 窗口内
+    assert eng.handle_resting(LOCK_DELAY_MS) is True  # 窗口满 → 应锁定
+    assert eng.resting_since is None  # 信号发出后已清除
+
+
+def test_lock_reset_budget_capped():
+    """锁定重置预算：贴地期间 15 次移动重置后，第 16 次不再重置计时。"""
+    eng = TetrisEngine()
+    eng.reset()
+    while eng.move(0, -1):  # 贴底
+        pass
+    eng.handle_resting(0)  # 开始贴地计时
+    for _ in range(LOCK_RESET_LIMIT):
+        eng.reset_lock_delay(count=True)
+    assert eng.lock_resets == LOCK_RESET_LIMIT
+    # 预算耗尽：第 16 次移动不再重置（resting_since 保持 0，计时继续走）
+    eng.handle_resting(0)
+    eng.reset_lock_delay(count=True)
+    assert eng.resting_since == 0
+    # 空中移动不计预算
+    eng2 = TetrisEngine()
+    eng2.reset()
+    eng2.reset_lock_delay(count=True)
+    assert eng2.lock_resets == 0
+
+
+def test_drop_scoring_in_engine():
+    """软降/硬降计分由引擎完成（指南标准：软降 +1/格，硬降 +2/格）。"""
+    eng = TetrisEngine()
+    eng.reset()
+    assert eng.soft_drop() is True
+    assert eng.score == 1  # 软降一格 +1
+    s0 = eng.score
+    distance = eng.hard_drop()
+    assert eng.score == s0 + 2 * distance  # 硬降每格 +2
+    assert eng.soft_drop() is False  # 已贴底，软降失败

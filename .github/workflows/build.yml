@@ -3,13 +3,14 @@ name: Build
 on:
   push:
     branches:
-      - main     # 🎯 main 分支推送：ubuntu 测试（免费）+ Nightly DMG（macOS）
+      - main     # 🎯 main 分支推送：ubuntu 测试（免费）＋macOS DMG 手动触发
     paths-ignore:
       - '**/*.md'   # 文档改动不触发构建（README / STYLES / 任何层级）
       - 'LICENSE'
       - '.gitignore'
       - '.aiderignore'
       - 'screenshots/**'
+  workflow_dispatch:  # 🖐️ 手动触发：Actions 页 → Build → Run workflow
 
 # 🔒 严格遵循“最小权限原则”：全局不赋予任何写权限，默认全只读。
 permissions:
@@ -41,7 +42,9 @@ jobs:
   build-macos:
     name: Nightly macOS DMG
     runs-on: macos-latest
-    if: github.ref_type != 'tag'   # 发版打包由 release.yml 负责，tag 推送不重复构建
+    # 仅手动触发时构建：push 只跑 ubuntu 测试，DMG 由 Actions 页
+    # Run workflow 手动触发（tag 发版打包由 release.yml 负责）
+    if: github.event_name == 'workflow_dispatch'
 
     steps:
       # 1. 签出代码仓库（保持深度为 0，防止 spec 内部读 Git 哈希崩溃）

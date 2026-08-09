@@ -24,6 +24,7 @@ class ConfigManager:
     _defaults: ClassVar[dict[str, _ConfigValue]] = {
         "clear_anim_enabled": True,
         "experimental": True,                     # 实验性功能开关，默认为 True
+        "ghost_enabled": False,
         "music_enabled": True,
         "sfx_enabled": True,
         "high_score": 0,
@@ -89,6 +90,17 @@ class ConfigManager:
     @clear_anim_enabled.setter
     def clear_anim_enabled(self, value: bool) -> None:
         self._data["clear_anim_enabled"] = value
+
+    @property
+    def ghost_enabled(self) -> bool:
+        val = self._data["ghost_enabled"]
+        # 运行时应为布尔值，确保类型检查通过
+        assert isinstance(val, bool)
+        return val
+
+    @ghost_enabled.setter
+    def ghost_enabled(self, value: bool) -> None:
+        self._data["ghost_enabled"] = value
 
     # ---------- 实验性功能开关 ----------
     @property

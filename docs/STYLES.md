@@ -50,7 +50,7 @@ and `tests/conftest.py` adds `src` for pytest; pyright resolves via
 
 ```
 main.py → tetris.py (TetrisApp)
-tetris.py → renderer.py, state_handlers.py, input_handler.py,
+tetris.py → renderer.py, ui_states.py, input_handler.py,
             audio_manager.py, config_manager.py, game_state.py,
             bot.py (BotInterface only), engine.py (TetrisEngine)
 bot.py → actions.py, engine.py (shared geometry primitives only)
@@ -63,7 +63,7 @@ renderer.py → game_state.py, engine.py (constants/shapes only)
 | `tetris.py` | App shell: window, event loop, state switching, input routing, bot driving. |
 | `engine.py` | Pure game rules — no graphics dependency, unit-testable in isolation. |
 | `renderer.py` | Draws a `GameState` onto a Surface; never touches the app or the engine. |
-| `state_handlers.py` | State pattern: one handler class per game state. |
+| `ui_states.py` | State pattern: one handler class per app/UI state. |
 | `input_handler.py` | Key → `Action` mapping and DAS/ARR auto-repeat. |
 | `actions.py` | The shared `Action` vocabulary (human input and bot) — pygame-free. |
 | `bot.py` | Bot decision and scheduling; exposes `BotInterface` / `BotRunner` / `BotSnapshot`. |
@@ -116,7 +116,7 @@ Rules:
 - Use `from __future__ import annotations` only where annotations reference
   names that are not available at runtime: forward references or
   `TYPE_CHECKING`-only imports (the one case in this repo is
-  `state_handlers.py`, which annotates with a `TYPE_CHECKING`-imported
+  `ui_states.py`, which annotates with a `TYPE_CHECKING`-imported
   `TetrisEngine` and needs it for Python 3.13). Do not add it everywhere:
   on Python 3.14+ (PEP 649) annotations are lazy by default, so it is a
   no-op there anyway.
@@ -129,7 +129,7 @@ Rules:
   (`GameState`, `BotSnapshot`).
 - Use `typing.ClassVar` for class-level constants that are part of the
   instance contract (`TetrisEngine.SCORE_TABLE`).
-- Use `@override` when overriding a base-class method (see `state_handlers.py`).
+- Use `@override` when overriding a base-class method (see `ui_states.py`).
 - Unused parameters that exist only for signature uniformity are named with a
   leading underscore (`_landing_height`).
 
@@ -198,7 +198,7 @@ imports…
   `bot: BotInterface`; the concrete `BotRunner` is created only in
   `_init_bot`.
 - **No pygame in logic modules.** pygame is confined to the integration
-  layer — `tetris.py`, `renderer.py`, `state_handlers.py`,
+  layer — `tetris.py`, `renderer.py`, `ui_states.py`,
   `input_handler.py`, `audio_manager.py`. Logic modules (`engine.py`,
   `bot.py`, `actions.py`, `game_state.py`, `config_manager.py`,
   `utils.py`) never import pygame; the shared `Action` vocabulary lives

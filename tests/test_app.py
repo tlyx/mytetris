@@ -8,6 +8,7 @@
 （bot 只是另一个输入源），以及软降/硬降计分等指南标准行为。
 """
 
+import json
 import os
 
 # pygame 无头环境：必须在构造 TetrisApp（初始化显示/音频）之前设置
@@ -15,7 +16,9 @@ os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
 from actions import Action
-from tetris import _LOCK_DELAY_MS, TetrisApp
+from config_manager import ConfigManager
+from engine import LOCK_DELAY_MS
+from tetris import TetrisApp
 
 
 def _app_with_piece_at_bottom() -> TetrisApp:
@@ -40,7 +43,7 @@ def test_fall_timer_applies_when_bot_enabled() -> None:
     app._now = 0
     app.handle_fall_timer()  # 首 tick：进入贴地窗口，不锁定
     assert app.game.current_type == piece_before
-    app._now = _LOCK_DELAY_MS + 100
+    app._now = LOCK_DELAY_MS + 100
     app.handle_fall_timer()  # 窗口已满 → 锁定
     assert app.game.current_type != piece_before  # 与 bot 关闭时一致
     assert not app.game.game_over
@@ -82,7 +85,7 @@ def test_fall_timer_locks_when_bot_disabled() -> None:
     app._now = 0
     app.handle_fall_timer()                      # 首 tick：进入贴地窗口，不锁定
     assert app.game.current_type == piece_before
-    app._now = _LOCK_DELAY_MS + 100
+    app._now = LOCK_DELAY_MS + 100
     app.handle_fall_timer()                      # 窗口已满 → 锁定
     assert app.game.current_type != piece_before  # 已锁定并生成新块
     assert app.game.total_lines == lines_before   # 空盘无消行
@@ -103,7 +106,7 @@ def test_lock_delay_holds_and_resets_on_move() -> None:
     app.handle_fall_timer()               # 400ms < 500ms → 仍不锁定
     assert app.game.current_type == piece_before
 
-    app._now = 400 + _LOCK_DELAY_MS + 100  # 已超窗口
+    app._now = 400 + LOCK_DELAY_MS + 100  # 已超窗口
     app.handle_fall_timer()
     assert app.game.current_type != piece_before  # 锁定并生成新块
 
@@ -132,3 +135,17 @@ def test_lock_delay_reset_budget_capped_at_15() -> None:
     app._now = 2100
     app.handle_fall_timer()  # 2100-1500=600ms >= 500 → 锁定
     assert app.game.current_type != piece_before
+
+
+def test_ghost_enabled_loaded_from_config(tmp_path, monkeypatch) -> None:
+    """ghost 开关启动时读取配置，而非默认 False。
+
+    回归：__init__ 里晚于 _init_config() 的 `self.ghost_enabled = False`
+    会把配置文件里已保存的值冲掉——配置写了但永远不生效。
+    """
+    cfg = tmp_path / "config.json"
+    cfg.write_text(json.dumps({"ghost_enabled": True}))
+    monkeypatch.setattr(ConfigManager, "_config_file", lambda self: cfg)
+    app = TetrisApp()
+    assert app.ghost_enabled is True
+    assert app.config.ghost_enabled is True

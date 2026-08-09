@@ -35,7 +35,7 @@ from renderer import (
     SCREEN_WIDTH,
     Renderer,
 )
-from state_handlers import (
+from ui_states import (
     GameOverState,
     PlayingState,
     StateHandler,
@@ -48,13 +48,6 @@ _MIN_WINDOW_WIDTH = max(
     400,
     LEFT_WIDTH + GRID_WIDTH * BLOCK_SIZE + RIGHT_WIDTH + 50,
 )
-
-# 锁定延迟（毫秒，指南标准）：方块贴地后仍可移动/旋转的操作窗口。
-# 每次成功移动/旋转重置计时；硬降立即锁定，不吃延迟。
-_LOCK_DELAY_MS = 500
-# 锁定延迟重置预算（指南标准）：每块最多 15 次成功移动/旋转重置，
-# 之后即使继续操作也不再延长计时，防止无限拖延。
-_LOCK_RESET_LIMIT = 15
 _MIN_WINDOW_HEIGHT = 400
 
 # ---- 应用图标路径 ----
@@ -72,7 +65,6 @@ class TetrisApp:
     screen: pygame.Surface
     game: TetrisEngine
     fall_event: int
-    current_level: int
     paused: bool
     confirm_quit: bool
     high_score: int
@@ -114,11 +106,6 @@ class TetrisApp:
     # ---- 统一时间源 ----
     _now: int  # 每帧更新，存储当前时间戳
 
-    # 贴地时刻（ticks），锁定延迟计时；None 表示方块未贴地
-    _piece_resting: int | None
-    # 本块已消耗的锁定延迟重置次数（上限 _LOCK_RESET_LIMIT，每块归零）
-    _lock_resets: int
-
     # ---- bot 相关 ----
     bot: BotInterface
     bot_enabled: bool
@@ -156,9 +143,6 @@ class TetrisApp:
         self._font_big = None
         self._font_small = None
         self._help_font = None
-
-        # 默认关闭 ghost piece
-        self.ghost_enabled = False
 
         # 创建渲染器实例
         self.renderer = Renderer()
@@ -220,17 +204,21 @@ class TetrisApp:
         """初始化游戏引擎、定时器、等级、分数、暂停等状态。"""
         self.game = TetrisEngine()
         self.fall_event = pygame.USEREVENT + 1
-        self.current_level = 1
-        self._update_speed()
         self.clock = pygame.time.Clock()
-        self.paused = False
-        self.confirm_quit = False
         self.high_score = 0
-        self.game_start_ticks = pygame.time.get_ticks()
-        self._piece_resting = None  # 贴地时刻（ticks），锁定延迟计时（类级已声明类型）
-        self._lock_resets = 0  # 锁定延迟重置预算（每块 15 次封顶）
         # 注意：music_enabled/sfx_enabled 已移入 config，不再在此处初始化
         self.clear_anim_enabled = True
+        self._reset_round_state()
+
+    def _reset_round_state(self) -> None:
+        """新一局的公共状态：等级/速度、暂停/退出确认、计时、音效/帮助标记。
+
+        启动（_init_game_state）与重开（restart_game）共用同一份初始值。
+        """
+        self._update_speed()
+        self.paused = False
+        self.confirm_quit = False
+        self.game_start_ticks = pygame.time.get_ticks()
         self._game_over_sound_played = False
         self._help_active = False
 
@@ -251,11 +239,12 @@ class TetrisApp:
             print(f"WARNING: Icon file not found, skipping: {_LOGO_FILE}")
 
     def _init_config(self) -> None:
-        """加载配置管理器并覆盖默认设置（音乐、音效、消行动画、最高分）。"""
+        """加载配置管理器并覆盖默认设置（音乐、音效、消行动画、落点影子、最高分）。"""
         self.config = ConfigManager()
         self.config.load()
         # 注意：不再从 config 复制到 self.music_enabled/sfx_enabled，因为属性已代理
         self.clear_anim_enabled = self.config.clear_anim_enabled
+        self.ghost_enabled = self.config.ghost_enabled
         self.high_score = self.config.high_score
 
     # ---- 音频初始化 ----
@@ -299,8 +288,9 @@ class TetrisApp:
         # 不在此处 save，退出时自动保存
 
     def _toggle_ghost(self) -> None:
-        """切换 Ghost piece（落点影子）显示开关。"""
+        """切换 Ghost piece（落点影子）显示开关（随 config 持久化）。"""
         self.ghost_enabled = not self.ghost_enabled
+        self.config.ghost_enabled = self.ghost_enabled
 
     # ---- 输入动作回调（由 InputHandler 调用） ----
 
@@ -317,27 +307,25 @@ class TetrisApp:
         """
         if action == Action.MOVE_LEFT:
             if self.game.move(-1, 0):
-                self._reset_lock_delay(count=True)  # 贴地窗口内移动 → 重置计时（计预算）
+                self.game.reset_lock_delay(count=True)  # 贴地窗口内移动 → 重置计时（计预算）
 
         elif action == Action.MOVE_RIGHT:
             if self.game.move(1, 0):
-                self._reset_lock_delay(count=True)
+                self.game.reset_lock_delay(count=True)
 
         elif action == Action.SOFT_DROP:
-            if self.game.move(0, -1):
-                self.game.add_score(1)  # 软降每格 +1（指南标准）
-                self._reset_lock_delay(count=True)
+            if self.game.soft_drop():
+                self.game.reset_lock_delay(count=True)
             else:
-                self._handle_resting_piece()
+                self._handle_landing()
 
         elif action == Action.HARD_DROP:
-            self._reset_lock_delay()  # 硬降立即锁定，不吃延迟
-            distance = self.game.hard_drop()
-            self.game.add_score(2 * distance)  # 硬降每格 +2（指南标准）
+            self.game.reset_lock_delay()  # 硬降立即锁定，不吃延迟
+            self.game.hard_drop()
             self._lock_and_update()
 
         elif action == Action.ROTATE and self.game.rotate():
-            self._reset_lock_delay(count=True)
+            self.game.reset_lock_delay(count=True)
 
     # -------------------- 公开方法（供状态处理器调用） --------------------
     # 这些方法必须与 AppInterface 协议中的签名一致
@@ -347,7 +335,7 @@ class TetrisApp:
             return
         self.paused = not self.paused
         if self.paused:
-            self._reset_lock_delay()  # 暂停冻结锁定窗口，恢复后重新计时
+            self.game.reset_lock_delay()  # 暂停冻结锁定窗口，恢复后重新计时
             pygame.time.set_timer(self.fall_event, 0)
             self.audio.pause_music()
         else:
@@ -358,32 +346,10 @@ class TetrisApp:
         """处理下落定时器事件（被状态类调用）。
 
         重力对所有模式一视同仁：bot 只是另一个输入源，同样受下落约束。
+        贴地锁定规则（窗口时长/重置预算）由引擎负责。
         """
         if not self.game.move(0, -1):
-            self._handle_resting_piece()
-
-    def _handle_resting_piece(self) -> None:
-        """当前块贴地时管理锁定延迟：贴地满 _LOCK_DELAY_MS 才锁定。
-
-        贴地后移动/旋转会重置计时（_reset_lock_delay），硬降不受影响。
-        """
-        if self._piece_resting is None:
-            self._piece_resting = self._now
-        elif self._now - self._piece_resting >= _LOCK_DELAY_MS:
-            self._piece_resting = None
-            self._lock_and_update()
-
-    def _reset_lock_delay(self, count: bool = False) -> None:
-        """重置贴地计时（成功移动/旋转/切换暂停时调用）。
-
-        :param count: 是否计入 15 次重置预算。仅贴地期间的成功移动/旋转
-            计入（预算约束落地后的微调次数）；暂停、硬降不计。
-        """
-        if count and self._piece_resting is not None:
-            if self._lock_resets >= _LOCK_RESET_LIMIT:
-                return  # 预算耗尽：不再重置，计时走完后锁定
-            self._lock_resets += 1
-        self._piece_resting = None
+            self._handle_landing()
 
     def toggle_help(self) -> None:
         """切换帮助界面的显示/隐藏。"""
@@ -398,15 +364,7 @@ class TetrisApp:
     def restart_game(self) -> None:
         """重置游戏所有状态，回到新游戏初始状态。"""
         self.game.reset()
-        self.current_level = 1
-        self._update_speed()
-        self.paused = False
-        self.confirm_quit = False
-        self.game_start_ticks = pygame.time.get_ticks()
-        self._game_over_sound_played = False
-        self._help_active = False
-        self._piece_resting = None
-        self._lock_resets = 0  # 新局重置锁定延迟预算
+        self._reset_round_state()
         self.input_handler.reset()
         # 状态切回 Playing
         self._current_state = PlayingState()
@@ -443,15 +401,9 @@ class TetrisApp:
     # ------------------------------------
 
     def _update_speed(self) -> None:
-        """根据等级计算下落速度，使用 engine 中的统一公式。"""
+        """根据等级计算下落速度，使用 engine 中的统一公式（等级变更后调用）。"""
         speed = TetrisEngine.fall_speed(self.game.level)
         pygame.time.set_timer(self.fall_event, speed)
-        self.current_level = self.game.level
-
-    def _check_level_upgrade(self) -> None:
-        """如果等级发生变化则更新下落速度"""
-        if self.game.level != self.current_level:
-            self._update_speed()
 
     def _update_high_score(self) -> None:
         """实时更新最高分（内存中）。退出时统一保存配置。
@@ -463,18 +415,24 @@ class TetrisApp:
             self.high_score = min(self.game.score, MAX_SCORE)
             self.config.high_score = self.high_score
 
+    def _handle_landing(self) -> None:
+        """方块无法下移：推进贴地锁定计时，窗口耗尽则锁定并结算。
+
+        软降失败与重力下落失败共用同一路径（贴地规则在引擎内）。
+        """
+        if self.game.handle_resting(self._now):
+            self._lock_and_update()
+
     def _lock_and_update(self) -> None:
         """锁定当前方块，清除满行，更新分数、等级、音效。"""
         if self.game.game_over:
             return
-        self._piece_resting = None  # 锁定后新块出生，贴地计时作废
-        self._lock_resets = 0  # 新块重置锁定延迟预算
         prev_lines = self.game.total_lines
         self.game.lock_and_clear_lines()
         if self.game.total_lines > prev_lines:
             self.audio.play_sfx("clear")  # 直接委托给 AudioManager
         self._update_high_score()
-        self._check_level_upgrade()
+        self._update_speed()  # 等级可能已变化（set_timer 幂等，未变时无副作用）
 
     def _build_game_state(self) -> GameState:
         """从当前游戏状态创建一个只读快照。"""
@@ -630,7 +588,7 @@ class TetrisApp:
                     print("BOT: experimental mode is disabled, cannot toggle bot")
                     continue
                 self.bot_enabled = not self.bot_enabled
-                self._piece_resting = None  # 切换接管/交还时清掉贴地计时
+                self.game.reset_lock_delay()  # 切换接管/交还时清掉贴地计时
                 if self.bot_enabled:
                     self._bot_was_enabled = True  # 记录 bot 曾启用
                     self.bot.start()

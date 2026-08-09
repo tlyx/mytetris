@@ -24,6 +24,13 @@ _MIN_SPEED = 100                  # 速度下限（最快）
 _MAX_LEVEL = (_MAX_INITIAL_SPEED - _MIN_SPEED) // _SPEED_DECREASE + 1   # =14
 # ---------------------------------------
 
+# ---------- 锁定延迟（指南标准） ----------
+# 方块贴地后仍可移动/旋转的操作窗口；每次成功移动/旋转重置计时，
+# 但每块最多重置 15 次（预算耗尽后不再延长），硬降立即锁定不吃延迟。
+LOCK_DELAY_MS = 500
+LOCK_RESET_LIMIT = 15
+# ---------------------------------------
+
 COLORS: dict[str, tuple[int, int, int]] = {
     "BACKGROUND": (10, 12, 15),
     "GRID_LINE": (30, 33, 40),
@@ -184,6 +191,10 @@ class TetrisEngine:
     # 当前方块的唯一实例 id：每次生成新块 +1。
     # 用于区分"同类型但不同的块"（bot 靠它识别换块，而非方块类型）。
     piece_id: int
+    # 贴地时刻（ticks），锁定延迟计时；None 表示方块未贴地
+    resting_since: int | None
+    # 本块已消耗的锁定延迟重置次数（上限 LOCK_RESET_LIMIT，每块归零）
+    lock_resets: int
     # 7-bag 相关
     _bag: list[str]
 
@@ -191,24 +202,10 @@ class TetrisEngine:
     _last_cleared_rows: list[int]
 
     def __init__(self) -> None:
-        """初始化网格与属性，并立即调用 reset 开始第一局。"""
-        self.grid = []
-        self.score = 0
-        self.level = 1
-        self.total_lines = 0
-        self.combo = 0
-        self.game_over = False
-        self.next_type = ""
-        self.current_type = ""
-        self.current_shape = []
-        self.x = 0
-        self.y = 0
-        # 旋转状态 0..3（0 = 生成朝向）。记录下来以备未来
-        # SRS 式踢表与确定性的旋转行为。
-        self.rotation = 0
-        self.piece_id = 0
-        self._bag = []
-        self._last_cleared_rows = []
+        """初始化引擎并立即开始第一局（reset 负责全部规则状态）。"""
+        # 仅在实例创建时初始化一次、且 reset 不负责的状态：
+        self.piece_id = 0  # _spawn_piece 会自增，需先有初值
+        self._last_cleared_rows = []  # 消行动画记录（reset 不重置）
         self.reset()
 
     def reset(self) -> None:
@@ -219,13 +216,10 @@ class TetrisEngine:
         self.total_lines = 0
         self.combo = 0
         self.game_over = False
-        # 清空 bag 并重新填充
-        self._bag = []
+        # 重新填充 bag（_refill_bag 全量写入），取出第一个方块
         self._refill_bag()
-        # 从 bag 中取出第一个方块作为 next_type
         self.next_type = self._draw_from_bag()
-        # 重置旋转状态并生成第一个方块
-        self.rotation = 0
+        # 生成第一个方块（_spawn_piece 内部重置旋转状态）
         self._spawn_piece()
 
     def move(self, dx: int, dy: int) -> bool:
@@ -241,11 +235,25 @@ class TetrisEngine:
         return False
 
     def hard_drop(self) -> int:
-        """硬降：将当前块垂直落到底部，返回落下的格数（计分用）。"""
+        """硬降：将当前块垂直落到底部，返回落下的格数（计分用）。
+
+        每落一格 +2 分（指南标准），由引擎统一计分。
+        """
         distance = 0
         while self.move(0, -1):
             distance += 1
+        self.add_score(2 * distance)  # 硬降每格 +2（指南标准）
         return distance
+
+    def soft_drop(self) -> bool:
+        """软降一格：成功则 +1 分（指南标准）并返回 True。
+
+        与 move(0, -1) 的区别：软降是玩家主动下移，计软降分。
+        """
+        if self.move(0, -1):
+            self.add_score(1)  # 软降每格 +1（指南标准）
+            return True
+        return False
 
     def add_score(self, points: int) -> None:
         """增加分数并封顶到 MAX_SCORE。"""
@@ -318,8 +326,10 @@ class TetrisEngine:
             combo_bonus = 0
 
         # 使用类常量 SCORE_TABLE
+        # lines_cleared ∈ 0..4（tetromino 在 10 宽网格中单行至多占 4 格），
+        # 直接索引：若未来引入更宽的块导致越界，KeyError 立即暴露而非静默按 4 行计分
         self.add_score(
-            TetrisEngine.SCORE_TABLE.get(lines_cleared, 800) * self.level + combo_bonus
+            TetrisEngine.SCORE_TABLE[lines_cleared] * self.level + combo_bonus
         )
 
         # 更新等级
@@ -334,6 +344,33 @@ class TetrisEngine:
                 self.grid.append([None for _ in range(GRID_WIDTH)])
 
         self._spawn_piece()
+
+    def reset_lock_delay(self, count: bool = False) -> None:
+        """重置贴地计时（成功移动/旋转/切换暂停时调用）。
+
+        :param count: 是否计入 LOCK_RESET_LIMIT 重置预算。仅方块贴地
+            （无法下移）时的成功移动/旋转计入——预算约束落地后的微调
+            次数；空中移动、暂停、硬降不计。
+        """
+        if count and self._check_collision(self.x, self.y - 1):
+            if self.lock_resets >= LOCK_RESET_LIMIT:
+                return  # 预算耗尽：不再重置，计时走完后锁定
+            self.lock_resets += 1
+        self.resting_since = None
+
+    def handle_resting(self, now: int) -> bool:
+        """当前块贴地时推进锁定延迟计时。
+
+        首次调用记录贴地时刻；贴地满 LOCK_DELAY_MS 后返回 True（应由
+        调用方锁定）。贴地期间的成功移动/旋转经 reset_lock_delay 重置计时。
+        """
+        if self.resting_since is None:
+            self.resting_since = now
+            return False
+        if now - self.resting_since >= LOCK_DELAY_MS:
+            self.resting_since = None
+            return True
+        return False
 
     def get_piece_cells(self) -> list[tuple[int, int]]:
         """返回当前方块各格的绝对坐标（内部底部原点坐标系）。"""
@@ -381,6 +418,9 @@ class TetrisEngine:
         self.current_shape = list(SHAPES_DATA[self.current_type])
         self.next_type = self._draw_from_bag()
         self.piece_id += 1
+        # 新块出生：贴地计时与重置预算清零
+        self.resting_since = None
+        self.lock_resets = 0
 
         # 水平居中 spawn（基于 piece 的 bounding box）
         min_px = min(px for px, _ in self.current_shape)

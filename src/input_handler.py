@@ -32,6 +32,12 @@ class InputHandler:
         self._key_last_action_time: dict[int, int] = {}
 
     # ---------- 首次按键处理 ----------
+    def _trigger_hold(self, key: int, action: Action, now: int) -> None:
+        """触发按住型动作（方向键/软降）并记录计时，供 DAS/ARR 使用。"""
+        self._callback(action)
+        self._key_pressed_time[key] = now
+        self._key_last_action_time[key] = now
+
     def handle_keydown(self, key: int, now: int) -> None:
         """处理第一次按下方向键或动作键。
 
@@ -41,17 +47,11 @@ class InputHandler:
         if key == pygame.K_UP:
             self._callback(Action.ROTATE)
         elif key == pygame.K_LEFT:
-            self._callback(Action.MOVE_LEFT)
-            self._key_pressed_time[pygame.K_LEFT] = now
-            self._key_last_action_time[pygame.K_LEFT] = now
+            self._trigger_hold(pygame.K_LEFT, Action.MOVE_LEFT, now)
         elif key == pygame.K_RIGHT:
-            self._callback(Action.MOVE_RIGHT)
-            self._key_pressed_time[pygame.K_RIGHT] = now
-            self._key_last_action_time[pygame.K_RIGHT] = now
+            self._trigger_hold(pygame.K_RIGHT, Action.MOVE_RIGHT, now)
         elif key == pygame.K_DOWN:
-            self._callback(Action.SOFT_DROP)
-            self._key_pressed_time[pygame.K_DOWN] = now
-            self._key_last_action_time[pygame.K_DOWN] = now
+            self._trigger_hold(pygame.K_DOWN, Action.SOFT_DROP, now)
         elif key == pygame.K_SPACE:
             self._callback(Action.HARD_DROP)
 
