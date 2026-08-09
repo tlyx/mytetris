@@ -275,9 +275,8 @@ def make_snapshot(
     return BotSnapshot(
         grid=[row[:] for row in eng.grid],
         current_type=eng.current_type,
-        current_shape=eng.current_shape.copy(),
         current_x=eng.x,
-        current_y=eng.y,
+        rotation=eng.rotation,
         next_type=eng.next_type,
         level=eng.level,
         game_over=eng.game_over,
@@ -309,7 +308,7 @@ def test_plan_to_actions_locks_piece() -> None:
         SHAPES_DATA.get(eng.next_type),
     )
     assert plan is not None
-    actions = _plan_to_actions(plan, eng.x)
+    actions = _plan_to_actions(plan, eng.x, eng.rotation)
     # 动作序列 = 旋转×n + 水平移动 + 硬降
     assert actions[-1] == Action.HARD_DROP
     assert actions.count(Action.HARD_DROP) == 1
@@ -321,16 +320,16 @@ def test_plan_to_actions_locks_piece() -> None:
 
 def test_plan_to_actions_sequence() -> None:
     """动作序列方向与数量正确：target_x 偏右→MOVE_RIGHT，偏左→MOVE_LEFT。"""
-    assert _plan_to_actions((2, 6), 3) == [
+    assert _plan_to_actions((2, 6), 3, 0) == [
         Action.ROTATE, Action.ROTATE,
         Action.MOVE_RIGHT, Action.MOVE_RIGHT, Action.MOVE_RIGHT,
         Action.HARD_DROP,
     ]
-    assert _plan_to_actions((0, 2), 6) == [
+    assert _plan_to_actions((0, 2), 6, 0) == [
         Action.MOVE_LEFT, Action.MOVE_LEFT, Action.MOVE_LEFT, Action.MOVE_LEFT,
         Action.HARD_DROP,
     ]
-    assert _plan_to_actions((1, 4), 4) == [Action.ROTATE, Action.HARD_DROP]
+    assert _plan_to_actions((1, 4), 4, 0) == [Action.ROTATE, Action.HARD_DROP]
 
 
 def test_decide_same_piece_no_replan() -> None:
@@ -456,6 +455,27 @@ def test_tick_throttles_one_action_per_frame() -> None:
     assert len(runner.tick(1, lambda: snap)) == 1
     assert len(runner.tick(1, lambda: snap)) == 1
     assert runner.tick(1, lambda: snap) == []
+
+
+def test_plan_to_actions_rotation_is_relative() -> None:
+    """旋转按键按相对量计算：中途接管（当前旋转 ≠ 0）也能正确到位。
+
+    回归：旧实现按绝对旋转数发键——当前旋转 2 时执行 plan rotation=0
+    会不发键（实际应转 2 次），方块停在错误朝向。
+    """
+    # 已就位：不发旋转键
+    assert _plan_to_actions((0, 0), 0, 0) == [Action.HARD_DROP]
+    assert _plan_to_actions((2, 0), 0, 2) == [Action.HARD_DROP]
+    # 当前旋转 2，目标 0 → 转 2 次
+    assert _plan_to_actions((0, 0), 0, 2) == [
+        Action.ROTATE, Action.ROTATE, Action.HARD_DROP,
+    ]
+    # 当前旋转 3，目标 1 → (1-3) % 4 = 2 次旋转 + 水平移动
+    assert _plan_to_actions((1, 5), 3, 3) == [
+        Action.ROTATE, Action.ROTATE,
+        Action.MOVE_RIGHT, Action.MOVE_RIGHT,
+        Action.HARD_DROP,
+    ]
 
 
 def test_runner_thread_emits_actions_and_stops() -> None:

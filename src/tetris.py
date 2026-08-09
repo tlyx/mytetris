@@ -415,9 +415,8 @@ class TetrisApp:
         return BotSnapshot(
             grid=[row[:] for row in self.game.grid],
             current_type=self.game.current_type,
-            current_shape=self.game.current_shape.copy(),
             current_x=self.game.x,
-            current_y=self.game.y,
+            rotation=self.game.rotation,
             next_type=self.game.next_type,
             level=self.game.level,
             game_over=self.game.game_over,

@@ -318,14 +318,18 @@ def _get_strategy(
 
 
 def _plan_to_actions(
-    plan: tuple[int, int], current_x: int
+    plan: tuple[int, int], current_x: int, current_rotation: int
 ) -> list[Action]:
     """把 (rotation, target_x) 计划翻译成按键动作序列（旋转→水平→硬降）。
 
     :param current_x: 快照中当前块的 engine-local x，用于计算水平移动量。
+    :param current_rotation: 快照中当前旋转状态 0..3；旋转按键按相对量
+        计算（(目标 - 当前) % 4），中途接管（方块已被转过）也能正确执行。
     """
-    rotation, target_x = plan
-    actions: list[Action] = [Action.ROTATE] * rotation
+    target_rotation, target_x = plan
+    actions: list[Action] = [Action.ROTATE] * (
+        (target_rotation - current_rotation) % 4
+    )
     dx = target_x - current_x
     if dx > 0:
         actions.extend([Action.MOVE_RIGHT] * dx)
@@ -345,9 +349,9 @@ class BotSnapshot:
 
     grid: list[list[tuple[int, int, int] | None]]
     current_type: str
-    current_shape: list[tuple[int, int]]
     current_x: int
-    current_y: int
+    # 当前旋转状态 0..3（_plan_to_actions 按相对量计算按键次数）
+    rotation: int
     next_type: str
     level: int
     game_over: bool
@@ -561,7 +565,7 @@ class BotRunner:
             return []
         return [
             (snap.piece_id, action)
-            for action in _plan_to_actions(plan, snap.current_x)
+            for action in _plan_to_actions(plan, snap.current_x, snap.rotation)
         ]
 
     def _drop_pending(self) -> None:
