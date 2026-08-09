@@ -1,4 +1,4 @@
-# tetris.py — 我的方块专业版（macOS Lab）
+# tetris.py — 应用外壳：窗口、事件循环、状态机与组合根
 #
 # 设计目标：使用逻辑表面（_logical）独立于物理窗口尺寸，
 # 保证所有文字与方块在视网膜屏上依然清晰。
@@ -62,102 +62,120 @@ _HELP_FONT_FILE = resource_path("assets/fonts/DejaVuSansMono.ttf")
 @final
 class TetrisApp:
     """我的方块主应用程序类，负责窗口管理、事件循环和音频控制。"""
+
+    # ---- 配置（最先加载，各组件按配置构造） ----
+    config: ConfigManager
+
+    # ---- 窗口与显示 ----
     screen: pygame.Surface
-    game: TetrisEngine
-    fall_event: int
-    paused: bool
-    confirm_quit: bool
-    high_score: int
-    game_start_ticks: int
-    clock: pygame.time.Clock
-    sidebar_bg: tuple[int, int, int]
     window_width: int
     window_height: int
     _logical: pygame.Surface | None
-    # 音频相关（委托给 AudioManager）
-    audio: AudioManager
-    _game_over_sound_played: bool
+    sidebar_bg: tuple[int, int, int]  # 窗口背景色
+
+    # ---- 游戏引擎与会话 ----
+    game: TetrisEngine
+    fall_event: int  # 重力下落定时器事件
+    clock: pygame.time.Clock
+    high_score: int
+    game_start_ticks: int
+
+    # ---- UI 流程状态（状态机 + 标志） ----
+    _current_state: StateHandler
+    paused: bool
+    confirm_quit: bool
+    _help_active: bool
+
+    # ---- 统一时间源 ----
+    _now: int  # 每帧更新，存储当前时间戳
+
+    # ---- 输入 ----
+    input_handler: InputHandler
+
+    # ---- 渲染 ----
+    renderer: Renderer
     # 字体缓存（基于 scale 懒加载）
     _current_scale: float
     _font_big: pygame.font.Font | None
     _font_small: pygame.font.Font | None
     _help_font: pygame.font.Font | None
-    # HELP 相关
-    _help_active: bool
 
-    # Ghost piece 开关
+    # ---- 音频 ----
+    audio: AudioManager
+    _game_over_sound_played: bool
+
+    # ---- 显示开关 ----
     ghost_enabled: bool
-
-    # 消行动画开关
     clear_anim_enabled: bool
 
-    # ---- 输入处理器 ----
-    input_handler: InputHandler
-
-    # ---- 渲染器实例 ----
-    renderer: Renderer
-
-    # ---- 配置管理器 ----
-    config: ConfigManager
-
-    # ---- 当前状态处理器（状态模式） ----
-    _current_state: StateHandler
-
-    # ---- 统一时间源 ----
-    _now: int  # 每帧更新，存储当前时间戳
-
-    # ---- bot 相关 ----
+    # ---- bot ----
     bot: BotInterface
     bot_enabled: bool
     _bot_was_enabled: bool  # 标记 bot 是否曾被启用过（用于决定是否保存配置）
 
-    @property
-    def now(self) -> int:
-        """返回当前帧的时间戳（毫秒），供状态处理器和输入处理器使用。"""
-        return self._now
-
+    # -------------------- 构造与初始化 --------------------
     def __init__(self) -> None:
-        """初始化 Pygame、窗口、字体、游戏引擎、音频等。"""
+        """初始化 Pygame、窗口、游戏引擎、输入、渲染、配置、音频与 bot。
+
+        初始化顺序与类注解分组一致（窗口 → 引擎会话 → UI 流程 → 时间源
+        → 输入 → 渲染 → 配置 → 音频 → bot）。
+        """
         pygame.init()
+
+        # ---- 配置（最先加载，各组件按配置构造） ----
+        self._init_config()
+
+        # ---- 窗口与显示 ----
         self._init_display_sizes()
         self._init_window_and_surfaces()
-        self._init_input()          # 输入初始化（包含 input_handler 创建）
-        self._init_game_state()
         self._init_sidebar_style()
         self._enforce_min_size()
         TetrisApp._init_icon()
+        pygame.mouse.set_visible(True)  # 初始时鼠标可见（不再全局隐藏）
 
-        # ---- 加载配置（包含音乐/音效开关） ----
-        self._init_config()
+        # ---- 游戏引擎与会话 ----
+        self._init_game_state()
 
-        # ---- 初始化音频（包含 AudioManager 创建与开关同步） ----
-        self._init_audio()
-
-        # ---- 初始化状态处理器（默认 Playing） ----
+        # ---- UI 流程状态（默认 Playing） ----
         self._current_state = PlayingState()
 
-        # 初始时鼠标可见（不再全局隐藏）
-        pygame.mouse.set_visible(True)
-        # 字体缓存初始化
+        # ---- 统一时间源 ----
+        self._now = 0
+
+        # ---- 输入 ----
+        self._init_input()  # 输入初始化（包含 input_handler 创建）
+
+        # ---- 渲染 ----
+        self.renderer = Renderer()
+        # 字体缓存初始化（基于 scale 懒加载）
         self._current_scale = 0.0
         self._font_big = None
         self._font_small = None
         self._help_font = None
 
-        # 创建渲染器实例
-        self.renderer = Renderer()
+        # ---- 音频 ----
+        self._init_audio()
 
-        # 初始化时间
-        self._now = 0
-
-        # ---------- BOT 状态 ----------
+        # ---- bot ----
         self._init_bot()
-        # -------------------------------
 
     # ------------------------------------------------------------------
-    # 初始化辅助方法 (将 __init__ 按功能拆分)
+    # 初始化辅助方法 (将 __init__ 按功能拆分，分组与 __init__ 内注释一致)
     # ------------------------------------------------------------------
+    # ---- 配置（最先加载，各组件按配置构造） ----
+    def _init_config(self) -> None:
+        """最先加载配置：显示开关（消行动画/落点影子）与最高分以此为唯一来源。
 
+        ConfigManager 自带默认值，无需先设默认再覆盖。
+        """
+        self.config = ConfigManager()
+        self.config.load()
+        # 注意：不再从 config 复制到 self.music_enabled/sfx_enabled，因为属性已代理
+        self.clear_anim_enabled = self.config.clear_anim_enabled
+        self.ghost_enabled = self.config.ghost_enabled
+        self.high_score = self.config.high_score
+
+    # ---- 窗口与显示 ----
     def _init_display_sizes(self) -> None:
         """计算初始窗口尺寸（消除黑边）。"""
         display_info = pygame.display.Info()
@@ -189,38 +207,8 @@ class TetrisApp:
         self.screen = pygame.display.set_mode(
             (self.window_width, self.window_height), pygame.RESIZABLE
         )
-        pygame.display.set_caption("MyTetris Professional - macOS Lab")
+        pygame.display.set_caption("MyTetris")
         self._logical = None   # 逻辑表面，渲染时按比例缩放
-
-    def _init_input(self) -> None:
-        """设置按键重复参数并创建输入处理器。"""
-        # 关闭全局自动重复，所有方向键的自动重复由 InputHandler 实现
-        pygame.key.set_repeat(0)
-
-        # 创建输入处理器，绑定按键回调
-        self.input_handler = InputHandler(self._on_input_action)
-
-    def _init_game_state(self) -> None:
-        """初始化游戏引擎、定时器、等级、分数、暂停等状态。"""
-        self.game = TetrisEngine()
-        self.fall_event = pygame.USEREVENT + 1
-        self.clock = pygame.time.Clock()
-        self.high_score = 0
-        # 注意：music_enabled/sfx_enabled 已移入 config，不再在此处初始化
-        self.clear_anim_enabled = True
-        self._reset_round_state()
-
-    def _reset_round_state(self) -> None:
-        """新一局的公共状态：等级/速度、暂停/退出确认、计时、音效/帮助标记。
-
-        启动（_init_game_state）与重开（restart_game）共用同一份初始值。
-        """
-        self._update_speed()
-        self.paused = False
-        self.confirm_quit = False
-        self.game_start_ticks = pygame.time.get_ticks()
-        self._game_over_sound_played = False
-        self._help_active = False
 
     def _init_sidebar_style(self) -> None:
         """设置侧边栏背景色（灰蓝色调）。"""
@@ -238,16 +226,36 @@ class TetrisApp:
         else:
             print(f"WARNING: Icon file not found, skipping: {_LOGO_FILE}")
 
-    def _init_config(self) -> None:
-        """加载配置管理器并覆盖默认设置（音乐、音效、消行动画、落点影子、最高分）。"""
-        self.config = ConfigManager()
-        self.config.load()
-        # 注意：不再从 config 复制到 self.music_enabled/sfx_enabled，因为属性已代理
-        self.clear_anim_enabled = self.config.clear_anim_enabled
-        self.ghost_enabled = self.config.ghost_enabled
-        self.high_score = self.config.high_score
+    # ---- 游戏引擎与会话 ----
+    def _init_game_state(self) -> None:
+        """初始化游戏引擎、下落定时器与时钟（回合公共状态由 _reset_round_state 提供）。"""
+        self.game = TetrisEngine()
+        self.fall_event = pygame.USEREVENT + 1
+        self.clock = pygame.time.Clock()
+        self._reset_round_state()
 
-    # ---- 音频初始化 ----
+    def _reset_round_state(self) -> None:
+        """新一局的公共状态：等级/速度、暂停/退出确认、计时、音效/帮助标记。
+
+        启动（_init_game_state）与重开（restart_game）共用同一份初始值。
+        """
+        self._update_speed()
+        self.paused = False
+        self.confirm_quit = False
+        self.game_start_ticks = pygame.time.get_ticks()
+        self._game_over_sound_played = False
+        self._help_active = False
+
+    # ---- 输入 ----
+    def _init_input(self) -> None:
+        """设置按键重复参数并创建输入处理器。"""
+        # 关闭全局自动重复，所有方向键的自动重复由 InputHandler 实现
+        pygame.key.set_repeat(0)
+
+        # 创建输入处理器，绑定按键回调
+        self.input_handler = InputHandler(self._on_input_action)
+
+    # ---- 音频 ----
     def _init_audio(self) -> None:
         """创建 AudioManager 实例并同步配置中的开关状态。"""
         self.audio = AudioManager()
@@ -255,7 +263,7 @@ class TetrisApp:
         self.audio.set_music_enabled(self.config.music_enabled)
         self.audio.set_sfx_enabled(self.config.sfx_enabled)
 
-    # ---- BOT 初始化 ----
+    # ---- bot ----
     def _init_bot(self) -> None:
         """创建新的 bot 运行器（默认关闭，线程未启动）。"""
         # 首次调用时 self.bot 尚不存在，故用 getattr 兜底；
@@ -267,67 +275,12 @@ class TetrisApp:
         self.bot_enabled = False
         self._bot_was_enabled = False
 
-    def cycle_bot_strategy(self) -> None:
-        """循环切换 bot 评估策略（experimental，同 bot 开关）。"""
-        name = self.bot.cycle_strategy()
-        print("BOT strategy:", name)
+    # -------------------- 公开 API(状态处理器契约) --------------------
+    @property
+    def now(self) -> int:
+        """返回当前帧的时间戳（毫秒），供状态处理器和输入处理器使用。"""
+        return self._now
 
-    # ---- 音频控制（直接操作 config，委托给 AudioManager） ----
-    def _toggle_music(self) -> None:
-        """切换背景音乐的开关（M键）。"""
-        new_state = not self.config.music_enabled
-        self.config.music_enabled = new_state
-        self.audio.set_music_enabled(new_state)
-        # 不在此处 save，退出时自动保存
-
-    def _toggle_sfx(self) -> None:
-        """切换音效的开关（S键）。"""
-        new_state = not self.config.sfx_enabled
-        self.config.sfx_enabled = new_state
-        self.audio.set_sfx_enabled(new_state)
-        # 不在此处 save，退出时自动保存
-
-    def _toggle_ghost(self) -> None:
-        """切换 Ghost piece（落点影子）显示开关（随 config 持久化）。"""
-        self.ghost_enabled = not self.ghost_enabled
-        self.config.ghost_enabled = self.ghost_enabled
-
-    # ---- 输入动作回调（由 InputHandler 调用） ----
-
-    def _on_input_action(self, action: Action) -> None:
-        """人类键盘输入回调（InputHandler 调用）；bot 模式下忽略人类按键。"""
-        if self.bot_enabled:
-            return
-        self._apply_action(action)
-
-    def _apply_action(self, action: Action) -> None:
-        """执行一个游戏动作（人类与 bot 共用同一路径）。
-
-        含软降/硬降计分、锁定延迟重置/触发——与按键语义完全一致。
-        """
-        if action == Action.MOVE_LEFT:
-            if self.game.move(-1, 0):
-                self.game.reset_lock_delay(count=True)  # 贴地窗口内移动 → 重置计时（计预算）
-
-        elif action == Action.MOVE_RIGHT:
-            if self.game.move(1, 0):
-                self.game.reset_lock_delay(count=True)
-
-        elif action == Action.SOFT_DROP:
-            if self.game.soft_drop():
-                self.game.reset_lock_delay(count=True)
-            else:
-                self._handle_landing()
-
-        elif action == Action.HARD_DROP:
-            self.game.reset_lock_delay()  # 硬降立即锁定，不吃延迟
-            self.game.hard_drop()
-            self._lock_and_update()
-
-        elif action == Action.ROTATE and self.game.rotate():
-            self.game.reset_lock_delay(count=True)
-
-    # -------------------- 公开方法（供状态处理器调用） --------------------
     # 这些方法必须与 AppInterface 协议中的签名一致
     def toggle_pause(self) -> None:
         """切换暂停状态（被状态类调用）。"""
@@ -381,27 +334,63 @@ class TetrisApp:
         pygame.mouse.set_visible(True)
         pygame.quit()
         sys.exit()
-    # ------------------------------------------------------------------
 
-    # ---------- 窗口尺寸辅助方法 ----------
-    @staticmethod
-    def _clamp_size(w: int, h: int) -> tuple[int, int]:
-        """返回不小于最小尺寸的窗口宽高。"""
-        return max(w, _MIN_WINDOW_WIDTH), max(h, _MIN_WINDOW_HEIGHT)
+    # -------------------- 输入与游戏动作 --------------------
+    # ---- 输入动作回调（由 InputHandler 调用） ----
+    def _on_input_action(self, action: Action) -> None:
+        """人类键盘输入回调（InputHandler 调用）；bot 模式下忽略人类按键。"""
+        if self.bot_enabled:
+            return
+        self._apply_action(action)
 
-    def _enforce_min_size(self) -> None:
-        """确保当前窗口不小于最小尺寸。"""
-        current_w, current_h = self.screen.get_size()
-        new_w, new_h = self._clamp_size(current_w, current_h)
-        if (new_w, new_h) != (current_w, current_h):
-            self.screen = pygame.display.set_mode((new_w, new_h), pygame.RESIZABLE)
-            self.window_width = new_w
-            self.window_height = new_h
+    def _apply_action(self, action: Action) -> None:
+        """执行一个游戏动作（人类与 bot 共用同一路径）。
 
-    # ------------------------------------
+        软降/硬降计分在引擎内部完成；此处仅处理锁定延迟重置/触发与落地结算。
+        """
+        if action == Action.MOVE_LEFT:
+            if self.game.move(-1, 0):
+                self.game.reset_lock_delay(count=True)  # 贴地窗口内移动 → 重置计时（计预算）
+
+        elif action == Action.MOVE_RIGHT:
+            if self.game.move(1, 0):
+                self.game.reset_lock_delay(count=True)
+
+        elif action == Action.SOFT_DROP:
+            if self.game.soft_drop():
+                self.game.reset_lock_delay(count=True)
+            else:
+                self._handle_landing()
+
+        elif action == Action.HARD_DROP:
+            self.game.reset_lock_delay()  # 硬降立即锁定，不吃延迟
+            self.game.hard_drop()
+            self._lock_and_update()
+
+        elif action == Action.ROTATE and self.game.rotate():
+            self.game.reset_lock_delay(count=True)
+
+    def _handle_landing(self) -> None:
+        """方块无法下移：推进贴地锁定计时，窗口耗尽则锁定并结算。
+
+        软降失败与重力下落失败共用同一路径（贴地规则在引擎内）。
+        """
+        if self.game.handle_resting(self._now):
+            self._lock_and_update()
+
+    def _lock_and_update(self) -> None:
+        """锁定当前方块并消行（分数/等级由引擎结算），随后更新最高分、下落速度与音效。"""
+        if self.game.game_over:
+            return
+        prev_lines = self.game.total_lines
+        self.game.lock_and_clear_lines()
+        if self.game.total_lines > prev_lines:
+            self.audio.play_sfx("clear")  # 直接委托给 AudioManager
+        self._update_high_score()
+        self._update_speed()  # 等级可能已变化（set_timer 幂等，未变时无副作用）
 
     def _update_speed(self) -> None:
-        """根据等级计算下落速度，使用 engine 中的统一公式（等级变更后调用）。"""
+        """根据等级计算下落速度（engine 统一公式；set_timer 幂等，可重复调用）。"""
         speed = TetrisEngine.fall_speed(self.game.level)
         pygame.time.set_timer(self.fall_event, speed)
 
@@ -415,25 +404,27 @@ class TetrisApp:
             self.high_score = min(self.game.score, MAX_SCORE)
             self.config.high_score = self.high_score
 
-    def _handle_landing(self) -> None:
-        """方块无法下移：推进贴地锁定计时，窗口耗尽则锁定并结算。
+    # -------------------- Bot --------------------
+    def cycle_bot_strategy(self) -> None:
+        """循环切换 bot 评估策略（experimental，同 bot 开关）。"""
+        name = self.bot.cycle_strategy()
+        print("BOT strategy:", name)
 
-        软降失败与重力下落失败共用同一路径（贴地规则在引擎内）。
-        """
-        if self.game.handle_resting(self._now):
-            self._lock_and_update()
+    def _build_bot_snapshot(self) -> BotSnapshot:
+        """构造投递给 bot 线程的只读快照（grid 行拷贝，线程安全）。"""
+        return BotSnapshot(
+            grid=[row[:] for row in self.game.grid],
+            current_type=self.game.current_type,
+            current_shape=self.game.current_shape.copy(),
+            current_x=self.game.x,
+            current_y=self.game.y,
+            next_type=self.game.next_type,
+            level=self.game.level,
+            game_over=self.game.game_over,
+            piece_id=self.game.piece_id,
+        )
 
-    def _lock_and_update(self) -> None:
-        """锁定当前方块，清除满行，更新分数、等级、音效。"""
-        if self.game.game_over:
-            return
-        prev_lines = self.game.total_lines
-        self.game.lock_and_clear_lines()
-        if self.game.total_lines > prev_lines:
-            self.audio.play_sfx("clear")  # 直接委托给 AudioManager
-        self._update_high_score()
-        self._update_speed()  # 等级可能已变化（set_timer 幂等，未变时无副作用）
-
+    # -------------------- 渲染与窗口 --------------------
     def _build_game_state(self) -> GameState:
         """从当前游戏状态创建一个只读快照。"""
         return GameState(
@@ -462,21 +453,46 @@ class TetrisApp:
             status_line=f"BOT: {self.bot.strategy}" if self.bot_enabled else "",
         )
 
-    def _build_bot_snapshot(self) -> BotSnapshot:
-        """构造投递给 bot 线程的只读快照（grid 行拷贝，线程安全）。"""
-        return BotSnapshot(
-            grid=[row[:] for row in self.game.grid],
-            current_type=self.game.current_type,
-            current_shape=self.game.current_shape.copy(),
-            current_x=self.game.x,
-            current_y=self.game.y,
-            next_type=self.game.next_type,
-            level=self.game.level,
-            game_over=self.game.game_over,
-            piece_id=self.game.piece_id,
+    def _render_game_scene(self) -> None:
+        """渲染一帧：创建/复用逻辑表面、确保字体、构建快照并委托给 Renderer。"""
+        scale = min(
+            self.window_width / SCREEN_WIDTH,
+            self.window_height / SCREEN_HEIGHT,
+        )
+        logical_w = int(SCREEN_WIDTH * scale)
+        logical_h = int(SCREEN_HEIGHT * scale)
+
+        if (self._logical is None
+                or self._logical.get_width() != logical_w
+                or self._logical.get_height() != logical_h):
+            self._logical = pygame.Surface((logical_w, logical_h))
+
+        # 字体处理委托给独立方法
+        self._ensure_fonts(scale)
+
+        state = self._build_game_state()
+
+        # 使用统一的当前时间
+        self.renderer.render(state, self._logical, scale, self._now)
+
+        x_off = (self.window_width - logical_w) // 2
+        y_off = (self.window_height - logical_h) // 2
+
+        self.screen.fill(self.sidebar_bg)
+        self.screen.blit(self._logical, (x_off, y_off))
+
+        bs = int(BLOCK_SIZE * scale)
+        left_width_px = int(LEFT_WIDTH * scale)
+        board_left_px = left_width_px
+        board_w_px = GRID_WIDTH * bs
+        board_h_px = GRID_HEIGHT * bs
+
+        # 鼠标隐藏逻辑委托给独立方法
+        TetrisApp._update_mouse_visibility(
+            x_off, y_off, board_left_px, board_w_px, board_h_px,
         )
 
-    # ---- 新拆分的方法：字体加载与鼠标隐藏 ----
+        pygame.display.flip()
 
     def _ensure_fonts(self, scale: float) -> None:
         """确保字体已根据当前缩放比例加载，若字体文件缺失则退出程序。"""
@@ -528,8 +544,30 @@ class TetrisApp:
             if not pygame.mouse.get_visible():
                 pygame.mouse.set_visible(True)
 
-    # ------------------------------------------------------------------
+    def _handle_resize(self, event: pygame.event.Event) -> None:
+        """处理窗口大小改变事件。"""
+        self.window_width, self.window_height = self._clamp_size(event.w, event.h)
+        self.screen = pygame.display.set_mode(
+            (self.window_width, self.window_height), pygame.RESIZABLE
+        )
 
+    # ------------------------------------------------------------------
+    # ---------- 窗口尺寸辅助方法 ----------
+    @staticmethod
+    def _clamp_size(w: int, h: int) -> tuple[int, int]:
+        """返回不小于最小尺寸的窗口宽高。"""
+        return max(w, _MIN_WINDOW_WIDTH), max(h, _MIN_WINDOW_HEIGHT)
+
+    def _enforce_min_size(self) -> None:
+        """确保当前窗口不小于最小尺寸。"""
+        current_w, current_h = self.screen.get_size()
+        new_w, new_h = self._clamp_size(current_w, current_h)
+        if (new_w, new_h) != (current_w, current_h):
+            self.screen = pygame.display.set_mode((new_w, new_h), pygame.RESIZABLE)
+            self.window_width = new_w
+            self.window_height = new_h
+
+    # -------------------- 事件循环 --------------------
     def run(self) -> None:
         """主游戏循环。"""
         while True:
@@ -623,50 +661,24 @@ class TetrisApp:
         self._current_state = new_state
         self._current_state.on_enter(self)
 
-    def _handle_resize(self, event: pygame.event.Event) -> None:
-        """处理窗口大小改变事件。"""
-        self.window_width, self.window_height = self._clamp_size(event.w, event.h)
-        self.screen = pygame.display.set_mode(
-            (self.window_width, self.window_height), pygame.RESIZABLE
-        )
+    # -------------------- 设置开关(音频/显示) --------------------
+    # ---- 音频控制（直接操作 config，委托给 AudioManager） ----
+    def _toggle_music(self) -> None:
+        """切换背景音乐的开关（M键）。"""
+        new_state = not self.config.music_enabled
+        self.config.music_enabled = new_state
+        self.audio.set_music_enabled(new_state)
+        # 不在此处 save，退出时自动保存
 
-    def _render_game_scene(self) -> None:
-        """极致渲染：创建逻辑表面、保证字体、构建状态、委托给 Renderer。"""
-        scale = min(
-            self.window_width / SCREEN_WIDTH,
-            self.window_height / SCREEN_HEIGHT,
-        )
-        logical_w = int(SCREEN_WIDTH * scale)
-        logical_h = int(SCREEN_HEIGHT * scale)
+    def _toggle_sfx(self) -> None:
+        """切换音效的开关（S键）。"""
+        new_state = not self.config.sfx_enabled
+        self.config.sfx_enabled = new_state
+        self.audio.set_sfx_enabled(new_state)
+        # 不在此处 save，退出时自动保存
 
-        if (self._logical is None
-                or self._logical.get_width() != logical_w
-                or self._logical.get_height() != logical_h):
-            self._logical = pygame.Surface((logical_w, logical_h))
+    def _toggle_ghost(self) -> None:
+        """切换 Ghost piece（落点影子）显示开关（随 config 持久化）。"""
+        self.ghost_enabled = not self.ghost_enabled
+        self.config.ghost_enabled = self.ghost_enabled
 
-        # 字体处理委托给独立方法
-        self._ensure_fonts(scale)
-
-        state = self._build_game_state()
-
-        # 使用统一的当前时间
-        self.renderer.render(state, self._logical, scale, self._now)
-
-        x_off = (self.window_width - logical_w) // 2
-        y_off = (self.window_height - logical_h) // 2
-
-        self.screen.fill(self.sidebar_bg)
-        self.screen.blit(self._logical, (x_off, y_off))
-
-        bs = int(BLOCK_SIZE * scale)
-        left_width_px = int(LEFT_WIDTH * scale)
-        board_left_px = left_width_px
-        board_w_px = GRID_WIDTH * bs
-        board_h_px = GRID_HEIGHT * bs
-
-        # 鼠标隐藏逻辑委托给独立方法
-        TetrisApp._update_mouse_visibility(
-            x_off, y_off, board_left_px, board_w_px, board_h_px,
-        )
-
-        pygame.display.flip()
