@@ -50,7 +50,7 @@ and `tests/conftest.py` adds `src` for pytest; pyright resolves via
 
 ```
 main.py → tetris.py (TetrisApp)
-tetris.py → renderer.py, ui_states.py, input_handler.py,
+tetris.py → renderer.py, ui_states.py, keyboard_handler.py,
             audio_manager.py, config_manager.py, contracts.py,
             bot.py (BotRunner), engine.py (TetrisEngine)
 bot.py → contracts.py, engine.py (shared geometry primitives only)
@@ -64,7 +64,7 @@ renderer.py → contracts.py, engine.py (constants/shapes only)
 | `engine.py` | Pure game rules — no graphics dependency, unit-testable in isolation. |
 | `renderer.py` | Draws a `GameState` onto a Surface; never touches the app or the engine. |
 | `ui_states.py` | State pattern: one handler class per app/UI state. |
-| `input_handler.py` | Key → `Action` mapping and DAS/ARR auto-repeat. |
+| `keyboard_handler.py` | Key → `Action` mapping and DAS/ARR auto-repeat. |
 | `contracts.py` | Cross-component contracts: data (`Action`, `GameState`, `BotSnapshot`) and interface protocols (`BotInterface`, `AppInterface`). |
 | `bot.py` | Bot decision and scheduling; exposes `BotRunner` (protocols/snapshot live in `contracts.py`). |
 | `config_manager.py` | `config.json` persistence. |
@@ -204,7 +204,7 @@ imports…
   `_init_bot`.
 - **No pygame in logic modules.** pygame is confined to the integration
   layer — `tetris.py`, `renderer.py`, `ui_states.py`,
-  `input_handler.py`, `audio_manager.py`. Logic modules (`engine.py`,
+  `keyboard_handler.py`, `audio_manager.py`. Logic modules (`engine.py`,
   `bot.py`, `contracts.py`, `config_manager.py`,
   `utils.py`) never import pygame; the shared `Action` vocabulary lives
   in `contracts.py`.

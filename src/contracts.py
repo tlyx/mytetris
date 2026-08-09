@@ -13,11 +13,11 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import TYPE_CHECKING, Protocol
 
-# 仅用于注解；运行时零依赖（type-only 边，避免与 input_handler 的导入环）
+# 仅用于注解；运行时零依赖（type-only 边，避免与 keyboard_handler 的导入环）
 if TYPE_CHECKING:
     from config_manager import ConfigManager
     from engine import TetrisEngine
-    from input_handler import InputHandler
+    from keyboard_handler import KeyboardHandler
 
 
 class Action(Enum):
@@ -123,7 +123,7 @@ class BotInterface(Protocol):
 class AppInterface(Protocol):
     """TetrisApp 对外暴露的接口（供状态处理器调用）。"""
     game: TetrisEngine
-    input_handler: InputHandler
+    keyboard_handler: KeyboardHandler
     config: ConfigManager
     paused: bool
     confirm_quit: bool

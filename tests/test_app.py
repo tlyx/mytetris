@@ -65,7 +65,7 @@ def test_drop_actions_score_points() -> None:
     app.game.reset()
 
     score_before = app.game.score
-    app._on_input_action(Action.SOFT_DROP)
+    app._on_keyboard_action(Action.SOFT_DROP)
     assert app.game.score == score_before + 1  # 软降一格
 
     # 硬降：I 块空盘从生成位落到底（距离 = 生成 y），每格 +2
@@ -73,7 +73,7 @@ def test_drop_actions_score_points() -> None:
     app.game.next_type = "I"
     app.game._spawn_piece()  # pyright: ignore[reportPrivateUsage]
     d_before = app.game.y    # I 的 max_py=0，生成在顶行 y=19
-    app._on_input_action(Action.HARD_DROP)
+    app._on_keyboard_action(Action.HARD_DROP)
     assert app.game.score == 2 * d_before  # I 落到底，距离恰为 d_before
 
 
@@ -99,7 +99,7 @@ def test_lock_delay_holds_and_resets_on_move() -> None:
     app._now = 0
     app.handle_fall_timer()               # 开始贴地计时
     app._now = 300
-    app._on_input_action(Action.MOVE_LEFT)  # 移动成功 → 重置计时
+    app._on_keyboard_action(Action.MOVE_LEFT)  # 移动成功 → 重置计时
     app._now = 400
     app.handle_fall_timer()               # 重新开始计时（t=400）
     app._now = 800
@@ -124,12 +124,12 @@ def test_lock_delay_reset_budget_capped_at_15() -> None:
     # 15 次成功移动（左右交替，保证每次都成功）——每次重置计时并消耗预算
     for i in range(15):
         app._now = 100 * (i + 1)
-        app._on_input_action(Action.MOVE_LEFT if i % 2 == 0 else Action.MOVE_RIGHT)
+        app._on_keyboard_action(Action.MOVE_LEFT if i % 2 == 0 else Action.MOVE_RIGHT)
         app.handle_fall_timer()
         assert app.game.current_type == piece_before
     # 预算耗尽（15/15）：第 16 次移动不再重置，计时仍从 t=1500 起算
     app._now = 1600
-    app._on_input_action(Action.MOVE_LEFT)
+    app._on_keyboard_action(Action.MOVE_LEFT)
     app.handle_fall_timer()
     assert app.game.current_type == piece_before  # 1600-1500=100ms < 500
     app._now = 2100

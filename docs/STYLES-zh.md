@@ -36,7 +36,7 @@
 
 ```
 main.py → tetris.py (TetrisApp)
-tetris.py → renderer.py, ui_states.py, input_handler.py,
+tetris.py → renderer.py, ui_states.py, keyboard_handler.py,
             audio_manager.py, config_manager.py, contracts.py,
             bot.py (BotRunner), engine.py (TetrisEngine)
 bot.py → contracts.py, engine.py (仅共享几何原语)
@@ -50,7 +50,7 @@ renderer.py → contracts.py, engine.py (仅常量/形状)
 | `engine.py` | 纯游戏规则——无图形依赖,可独立单元测试。 |
 | `renderer.py` | 将 `GameState` 绘制到 Surface;绝不触碰应用或引擎。 |
 | `ui_states.py` | 状态模式:每个 UI 状态对应一个处理器类。 |
-| `input_handler.py` | 按键 → `Action` 映射与 DAS/ARR 自动重复。 |
+| `keyboard_handler.py` | 按键 → `Action` 映射与 DAS/ARR 自动重复。 |
 | `contracts.py` | 跨组件契约:数据结构(`Action`、`GameState`、`BotSnapshot`)与接口协议(`BotInterface`、`AppInterface`)。 |
 | `bot.py` | bot 决策与调度;对外暴露 `BotRunner`(协议/快照在 `contracts.py`)。 |
 | `config_manager.py` | `config.json` 持久化。 |
@@ -152,7 +152,7 @@ imports…
 ## 6. 依赖规则
 
 - **依赖接口,不依赖实现。** `TetrisApp` 持有 `bot: BotInterface`;具体 `BotRunner` 只在 `_init_bot` 中创建。
-- **逻辑模块不碰 pygame。** pygame 只存在于集成层——`tetris.py`、`renderer.py`、`ui_states.py`、`input_handler.py`、`audio_manager.py`。逻辑模块(`engine.py`、`bot.py`、`contracts.py`、`config_manager.py`、`utils.py`)绝不 import pygame;共享的 `Action` 词汇表放在 `contracts.py`。
+- **逻辑模块不碰 pygame。** pygame 只存在于集成层——`tetris.py`、`renderer.py`、`ui_states.py`、`keyboard_handler.py`、`audio_manager.py`。逻辑模块(`engine.py`、`bot.py`、`contracts.py`、`config_manager.py`、`utils.py`)绝不 import pygame;共享的 `Action` 词汇表放在 `contracts.py`。
 - **渲染器只读。** 它接收 `GameState` 快照,不持有 `TetrisApp`/`TetrisEngine` 引用,渲染通用的 `status_line` 而不是了解"bot"。
 - **bot 是玩家,不是后门。** 它通过与人类键盘输入完全相同的路径(`TetrisApp._apply_action`)发出 `Action`,并受同样的重力、锁定延迟与计分约束。绝不给它直接访问引擎的能力,也不要为它关闭游戏机制。
 - 模块需要其他模块的状态时,优先使用窄而显式的接口(`BotSnapshot`、`tick(current_piece_id, make_snapshot)`),而不是传递整个对象。

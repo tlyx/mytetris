@@ -11,7 +11,7 @@
 #  - 音频控制（委托给 AudioManager）
 #  - 将渲染委托给 Renderer 类（renderer.py）
 #  - 创建 GameState 快照传递给 Renderer
-#  - 输入处理（委托给 InputHandler）
+#  - 键盘输入处理（委托给 KeyboardHandler）
 #  - 构造 BotSnapshot 并驱动公平 bot（委托给 BotRunner）
 
 import sys
@@ -25,7 +25,7 @@ from bot import BotRunner
 from config_manager import ConfigManager
 from contracts import Action, BotInterface, BotSnapshot, GameState
 from engine import GRID_HEIGHT, GRID_WIDTH, MAX_SCORE, TetrisEngine
-from input_handler import InputHandler
+from keyboard_handler import KeyboardHandler
 from renderer import (
     BLOCK_SIZE,
     LEFT_WIDTH,
@@ -89,8 +89,8 @@ class TetrisApp:
     # ---- 统一时间源 ----
     _now: int  # 每帧更新，存储当前时间戳
 
-    # ---- 输入 ----
-    input_handler: InputHandler
+    # ---- 键盘输入 ----
+    keyboard_handler: KeyboardHandler
 
     # ---- 渲染 ----
     renderer: Renderer
@@ -142,8 +142,8 @@ class TetrisApp:
         # ---- 统一时间源 ----
         self._now = 0
 
-        # ---- 输入 ----
-        self._init_input()  # 输入初始化（包含 input_handler 创建）
+        # ---- 键盘输入 ----
+        self._init_keyboard()  # 键盘输入初始化（包含 keyboard_handler 创建）
 
         # ---- 渲染 ----
         self.renderer = Renderer()
@@ -246,14 +246,14 @@ class TetrisApp:
         self._game_over_sound_played = False
         self._help_active = False
 
-    # ---- 输入 ----
-    def _init_input(self) -> None:
-        """设置按键重复参数并创建输入处理器。"""
-        # 关闭全局自动重复，所有方向键的自动重复由 InputHandler 实现
+    # ---- 键盘输入 ----
+    def _init_keyboard(self) -> None:
+        """设置按键重复参数并创建键盘输入处理器。"""
+        # 关闭全局自动重复，所有方向键的自动重复由 KeyboardHandler 实现
         pygame.key.set_repeat(0)
 
-        # 创建输入处理器，绑定按键回调
-        self.input_handler = InputHandler(self._on_input_action)
+        # 创建键盘输入处理器，绑定按键回调
+        self.keyboard_handler = KeyboardHandler(self._on_keyboard_action)
 
     # ---- 音频 ----
     def _init_audio(self) -> None:
@@ -318,7 +318,7 @@ class TetrisApp:
         """重置游戏所有状态，回到新游戏初始状态。"""
         self.game.reset()
         self._reset_round_state()
-        self.input_handler.reset()
+        self.keyboard_handler.reset()
         # 状态切回 Playing
         self._current_state = PlayingState()
         # 重置 Bot（包括 bot_enabled 状态）
@@ -336,9 +336,9 @@ class TetrisApp:
         sys.exit()
 
     # -------------------- 输入与游戏动作 --------------------
-    # ---- 输入动作回调（由 InputHandler 调用） ----
-    def _on_input_action(self, action: Action) -> None:
-        """人类键盘输入回调（InputHandler 调用）；bot 模式下忽略人类按键。"""
+    # ---- 键盘动作回调（由 KeyboardHandler 调用） ----
+    def _on_keyboard_action(self, action: Action) -> None:
+        """人类键盘动作回调（KeyboardHandler 调用）；bot 模式下忽略人类按键。"""
         if self.bot_enabled:
             return
         self._apply_action(action)
@@ -578,9 +578,9 @@ class TetrisApp:
             # 仅在玩家活跃时处理自动重复
             if not (self.game.game_over or self.paused or self.confirm_quit or self._help_active):
                 if not self.bot_enabled:
-                    self.input_handler.process_auto_repeat(self._now)
+                    self.keyboard_handler.process_auto_repeat(self._now)
             else:
-                self.input_handler.reset()
+                self.keyboard_handler.reset()
 
             # bot 公平接管：每帧一个窄调用，内部处理换块投递与过期丢弃，
             # 返回的动作走与人类按键完全相同的应用路径。

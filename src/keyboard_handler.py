@@ -1,4 +1,4 @@
-# input_handler.py — 输入处理器
+# keyboard_handler.py — 键盘输入处理器
 #
 # 此文件主要负责：
 #  - 按键 → Action 的映射
@@ -14,7 +14,7 @@ from contracts import Action
 
 
 @final
-class InputHandler:
+class KeyboardHandler:
     """管理键盘按键的首次按下和自动重复（DAS/ARR）。"""
 
     # DAS/ARR 自动重复参数：首次按下等待 200ms，之后每 50ms 触发一次

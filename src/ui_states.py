@@ -54,7 +54,7 @@ class PlayingState(StateHandler):
                 return HelpState()
             else:
                 # 使用统一时间源 app.now
-                app.input_handler.handle_keydown(key, app.now)
+                app.keyboard_handler.handle_keydown(key, app.now)
         return None
 
 
