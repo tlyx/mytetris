@@ -41,7 +41,12 @@ the code so that the style stays consistent.
 ## 2. Module Architecture
 
 The codebase is split by responsibility, and the dependency direction is
-strictly one-way:
+strictly one-way. Layout: all code lives in `src/` (flat top-level modules,
+not a package), including the `main.py` entry point; `tests/` and `docs/`
+live at the project root. Imports resolve because the interpreter puts the
+script's directory (`src/`) on the path when running `uv run src/main.py`,
+and `tests/conftest.py` adds `src` for pytest; pyright resolves via
+`extraPaths`.
 
 ```
 main.py → tetris.py (TetrisApp)

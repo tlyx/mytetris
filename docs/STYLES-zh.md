@@ -32,7 +32,7 @@
 
 ## 2. 模块架构
 
-代码按职责拆分,依赖方向严格单向:
+代码按职责拆分,依赖方向严格单向。布局:全部代码位于 `src/`(平铺的顶层模块,非包),包括入口 `main.py`;`tests/`、`docs/` 位于项目根。导入解析:运行 `uv run src/main.py` 时解释器自动把脚本目录(src)加入路径;pytest 由 `tests/conftest.py` 注入 src;pyright 经 `extraPaths` 解析。
 
 ```
 main.py → tetris.py (TetrisApp)

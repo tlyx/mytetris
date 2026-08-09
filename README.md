@@ -58,7 +58,7 @@
 
 Run the game using:
 ```bash
-uv run main.py
+uv run src/main.py
 ```
 
 ## macOS Gatekeeper Troubleshooting

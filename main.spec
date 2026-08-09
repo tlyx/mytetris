@@ -68,8 +68,9 @@ with open(os.path.join(ZH_LPROJ, "InfoPlist.strings"), "w", encoding="utf-8") as
 # 2. ANALYSIS LAYER (静态代码与依赖分析层)
 # =========================================================================
 a = Analysis(
-    ['main.py'],
-    pathex=[],               # 🎯 移除了对 build 目录的依赖，确保搜索路径彻底干净
+    # 入口位于 src/：PyInstaller 自动把脚本所在目录加入分析路径，
+    # 项目模块（tetris/engine/...）无需 pathex 即可解析。
+    ['src/main.py'],
     binaries=[],
     datas=[
         # 全部直接释放到 .app/Contents/Resources/ 正下方

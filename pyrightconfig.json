@@ -2,6 +2,7 @@
   "typeCheckingMode": "strict",
   "reportUnusedCallResult": false,
   "reportAny": false,
+  "extraPaths": ["src"],
   "exclude": [
     "tests",
     ".venv",
