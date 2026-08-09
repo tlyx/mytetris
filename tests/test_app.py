@@ -106,3 +106,29 @@ def test_lock_delay_holds_and_resets_on_move() -> None:
     app._now = 400 + _LOCK_DELAY_MS + 100  # 已超窗口
     app.handle_fall_timer()
     assert app.game.current_type != piece_before  # 锁定并生成新块
+
+
+def test_lock_delay_reset_budget_capped_at_15() -> None:
+    """锁定延迟重置预算（指南标准）：每块最多 15 次成功移动重置。
+
+    预算耗尽后继续移动不再延长计时，500ms 窗口走完即锁定。
+    """
+    app = _app_with_piece_at_bottom()
+    piece_before = app.game.current_type
+    app._now = 0
+    app.handle_fall_timer()  # 进入贴地窗口
+    assert app.game.current_type == piece_before
+    # 15 次成功移动（左右交替，保证每次都成功）——每次重置计时并消耗预算
+    for i in range(15):
+        app._now = 100 * (i + 1)
+        app._on_input_action(Action.MOVE_LEFT if i % 2 == 0 else Action.MOVE_RIGHT)
+        app.handle_fall_timer()
+        assert app.game.current_type == piece_before
+    # 预算耗尽（15/15）：第 16 次移动不再重置，计时仍从 t=1500 起算
+    app._now = 1600
+    app._on_input_action(Action.MOVE_LEFT)
+    app.handle_fall_timer()
+    assert app.game.current_type == piece_before  # 1600-1500=100ms < 500
+    app._now = 2100
+    app.handle_fall_timer()  # 2100-1500=600ms >= 500 → 锁定
+    assert app.game.current_type != piece_before
