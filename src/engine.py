@@ -188,6 +188,8 @@ class GameEngine:
 
     # 消行得分表（类常量）
     SCORE_TABLE: ClassVar[dict[int, int]] = {0: 0, 1: 100, 2: 300, 3: 500, 4: 800}
+    # T-spin 得分表（指南标准）：无消行 100，单/双/三消 800/1200/1600
+    T_SPIN_TABLE: ClassVar[dict[int, int]] = {0: 100, 1: 800, 2: 1200, 3: 1600}
 
     grid: list[list[tuple[int, int, int] | None]]
     score: int
@@ -312,7 +314,16 @@ class GameEngine:
         """锁定当前方块到网格，然后检测并消除满行，更新分数、等级，生成下一个方块。
 
         内部网格语义：self.grid[0] 为底行；self.grid[GRID_HEIGHT-1] 为顶行。
+
+        T-spin 判定在锁定前进行（3 角规则作用于锁定前的盘面）：T 块 +
+        旋转是最后动作（严格规则：旋转后硬降不算）+ 中心四对角 ≥3 被占。
         """
+        t_spin = (
+            self.current_type == "T"
+            and self.last_was_rotation
+            and is_t_spin(self.grid, self.x, self.y)
+        )
+
         lock_color = COLORS[self.current_type]
         for gx, gy in cells_in_bounds(self.x, self.y, self.current_shape):
             self.grid[gy][gx] = lock_color
@@ -336,12 +347,12 @@ class GameEngine:
             self.combo = 0
             combo_bonus = 0
 
-        # 使用类常量 SCORE_TABLE
-        # lines_cleared ∈ 0..4（tetromino 在 10 宽网格中单行至多占 4 格），
-        # 直接索引：若未来引入更宽的块导致越界，KeyError 立即暴露而非静默按 4 行计分
-        self.add_score(
-            GameEngine.SCORE_TABLE[lines_cleared] * self.level + combo_bonus
+        # 计分：T-spin 走独立表（无消行 100 / 单 800 / 双 1200 / 三 1600），
+        # 否则按常规消行表；连击加成正交叠加，两者通用。
+        table = (
+            GameEngine.T_SPIN_TABLE if t_spin else GameEngine.SCORE_TABLE
         )
+        self.add_score(table[lines_cleared] * self.level + combo_bonus)
 
         # 更新等级
         potential_level = (self.total_lines // 10) + 1

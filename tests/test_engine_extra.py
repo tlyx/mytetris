@@ -443,3 +443,101 @@ def test_t_spin_rotation_independent():
         assert is_t_spin(eng.grid, eng.x, eng.y) is True
         eng.rotate()  # 原地旋转不触发踢位（对角不挡正交单元）
         assert (0, 0) in eng.current_shape  # 中心单元不变
+
+
+# ----------------------------------------------------------------------
+# T-spin 计分（指南标准：无消行 100，单/双/三消 800/1200/1600，×level）
+# ----------------------------------------------------------------------
+
+def _make_t_spin_scene(rows: int) -> GameEngine:
+    """构造 T-spin 落点场景：底部 rows 行填满（留 T 的落点空隙）且 3 角被占。
+
+    返回引擎：T 已旋转到 rotation 1（last_was_rotation=True），
+    随后通过直接赋值定位到 (5, 1)（赋值不是动作，不清除旋转标志）。
+    """
+    eng = make_empty_engine()
+    eng.next_type = "T"
+    eng._spawn_piece()
+    assert eng.rotate() is True  # rotation 0→1，标志置位
+    x, y = 5, 1  # T rot1 占据行 0,1,2
+    shape = rotate_shape(SHAPES_DATA["T"], 1)
+    occupied = {(x + dx, y + dy) for dx, dy in shape}
+    for row in range(rows):
+        for col in range(GRID_WIDTH):
+            if (col, row) not in occupied:
+                eng.grid[row][col] = (5, 5, 5)
+    corners = [(x + 1, y + 1), (x + 1, y - 1), (x - 1, y + 1), (x - 1, y - 1)]
+    filled = sum(
+        1 for cx, cy in corners
+        if 0 <= cx < GRID_WIDTH and 0 <= cy < GRID_HEIGHT and eng.grid[cy][cx] is not None
+    )
+    for cx, cy in corners:
+        if filled >= 3:
+            break
+        if 0 <= cx < GRID_WIDTH and 0 <= cy < GRID_HEIGHT and eng.grid[cy][cx] is None:
+            eng.grid[cy][cx] = (5, 5, 5)  # 单格填入不会意外完成一行
+            filled += 1
+    assert filled >= 3, "无法构造 3 角"
+    eng.x, eng.y = x, y
+    return eng
+
+
+def test_t_spin_single_scores_800():
+    """T-spin 单消 = 800×level（level 1）。"""
+    eng = _make_t_spin_scene(rows=1)
+    eng.lock_and_clear_lines()
+    assert eng.total_lines == 1
+    assert eng.score == 800
+
+
+def test_t_spin_double_scores_1200():
+    eng = _make_t_spin_scene(rows=2)
+    eng.lock_and_clear_lines()
+    assert eng.total_lines == 2
+    assert eng.score == 1200
+
+
+def test_t_spin_triple_scores_1600():
+    eng = _make_t_spin_scene(rows=3)
+    eng.lock_and_clear_lines()
+    assert eng.total_lines == 3
+    assert eng.score == 1600
+
+
+def test_t_spin_no_clear_scores_100():
+    """T-spin 无消行 = 100×level（奖励风险动作）。"""
+    eng = _make_t_spin_scene(rows=0)
+    eng.lock_and_clear_lines()
+    assert eng.total_lines == 0
+    assert eng.score == 100
+
+
+def test_t_spin_requires_rotation_flag():
+    """没有旋转收尾（标志 False）→ 不算 T-spin，按常规计分。"""
+    eng = make_empty_engine()
+    eng.next_type = "T"
+    eng._spawn_piece()
+    # 不旋转：直接构造与单消 T-spin 相同的落点，但标志为 False
+    x, y = 5, 1
+    shape = rotate_shape(SHAPES_DATA["T"], 1)
+    occupied = {(x + dx, y + dy) for dx, dy in shape}
+    for col in range(GRID_WIDTH):
+        if (col, 0) not in occupied:
+            eng.grid[0][col] = (5, 5, 5)
+    for cx, cy in ((6, 2), (6, 0), (4, 0)):
+        eng.grid[cy][cx] = (5, 5, 5)
+    # 直接设定形状与位置（赋值不是动作，标志保持 False）
+    eng.current_shape = rotate_shape(SHAPES_DATA["T"], 1)
+    eng.x, eng.y = x, y
+    assert eng.last_was_rotation is False
+    eng.lock_and_clear_lines()
+    assert eng.total_lines == 1
+    assert eng.score == 100  # SCORE_TABLE[1]，而非 800
+
+
+def test_t_spin_combo_bonus_stacks():
+    """连击加成正交叠加：combo=1（本次消行后变 2）时 T-spin 单消 = 800 + 50。"""
+    eng = _make_t_spin_scene(rows=1)
+    eng.combo = 1
+    eng.lock_and_clear_lines()
+    assert eng.score == 800 + 50
