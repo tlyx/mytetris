@@ -294,3 +294,21 @@ Before submitting a change:
 - [ ] `ruff check .` clean, `uv run pytest -q` green.
 - [ ] Commit message in English with an appropriate prefix (+ `Co-authored-by`
       trailer when AI-assisted).
+
+### Pre-release hygiene (time-boxed ~30 min, before bumping the version)
+
+- [ ] **Semantic audit** — walk the full name inventory; hunt for names that
+      no longer cover their concept (e.g. a name vs. its comment disagreeing,
+      or a concept that grew after the module split — `InputHandler` →
+      `KeyboardHandler` when the bot became a second Action source).
+- [ ] **Dead code / dead API** — nothing public is referenced only by tests
+      (white-box tests reach `_` internals directly, no shims); every field of
+      a shared data structure has a real reader.
+- [ ] **Comments match code** — docstrings and module-header responsibility
+      bullets reflect the current behavior, not the pre-refactor one.
+- [ ] **Docs drift** — STYLES zh/en agree with each other and with the actual
+      config (`src = ["src"]`, CI triggers, test-module list); README feature
+      and key tables are current.
+- [ ] **Full verification** — `pytest`, `ruff`, basedpyright, headless smoke
+      run all green.
+- [ ] Only then bump the version and release.
