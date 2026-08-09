@@ -14,13 +14,13 @@ from typing import final
 
 import pygame  # via pygame-ce
 
+from contracts import GameState
 from engine import (
     COLORS,
     GRID_HEIGHT,
     GRID_WIDTH,
     SHAPES_DATA,
 )
-from game_state import GameState
 
 # 方块大小（逻辑像素）
 BLOCK_SIZE = 30

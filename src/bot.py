@@ -8,10 +8,9 @@
 # 想太久，方块自己掉下去锁掉。
 #
 # 对外 API（游戏主体只依赖这些）：
-#   - BotInterface : TetrisApp 依赖的协议（可整体替换 bot 实现）
 #   - BotRunner    : 具体实现（组合点在 TetrisApp._init_bot）
-#   - BotSnapshot  : 游戏侧构造的只读状态快照
 #   - STRATEGIES / DEFAULT_STRATEGY : 评估策略的可配置行为
+#   （BotInterface / BotSnapshot 是跨组件契约，定义见 contracts.py）
 #
 # 其余模块级求解函数均为私有（_ 前缀）实现细节，仅供 BotRunner 内部
 # 与白盒测试使用，不属于对外接口。
@@ -19,7 +18,7 @@
 # 此文件主要负责：
 #  - 2-ply 前瞻求解与评估策略注册表
 #  - BotRunner 独立线程调度（快照信箱 / 动作队列 / 生命周期）
-#  - 对外接口（BotInterface / BotSnapshot / BotRunner）
+#  - 对外接口（BotRunner；BotInterface 见 contracts.py）
 #
 # 评估策略可选用（STRATEGIES 注册表，构造参数或 set_strategy /
 # cycle_strategy 切换）：
@@ -42,10 +41,9 @@ import copy
 import queue
 import threading
 from collections.abc import Callable
-from dataclasses import dataclass
-from typing import Protocol, final
+from typing import final
 
-from actions import Action
+from contracts import Action, BotSnapshot
 from engine import (
     GRID_HEIGHT,
     GRID_WIDTH,
@@ -343,23 +341,6 @@ def _plan_to_actions(
 # 对外接口（游戏主体依赖的部分）
 # ------------------------------------------------------------------
 
-@dataclass(frozen=True)
-class BotSnapshot:
-    """游戏侧构造、bot 侧消费的只读游戏状态快照（grid 为行拷贝）。"""
-
-    grid: list[list[tuple[int, int, int] | None]]
-    current_type: str
-    current_x: int
-    # 当前旋转状态 0..3（_plan_to_actions 按相对量计算按键次数）
-    rotation: int
-    next_type: str
-    level: int
-    game_over: bool
-    # 当前方块实例 id（引擎每次生成新块 +1）：同一类型但不同的块 id 不同，
-    # 是 bot 识别"换块了"的可靠依据（方块类型可能连续相同）。
-    piece_id: int
-
-
 @final
 class _Mailbox:
     """单槽快照信箱：主线程投递，bot 线程阻塞等待新一代快照。
@@ -399,26 +380,6 @@ class _Mailbox:
                 if not self._cond.wait(timeout):
                     return None
             return self._latest
-
-
-class BotInterface(Protocol):
-    """游戏主体依赖的 bot 接口（可整体替换实现）。
-
-    TetrisApp 只依赖此协议：换 bot 实现（如深度强化学习版）时，
-    提供同接口即可，游戏代码零改动。
-    """
-
-    @property
-    def strategy(self) -> str: ...
-
-    def start(self) -> None: ...
-    def stop(self, timeout: float = 1.0) -> None: ...
-    def cycle_strategy(self) -> str: ...
-    def tick(
-        self,
-        current_piece_id: int,
-        make_snapshot: Callable[[], BotSnapshot],
-    ) -> list[Action]: ...
 
 
 @final

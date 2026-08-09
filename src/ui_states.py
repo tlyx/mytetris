@@ -3,37 +3,15 @@
 # 此文件主要负责：
 #  - 状态机：Playing / Paused / GameOver / ConfirmQuit / Help
 #  - 各状态下的按键分发与状态转换
+#  - AppInterface 契约（TetrisApp 对外接口）见 contracts.py
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Protocol, override
+from typing import override
 
 import pygame
 
-if TYPE_CHECKING:
-    from engine import TetrisEngine
-
-from config_manager import ConfigManager
-from input_handler import InputHandler
-
-
-class AppInterface(Protocol):
-    """TetrisApp 对外暴露的接口（供状态处理器调用）。"""
-    game: TetrisEngine
-    input_handler: InputHandler
-    config: ConfigManager
-    paused: bool
-    confirm_quit: bool
-    fall_event: int
-
-    @property
-    def now(self) -> int: ...  # 当前时间（毫秒），由外部提供
-
-    def toggle_pause(self) -> None: ...
-    def handle_fall_timer(self) -> None: ...
-    def toggle_help(self) -> None: ...
-    def restart_game(self) -> None: ...
-    def handle_quit(self) -> None: ...
+from contracts import AppInterface
 
 
 class StateHandler:

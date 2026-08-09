@@ -10,7 +10,7 @@ from typing import final
 
 import pygame
 
-from actions import Action
+from contracts import Action
 
 
 @final

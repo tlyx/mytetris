@@ -23,11 +23,9 @@ import time
 
 import pytest
 
-from actions import Action
 from bot import (
     STRATEGIES,
     BotRunner,
-    BotSnapshot,
     _best_move,
     _board_features,
     _evaluate,
@@ -35,6 +33,7 @@ from bot import (
     _Mailbox,
     _plan_to_actions,
 )
+from contracts import Action, BotSnapshot
 from engine import (
     GRID_HEIGHT,
     GRID_WIDTH,

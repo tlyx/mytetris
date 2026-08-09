@@ -15,8 +15,8 @@ import os
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
-from actions import Action
 from config_manager import ConfigManager
+from contracts import Action
 from engine import LOCK_DELAY_MS
 from tetris import TetrisApp
 

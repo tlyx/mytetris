@@ -51,10 +51,10 @@ and `tests/conftest.py` adds `src` for pytest; pyright resolves via
 ```
 main.py → tetris.py (TetrisApp)
 tetris.py → renderer.py, ui_states.py, input_handler.py,
-            audio_manager.py, config_manager.py, game_state.py,
-            bot.py (BotInterface only), engine.py (TetrisEngine)
-bot.py → actions.py, engine.py (shared geometry primitives only)
-renderer.py → game_state.py, engine.py (constants/shapes only)
+            audio_manager.py, config_manager.py, contracts.py,
+            bot.py (BotRunner), engine.py (TetrisEngine)
+bot.py → contracts.py, engine.py (shared geometry primitives only)
+renderer.py → contracts.py, engine.py (constants/shapes only)
 ```
 
 | Module | Responsibility |
@@ -65,9 +65,8 @@ renderer.py → game_state.py, engine.py (constants/shapes only)
 | `renderer.py` | Draws a `GameState` onto a Surface; never touches the app or the engine. |
 | `ui_states.py` | State pattern: one handler class per app/UI state. |
 | `input_handler.py` | Key → `Action` mapping and DAS/ARR auto-repeat. |
-| `actions.py` | The shared `Action` vocabulary (human input and bot) — pygame-free. |
-| `bot.py` | Bot decision and scheduling; exposes `BotInterface` / `BotRunner` / `BotSnapshot`. |
-| `game_state.py` | Immutable render snapshot. |
+| `contracts.py` | Cross-component contracts: data (`Action`, `GameState`, `BotSnapshot`) and interface protocols (`BotInterface`, `AppInterface`). |
+| `bot.py` | Bot decision and scheduling; exposes `BotRunner` (protocols/snapshot live in `contracts.py`). |
 | `config_manager.py` | `config.json` persistence. |
 | `audio_manager.py` | Music/sound loading and playback, graceful degradation. |
 | `utils.py` | `resource_path` (PyInstaller-aware path resolution). |
@@ -206,9 +205,9 @@ imports…
 - **No pygame in logic modules.** pygame is confined to the integration
   layer — `tetris.py`, `renderer.py`, `ui_states.py`,
   `input_handler.py`, `audio_manager.py`. Logic modules (`engine.py`,
-  `bot.py`, `actions.py`, `game_state.py`, `config_manager.py`,
+  `bot.py`, `contracts.py`, `config_manager.py`,
   `utils.py`) never import pygame; the shared `Action` vocabulary lives
-  in `actions.py`.
+  in `contracts.py`.
 - **The renderer is read-only.** It takes a `GameState` snapshot, holds no
   reference to `TetrisApp`/`TetrisEngine`, and renders a generic
   `status_line` instead of knowing about "the bot".

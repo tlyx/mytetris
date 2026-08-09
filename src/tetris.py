@@ -20,12 +20,11 @@ from typing import final
 
 import pygame  # via pygame-ce
 
-from actions import Action
 from audio_manager import AudioManager
-from bot import BotInterface, BotRunner, BotSnapshot
+from bot import BotRunner
 from config_manager import ConfigManager
+from contracts import Action, BotInterface, BotSnapshot, GameState
 from engine import GRID_HEIGHT, GRID_WIDTH, MAX_SCORE, TetrisEngine
-from game_state import GameState
 from input_handler import InputHandler
 from renderer import (
     BLOCK_SIZE,
