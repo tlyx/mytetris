@@ -71,7 +71,7 @@ class TetrisApp:
     window_width: int
     window_height: int
     _logical: pygame.Surface | None
-    sidebar_bg: tuple[int, int, int]  # 窗口背景色
+    window_bg: tuple[int, int, int]  # 窗口背景色
 
     # ---- 游戏引擎与会话 ----
     game: TetrisEngine
@@ -128,7 +128,7 @@ class TetrisApp:
         # ---- 窗口与显示 ----
         self._init_display_sizes()
         self._init_window_and_surfaces()
-        self._init_sidebar_style()
+        self._init_window_style()
         self._enforce_min_size()
         TetrisApp._init_icon()
         pygame.mouse.set_visible(True)  # 初始时鼠标可见（不再全局隐藏）
@@ -210,9 +210,9 @@ class TetrisApp:
         pygame.display.set_caption("MyTetris")
         self._logical = None   # 逻辑表面，渲染时按比例缩放
 
-    def _init_sidebar_style(self) -> None:
-        """设置侧边栏背景色（灰蓝色调，与 Renderer 面板配色一致）。"""
-        self.sidebar_bg = PANEL_BG
+    def _init_window_style(self) -> None:
+        """设置窗口背景色（灰蓝色调，与 Renderer 面板配色一致）。"""
+        self.window_bg = PANEL_BG
 
     @staticmethod
     def _init_icon() -> None:
@@ -477,7 +477,7 @@ class TetrisApp:
         x_off = (self.window_width - logical_w) // 2
         y_off = (self.window_height - logical_h) // 2
 
-        self.screen.fill(self.sidebar_bg)
+        self.screen.fill(self.window_bg)
         self.screen.blit(self._logical, (x_off, y_off))
 
         bs = int(BLOCK_SIZE * scale)
