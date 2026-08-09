@@ -3,8 +3,8 @@
 # 覆盖 wall-kick、多行消分、Game Over、纯几何函数契约。
 
 from engine import (
-    _WALL_KICKS_I,
-    _WALL_KICKS_OTHERS,
+    _SRS_KICKS_I,
+    _SRS_KICKS_JLSTZ,
     GRID_HEIGHT,
     GRID_WIDTH,
     LOCK_DELAY_MS,
@@ -37,8 +37,13 @@ def test_rotate_fails_when_blocked():
     # compute the rotated shape as engine does
     new_shape = [(-dy, dx) for dx, dy in eng.current_shape]
 
-    # choose kick set
-    kicks = _WALL_KICKS_I if eng.current_type == "I" else _WALL_KICKS_OTHERS
+    # SRS 表按 (from, to) 过渡取候选；本测试从出生态(rotation=0)顺时针转一次
+    to_rot = (old_rot + 1) % 4
+    kicks = (
+        _SRS_KICKS_I[(old_rot, to_rot)]
+        if eng.current_type == "I"
+        else _SRS_KICKS_JLSTZ[(old_rot, to_rot)]
+    )
 
     # Fill the grid at all candidate positions for the rotated shape with each kick
     for ox, oy in kicks:
@@ -54,7 +59,8 @@ def test_rotate_fails_when_blocked():
     assert eng.rotation == old_rot
 
 
-def test_rotation_uses_kicks_to_succeed():
+def test_rotation_uses_srs_left_kick():
+    """SRS 0→R 第二候选为 (-1,0)：原地被堵时左踢 1 格完成旋转。"""
     eng = make_empty_engine()
     eng.next_type = "J"
     eng._spawn_piece()
@@ -62,35 +68,17 @@ def test_rotation_uses_kicks_to_succeed():
     old_rot = eng.rotation
 
     new_shape = [(-dy, dx) for dx, dy in eng.current_shape]
-    # block the direct rotation at (0,0) but leave the (1,0) kick free
-    # fill direct positions
+    # block the direct rotation at (0,0); SRS 0→R 的下一候选是 (-1,0)
     for dx, dy in new_shape:
         tx = eng.x + dx
         ty = eng.y + dy
         if 0 <= tx < GRID_WIDTH and 0 <= ty < GRID_HEIGHT:
             eng.grid[ty][tx] = (8, 8, 8)
 
-    # ensure kick (1,0) positions are free
-    kick_ok = True
-    for dx, dy in new_shape:
-        tx = eng.x + 1 + dx
-        ty = eng.y + 0 + dy
-        if not (0 <= tx < GRID_WIDTH and 0 <= ty < GRID_HEIGHT):
-            kick_ok = False
-            break
-        if eng.grid[ty][tx] is not None:
-            kick_ok = False
-            break
-
-    if not kick_ok:
-        # if the designed kick isn't possible at spawn location, move piece right one
-        eng.move(1, 0)
-        old_x = eng.x - 1
-
     eng.rotate()
-    # rotation should have been applied (rotation increments)
+    # rotation should have been applied via the (-1,0) kick
     assert eng.rotation == (old_rot + 1) % 4
-    assert eng.x >= old_x
+    assert eng.x == old_x - 1
 
 
 def test_lock_and_clear_multiple_lines_scoring():
@@ -320,3 +308,53 @@ def test_drop_scoring_in_engine():
     distance = eng.hard_drop()
     assert eng.score == s0 + 2 * distance  # 硬降每格 +2
     assert eng.soft_drop() is False  # 已贴底，软降失败
+
+
+def test_srs_floor_kick_lifts_piece():
+    """SRS 地板旋转：贴地方块原地旋转被挡，靠 (0,2) 上踢完成。
+
+    T 块 rotation 0 的 (0,-1) 单元在贴底时越界；0→R 踢序中 (0,2)
+    先于其他抬升候选命中，故 y += 2。
+    """
+    eng = make_empty_engine()
+    eng.next_type = "T"
+    eng._spawn_piece()
+    while eng.move(0, -1):  # 贴底(y=0)
+        pass
+    assert eng.y == 0
+    eng.rotate()
+    assert eng.rotation == 1
+    assert eng.y == 2  # (0,2) 上踢
+
+
+def test_srs_i_piece_wide_kick():
+    """I 块 0→R 第二候选为 (-2,0)：原地被堵时横向大踢 2 格。"""
+    eng = make_empty_engine()
+    eng.next_type = "I"
+    eng._spawn_piece()
+    old_x = eng.x
+
+    new_shape = [(-dy, dx) for dx, dy in eng.current_shape]
+    # 堵死原地旋转与 (-2,0) 之外的候选：此处只堵 (0,0) 与 (1,0) 位置
+    for dx, dy in new_shape:
+        for ox in (0, 1):
+            tx = eng.x + ox + dx
+            ty = eng.y + dy
+            if 0 <= tx < GRID_WIDTH and 0 <= ty < GRID_HEIGHT:
+                eng.grid[ty][tx] = (7, 7, 7)
+
+    eng.rotate()
+    assert eng.rotation == 1
+    assert eng.x == old_x - 2  # 命中 (-2,0) 踢
+
+
+def test_rotation_state_round_trip_four_cw():
+    """顺时针连转 4 次回到原旋转状态与形状。"""
+    eng = make_empty_engine()
+    eng.next_type = "T"
+    eng._spawn_piece()
+    base_shape = list(eng.current_shape)
+    for _ in range(4):
+        assert eng.rotate() is True
+    assert eng.rotation == 0
+    assert eng.current_shape == base_shape

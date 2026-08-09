@@ -59,32 +59,26 @@ SHAPES_DATA: dict[str, list[tuple[int, int]]] = {
 # 七种标准方块类型列表（用于7-bag随机生成），派生自 SHAPES_DATA 键（单一来源）
 _ALL_PIECES: list[str] = list(SHAPES_DATA)
 
-# ----------------- Wall kick / spawn related constants -----------------
-# 一组紧凑实用的踢位偏移：旋转碰撞时依次尝试。并非完整的 SRS 实现，
-# 但比临时内联列表更明确、更易维护。
-# I 方块通常需要更宽的横向踢位，因此单独提供一组。
-_WALL_KICKS_OTHERS: list[tuple[int, int]] = [
-    (0, 0),
-    (1, 0),
-    (-1, 0),
-    # 切换到底部原点时 y 分量取反；
-    # 使用正值表示内部坐标系中的向上踢。
-    (0, 1),
-    (1, 1),
-    (-1, 1),
-    (0, 2),
-]
+# ----------------- SRS 踢位表（官方 Super Rotation System） -----------------
+# 标准 SRS 表以 (from_rotation, to_rotation) 为键，每个过渡 5 个候选偏移，
+# 依次尝试直至旋转成功（(0,0) 恒为第一候选 = 原地旋转）。
+# 本游戏仅顺时针旋转（rotation+1），故只用到 4 个顺时针过渡；
+# 逆时针的另外 4 个过渡待将来支持逆时针旋转时补齐。
+# 坐标已从标准表（y 向下）翻转为内部底部原点（y 向上为正）。
+_SRS_KICKS_JLSTZ: dict[tuple[int, int], list[tuple[int, int]]] = {
+    (0, 1): [(0, 0), (-1, 0), (-1, -1), (0, 2), (-1, 2)],
+    (1, 2): [(0, 0), (1, 0), (1, 1), (0, -2), (1, -2)],
+    (2, 3): [(0, 0), (1, 0), (1, -1), (0, 2), (1, 2)],
+    (3, 0): [(0, 0), (-1, 0), (-1, 1), (0, -2), (-1, -2)],
+}
 
-_WALL_KICKS_I: list[tuple[int, int]] = [
-    (0, 0),
-    (1, 0),
-    (-1, 0),
-    (2, 0),
-    (-2, 0),
-    # I 块特殊踢的垂直分量同样取反
-    (0, 1),
-    (0, 2),
-]
+# I 块更宽，使用独立的横向大踢位
+_SRS_KICKS_I: dict[tuple[int, int], list[tuple[int, int]]] = {
+    (0, 1): [(0, 0), (-2, 0), (1, 0), (-2, 1), (1, -2)],
+    (1, 2): [(0, 0), (-1, 0), (2, 0), (-1, -2), (2, 1)],
+    (2, 3): [(0, 0), (2, 0), (-1, 0), (2, -1), (-1, 2)],
+    (3, 0): [(0, 0), (1, 0), (-2, 0), (1, 2), (-2, -1)],
+}
 
 # 注意：生成行为会把方块最高单元对齐到顶行，保证所有方块单元
 # 生成后立即满足 ty >= 0，使各类型方块的生成位置确定且一致。
@@ -260,13 +254,14 @@ class GameEngine:
         self.score = min(self.score + points, MAX_SCORE)
 
     def rotate(self) -> bool:
-        """旋转当前方块（O 方块为无操作）并尝试 wall-kick。
+        """旋转当前方块（O 方块为无操作）并尝试 SRS 踢位。
 
         返回 True 表示旋转已应用（可能经过 kick 位移），
         False 表示未发生旋转（O 方块或所有 kick 均碰撞）。
 
         旋转使用引擎内部底部原点坐标系下的 90° 顺时针变换：
-        (x, y) -> (y, -x)。
+        (x, y) -> (y, -x)。踢位按 (当前旋转, 目标旋转) 查 SRS 表，
+        (0,0) 为第一候选即原地旋转。
         """
         if self.current_type == "O":
             # O 方块旋转是无操作
@@ -274,24 +269,16 @@ class GameEngine:
 
         # 在引擎内部坐标系中顺时针旋转 90°。
         new_shape = rotate_shape(self.current_shape, 1)
+        to_rotation = (self.rotation + 1) % 4
 
-        # 先尝试不做踢位直接旋转
-        if not self._check_collision(self.x, self.y, new_shape):
-            self.current_shape = new_shape
-            # update rotation state (one step in our clockwise convention)
-            self.rotation = (self.rotation + 1) % 4
-            return True
-
-        # choose appropriate kick set
-        kicks = _WALL_KICKS_I if self.current_type == "I" else _WALL_KICKS_OTHERS
-
-        for ox, oy in kicks:
+        kicks = _SRS_KICKS_I if self.current_type == "I" else _SRS_KICKS_JLSTZ
+        for ox, oy in kicks[(self.rotation, to_rotation)]:
             if not self._check_collision(self.x + ox, self.y + oy, new_shape):
                 self.x += ox
                 self.y += oy
                 self.current_shape = new_shape
-                # update rotation state only when rotation actually applied
-                self.rotation = (self.rotation + 1) % 4
+                # 仅在旋转实际应用时更新旋转状态
+                self.rotation = to_rotation
                 return True
 
         # 旋转失败（所有踢位均碰撞）
