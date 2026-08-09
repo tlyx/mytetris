@@ -109,6 +109,25 @@ def spawn_y(shape: list[tuple[int, int]]) -> int:
     return GRID_HEIGHT - 1 - max(py for _, py in shape)
 
 
+def is_t_spin(
+    grid: list[list[tuple[int, int, int] | None]], x: int, y: int
+) -> bool:
+    """T-spin 3 角规则：T 块中心四对角中 ≥3 格被占。
+
+    T 块的中心恒为本地原点 (0,0)，四个对角为 (x±1, y±1)，与旋转状态
+    无关（旋转绕中心进行，中心单元不变）。越界对角不算被占。
+
+    只做角位判定；"最后动作是旋转"由引擎的 last_was_rotation 标志
+    负责，两者缺一不可（严格规则：旋转后硬降不算 T-spin）。
+    """
+    corners = 0
+    for ox, oy in ((1, 1), (1, -1), (-1, 1), (-1, -1)):
+        tx, ty = x + ox, y + oy
+        if 0 <= tx < GRID_WIDTH and 0 <= ty < GRID_HEIGHT and grid[ty][tx] is not None:
+            corners += 1
+    return corners >= 3
+
+
 def collides(
     grid: list[list[tuple[int, int, int] | None]],
     x: int,
@@ -182,6 +201,9 @@ class GameEngine:
     x: int
     y: int
     rotation: int
+    # T-spin 判定：最后一次成功动作是否为旋转（移动/软降/硬降会清除）。
+    # 严格规则：旋转必须是字面上的最后动作，旋转后硬降不算 T-spin。
+    last_was_rotation: bool
     # 当前方块的唯一实例 id：每次生成新块 +1。
     # 用于区分"同类型但不同的块"（bot 靠它识别换块，而非方块类型）。
     piece_id: int
@@ -225,6 +247,7 @@ class GameEngine:
         if not self._check_collision(self.x + dx, self.y + dy):
             self.x += dx
             self.y += dy
+            self.last_was_rotation = False  # 移动成功 → 旋转不再是最后动作
             return True
         return False
 
@@ -279,6 +302,7 @@ class GameEngine:
                 self.current_shape = new_shape
                 # 仅在旋转实际应用时更新旋转状态
                 self.rotation = to_rotation
+                self.last_was_rotation = True  # 旋转成功 → 旋转是最后动作
                 return True
 
         # 旋转失败（所有踢位均碰撞）
@@ -420,6 +444,7 @@ class GameEngine:
 
         # reset rotation
         self.rotation = 0
+        self.last_was_rotation = False  # 新块：旋转标志清零
 
         if self._check_collision(self.x, self.y):
             self.game_over = True

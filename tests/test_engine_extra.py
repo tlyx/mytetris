@@ -15,6 +15,7 @@ from engine import (
     cells_in_bounds,
     collides,
     drop_y,
+    is_t_spin,
     rotate_shape,
     spawn_y,
 )
@@ -358,3 +359,87 @@ def test_rotation_state_round_trip_four_cw():
         assert eng.rotate() is True
     assert eng.rotation == 0
     assert eng.current_shape == base_shape
+
+
+# ----------------------------------------------------------------------
+# T-spin：旋转标志语义 + 3 角规则（严格规则：旋转后硬降不算）
+# ----------------------------------------------------------------------
+
+def test_rotation_flag_lifecycle():
+    """旋转置位、移动/软降/硬降清除、换块清零。"""
+    eng = make_empty_engine()
+    eng.next_type = "T"
+    eng._spawn_piece()
+    assert eng.last_was_rotation is False  # 出生即清零
+    assert eng.rotate() is True
+    assert eng.last_was_rotation is True
+    assert eng.move(1, 0) is True
+    assert eng.last_was_rotation is False  # 移动清除
+    # 硬降清除（贴底旋转会触发地板踢,再硬降必然清标志）
+    assert eng.rotate() is True
+    eng.hard_drop()
+    assert eng.last_was_rotation is False
+    # 软降清除：换块为 T 后在空中旋转再软降（空中软降必成功）
+    eng.next_type = "T"
+    eng._spawn_piece()
+    assert eng.rotate() is True
+    assert eng.soft_drop() is True
+    assert eng.last_was_rotation is False
+
+
+def test_failed_move_keeps_rotation_flag():
+    """失败的移动不算动作：被障碍堵住的移动不改变标志。"""
+    eng = make_empty_engine()
+    eng.next_type = "T"
+    eng._spawn_piece()
+    assert eng.rotate() is True
+    assert eng.last_was_rotation is True
+    # 在右侧摆放障碍,使 move(1,0) 失败（当前形状在 x+1 处全部被堵）
+    for dx, dy in eng.current_shape:
+        gx = eng.x + 1 + dx
+        gy = eng.y + dy
+        if 0 <= gx < GRID_WIDTH and 0 <= gy < GRID_HEIGHT:
+            eng.grid[gy][gx] = (9, 9, 9)
+    assert eng.move(1, 0) is False  # 被堵,失败
+    assert eng.last_was_rotation is True  # 失败的移动不清除标志
+
+
+def _corner_grid(filled: set[tuple[int, int]]) -> list[list[tuple[int, int, int] | None]]:
+    """构造以 (5, 5) 为中心、指定对角被占的网格。"""
+    grid = [[None for _ in range(GRID_WIDTH)] for _ in range(GRID_HEIGHT)]
+    for gx, gy in filled:
+        grid[gy][gx] = (1, 1, 1)
+    return grid
+
+
+def test_t_spin_three_corners_true():
+    """3 角被占 → T-spin 成立。"""
+    grid = _corner_grid({(6, 6), (6, 4), (4, 6)})
+    assert is_t_spin(grid, 5, 5) is True
+
+
+def test_t_spin_two_corners_false():
+    """仅 2 角被占 → 不成立。"""
+    grid = _corner_grid({(6, 6), (4, 6)})
+    assert is_t_spin(grid, 5, 5) is False
+
+
+def test_t_spin_corner_out_of_bounds_not_counted():
+    """越界对角不算被占：贴边中心只有 3 个对角可查，2 个被占即不成立。"""
+    grid = _corner_grid({(1, 6), (1, 4)})  # x=0 中心，(1,·) 为右侧对角
+    assert is_t_spin(grid, 0, 5) is False  # 左侧对角全部越界，只有 2 角
+
+
+def test_t_spin_rotation_independent():
+    """T 块中心恒为原点：各旋转状态下 3 角判定一致。"""
+    eng = make_empty_engine()
+    eng.next_type = "T"
+    eng._spawn_piece()
+    # 把 T 移到 (5, 5) 附近并填充其四对角中的 3 个
+    eng.x, eng.y = 5, 5
+    for gx, gy in ((6, 6), (6, 4), (4, 6)):
+        eng.grid[gy][gx] = (1, 1, 1)
+    for _ in range(4):
+        assert is_t_spin(eng.grid, eng.x, eng.y) is True
+        eng.rotate()  # 原地旋转不触发踢位（对角不挡正交单元）
+        assert (0, 0) in eng.current_shape  # 中心单元不变
