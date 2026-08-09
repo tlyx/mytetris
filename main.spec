@@ -1,6 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 """
-PyInstaller Specification File for MyTetris (macOS Application)
+PyInstaller Specification File for TaoClear (macOS Application)
 Architecture: macOS Standard Bundle (onedir mode for compliant sandboxing)
 
 This configuration handles the multi-layered bundle structure required by macOS,
@@ -98,7 +98,7 @@ exe = EXE(
     pyz,
     a.scripts,
     exclude_binaries=True,
-    name='mytetris',
+    name='taoclear',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -115,20 +115,20 @@ exe = EXE(
 # =========================================================================
 # 4. APPLICATION BUNDLE LAYER (苹果沙盒应用封装层)
 # =========================================================================
-# 在此处完成二进制、依赖库和多层级资源向标准的 mytetris.app/ 目录的组装。
+# 在此处完成二进制、依赖库和多层级资源向标准的 TaoClear.app/ 目录的组装。
 app = BUNDLE(
     exe,
     a.binaries,
     a.datas,
-    name='mytetris.app',
+    name='TaoClear.app',
     icon='assets/logo.png',
-    bundle_identifier='org.tlyx.mytetris',
+    bundle_identifier='org.tlyx.taoclear',
     info_plist={
         'CFBundleShortVersionString': APP_VERSION,  # 🎯 动态同步系统显示版本号
         'CFBundleVersion': APP_VERSION,             # 🎯 动态同步内部构建版本号
         'NSHighResolutionCapable': True,            # 显式声明启用 Retina 高分辨率自适应支持
         'CFBundleDevelopmentRegion': 'en',
         'CFBundleLocalizations': ['en', 'zh_CN'],
-        'CFBundleDisplayName': 'mytetris',
+        'CFBundleDisplayName': 'TaoClear',
     },
 )

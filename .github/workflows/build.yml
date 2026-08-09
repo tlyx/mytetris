@@ -67,7 +67,7 @@ jobs:
       - name: Build macOS App Bundle
         run: uv run pyinstaller main.spec
 
-      # 5. 安装 macOS 官方打包工具并一键合成 mytetris.dmg 挂载盘
+      # 5. 安装 macOS 官方打包工具并一键合成 TaoClear.dmg 挂载盘
       - name: Create DMG Installer
         run: |
           brew install create-dmg --quiet
@@ -75,19 +75,19 @@ jobs:
           SHORT_SHA=$(git rev-parse --short HEAD)
           cd dist
           create-dmg \
-            --volname "mytetris Installer" \
+            --volname "TaoClear Installer" \
             --volicon "../assets/logo.png" \
             --window-pos 200 120 \
             --window-size 600 400 \
             --icon-size 100 \
-            --icon "mytetris.app" 175 190 \
+            --icon "TaoClear.app" 175 190 \
             --app-drop-link 425 190 \
-            "mytetris-${SHORT_SHA}.dmg" \
-            "mytetris.app"
+            "TaoClear-${SHORT_SHA}.dmg" \
+            "TaoClear.app"
 
       # 6. 将生成的日常开发版 .dmg 作为 Actions 附件上传
       - name: Upload Nightly Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: mytetris-macOS-nightly
+          name: taoclear-macOS-nightly
           path: dist/*.dmg

@@ -207,7 +207,7 @@ class TetrisApp:
         self.screen = pygame.display.set_mode(
             (self.window_width, self.window_height), pygame.RESIZABLE
         )
-        pygame.display.set_caption("MyTetris")
+        pygame.display.set_caption("TaoClear")
         self._logical = None   # 逻辑表面，渲染时按比例缩放
 
     def _init_window_style(self) -> None:

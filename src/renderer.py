@@ -36,7 +36,7 @@ SCREEN_HEIGHT = GRID_HEIGHT * BLOCK_SIZE
 # ---- 布局常量（纯数字，绘制时乘以 scale） ----
 # 左侧面板
 _LEFT_PADDING = 10                       # 左侧文字距面板左边缘
-_TITLE_Y = 20                            # "MyTetris" 标题的 y 坐标
+_TITLE_Y = 20                            # "TaoClear" 标题的 y 坐标
 _TITLE_SEP_LINE_Y = 70                   # 标题下方分隔线 y 坐标
 _BOTTOM_MARGIN = 60                      # 底部留白（音乐/音效距离底部）
 _AUDIO_GAP = 10                          # 音乐行与音效行间距
@@ -292,7 +292,7 @@ class Renderer:
         left_content_x = left_padding
         left_content_width = left_width_px - 2 * left_padding
         # 游戏名称（居中）
-        title_surf = self.font_big.render("MyTetris", True, (255, 255, 255))
+        title_surf = self.font_big.render("TaoClear", True, (255, 255, 255))
         title_x = left_content_x + (left_content_width - title_surf.get_width()) // 2
         ds.blit(title_surf, (title_x, int(_TITLE_Y * scale)))
         # 分隔线（标题下方）

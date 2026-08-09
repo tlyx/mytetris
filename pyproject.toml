@@ -1,7 +1,7 @@
 [project]
-name = "mytetris"
+name = "taoclear"
 version = "0.9.15-dev"
-description = "Homemade MyTetris with AI"
+description = "Homemade falling-block game with AI"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [

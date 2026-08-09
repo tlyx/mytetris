@@ -1,7 +1,7 @@
-# MyTetris Style Guide
+# TaoClear Style Guide
 
 This document describes the programming style and conventions used in the
-MyTetris codebase. It is written in English; code comments and docstrings are
+TaoClear codebase. It is written in English; code comments and docstrings are
 written in Chinese (the project language). Follow these rules when modifying
 the code so that the style stays consistent.
 

@@ -34,7 +34,7 @@ class ConfigManager:
     _data: dict[str, bool | int]
     _shadow: dict[str, bool | int]  # 用于检测变化
 
-    def __init__(self, app_name: str = "mytetris") -> None:
+    def __init__(self, app_name: str = "taoclear") -> None:
         self._app_name = app_name
         self._data = {}
         self._shadow = {}

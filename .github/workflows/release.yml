@@ -52,15 +52,15 @@ jobs:
 
           cd dist
           create-dmg \
-            --volname "mytetris Installer" \
+            --volname "TaoClear Installer" \
             --volicon "../assets/logo.png" \
             --window-pos 200 120 \
             --window-size 600 400 \
             --icon-size 100 \
-            --icon "mytetris.app" 175 190 \
+            --icon "TaoClear.app" 175 190 \
             --app-drop-link 425 190 \
-            "mytetris-${VERSION}-${SHORT_SHA}.dmg" \
-            "mytetris.app"
+            "TaoClear-${VERSION}-${SHORT_SHA}.dmg" \
+            "TaoClear.app"
 
       # 📦 将生成的 dmg 作为临时的 artifacts 暂存（默认保留 90 天，这里只做中转）
       - name: Upload DMG Artifact
@@ -94,7 +94,7 @@ jobs:
           name: dmg-artifact
           path: dist
 
-      # 3. 核心动作：借助临时开启的 write 权限，自动在 GitHub 创建发布页面并挂载 mytetris-X.X.X-hhhhhhh.dmg
+      # 3. 核心动作：借助临时开启的 write 权限，自动在 GitHub 创建发布页面并挂载 TaoClear-X.X.X-hhhhhhh.dmg
       - name: Deploy Official Release
         uses: softprops/action-gh-release@v2
         with:

@@ -440,7 +440,7 @@ class BotRunner:
         self._stop.clear()
         # 用局部变量承载线程对象：PyCharm 对实例属性赋值后的收窄不可靠，
         # 直接 self._thread.start() 会被按 Thread | None 判定告警。
-        thread = threading.Thread(target=self._loop, name="mytetris-bot", daemon=True)
+        thread = threading.Thread(target=self._loop, name="taoclear-bot", daemon=True)
         self._thread = thread
         thread.start()
 
