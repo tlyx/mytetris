@@ -25,7 +25,7 @@
 ## 1. 语言与排版
 
 - **Python 3.13+**(`requires-python = ">=3.13"`),依赖由 [uv](https://github.com/astral-sh/uv) 管理(`uv sync`、`uv run …`)。
-- 行宽遵循 ruff 默认值(88 列);项目仅在 `[tool.ruff]` 中固定 `src = ["."]`,其余依赖 ruff 默认配置。
+- 行宽遵循 ruff 默认值(88 列);项目仅在 `[tool.ruff]` 中固定 `src = ["src"]`,其余依赖 ruff 默认配置。
 - 导入顺序由 ruff 强制(`I001`):标准库 → 第三方 → 第一方,各组之间以空行分隔。若文件带有 `from __future__` 导入,它必须排在首位(何时需要见 §4)。
 - 每个模块只承担一个职责;见 [模块架构](#2-模块架构)。
 - 注释与文档字符串使用中文,与现有代码一致。行内注释解释*为什么*,不解释*是什么*。
@@ -171,7 +171,7 @@ imports…
 ## 8. 测试
 
 - 测试位于 `tests/`,从仓库根目录运行 `pytest`(`uv run pytest -q`)。
-- 按职责拆分测试模块:`test_engine.py`、`test_engine_extra.py`、`test_bot.py`、`test_app.py`。
+- 按职责拆分测试模块:`test_engine.py`、`test_engine_extra.py`、`test_bot.py`、`test_app.py`、`test_config.py`。
 - 白盒测试直接访问引擎内部;这类文件在第 1 行携带文件级 `# pyright: reportPrivateUsage=false` 指令压制私有访问诊断(不保留辅助 shim 模块)。
 - 优先确定性构造:显式构造盘面(标注类型的 grid、显式 `piece_id`),而不是依赖随机 bag。
 - 测试必须相互隔离、整包安全;不得依赖真实墙钟时序(线程测试使用超时与宽裕的截止时间)。
@@ -182,12 +182,12 @@ imports…
 | 工具 | 职责 | 配置 |
 | --- | --- | --- |
 | uv | 依赖/环境管理 | `pyproject.toml`;dev 依赖:pillow、pyinstaller、pytest、ruff |
-| ruff | Lint + 导入排序 | `[tool.ruff] src = ["."]`(固定项目根,使分类不随运行目录变化) |
+| ruff | Lint + 导入排序 | `[tool.ruff] src = ["src"]`(固定源码根,使分类不随运行目录变化) |
 | basedpyright | 类型检查(strict) | `pyrightconfig.json`;CLI 检查排除 tests,经文件级指令保持严格 |
 | pytest | 测试 | `tests/` |
 
 - 提交前运行 `ruff check .` 与 `uv run pytest -q`,两者必须全绿。
-- CI 在每次 push 到 `main` 时于 ubuntu 运行同样的检查(`.github/workflows/build.yml`);macOS 打包由 tag 触发(`.github/workflows/release.yml`)。
+- CI 在每次 push 到 `main` 时于 ubuntu 运行同样的检查(`.github/workflows/build.yml`);macOS DMG 通过手动 `workflow_dispatch` 构建(Actions → Run workflow),正式发版由 tag 触发 `.github/workflows/release.yml` 打包。
 
 ## 10. Git 与版本管理
 

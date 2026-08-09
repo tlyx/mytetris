@@ -28,7 +28,7 @@ the code so that the style stays consistent.
 - **Python 3.13+** (`requires-python = ">=3.13"`), dependency-managed with
   [uv](https://github.com/astral-sh/uv) (`uv sync`, `uv run …`).
 - Line length follows ruff's default (88 columns); the project only pins
-  `src = ["."]` in `[tool.ruff]` and relies on ruff's defaults otherwise.
+  `src = ["src"]` in `[tool.ruff]` and relies on ruff's defaults otherwise.
 - Import order is enforced by ruff (`I001`): standard library → third-party →
   first-party, each group separated by a blank line. If a file carries a
   `from __future__` import, it always comes first (see §4 for when that is
@@ -242,7 +242,7 @@ imports…
 - Tests live in `tests/`, run with `pytest` from the repository root
   (`uv run pytest -q`).
 - One test module per concern: `test_engine.py`, `test_engine_extra.py`,
-  `test_bot.py`, `test_app.py`.
+  `test_bot.py`, `test_app.py`, `test_config.py`.
 - White-box tests touch engine internals directly; such files carry the
   file-level `# pyright: reportPrivateUsage=false` directive on line 1 to
   suppress private-use diagnostics (no helper shim module is kept).
@@ -258,15 +258,16 @@ imports…
 | Tool | Role | Config |
 | --- | --- | --- |
 | uv | Dependency/env management | `pyproject.toml`; dev deps: pillow, pyinstaller, pytest, ruff |
-| ruff | Lint + import sort | `[tool.ruff] src = ["."]` (pins the project root so classification is cwd-independent) |
+| ruff | Lint + import sort | `[tool.ruff] src = ["src"]` (pins the source root so classification is cwd-independent) |
 | basedpyright | Type checking (strict) | `pyrightconfig.json`; tests excluded from CLI checks, kept strict via file directives |
 | pytest | Tests | `tests/` |
 
 - Run `ruff check .` and `uv run pytest -q` before committing; both must be
   clean.
 - CI runs the same checks on ubuntu for every push to `main`
-  (`.github/workflows/build.yml`); macOS packaging is tag-triggered via
-  `.github/workflows/release.yml`.
+  (`.github/workflows/build.yml`); the macOS DMG is built on manual
+  `workflow_dispatch` (Actions → Run workflow), and official releases are
+  packaged from tags via `.github/workflows/release.yml`.
 
 ## 10. Git & Versioning
 

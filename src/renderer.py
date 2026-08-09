@@ -63,6 +63,11 @@ _HELP_GAP = 12                           # 帮助覆盖层各行间距
 # 实时状态行颜色（右下 Time 下方，如 "BOT: modern"）
 _STATUS_COLOR: tuple[int, int, int] = (255, 200, 80)
 
+# ---- 面板/边框/分隔线配色（避免散落的魔法数） ----
+PANEL_BG: tuple[int, int, int] = (40, 45, 55)        # 左右面板背景（tetris 也用它填充窗口）
+_BORDER_COLOR: tuple[int, int, int] = (80, 85, 95)   # 棋盘边框
+_SEP_COLOR: tuple[int, int, int] = (60, 60, 70)      # 面板分隔线
+
 # ---- 消行动画持续时间（毫秒） ----
 _CLEAR_ANIM_DURATION = 200
 
@@ -181,7 +186,7 @@ class Renderer:
         bs = int(BLOCK_SIZE * scale)
         left_width_px = int(LEFT_WIDTH * scale)
         right_width_px = int(RIGHT_WIDTH * scale)
-        border_color = (80, 85, 95)
+        border_color = _BORDER_COLOR
 
         board_left = left_width_px
         board_w = GRID_WIDTH * bs
@@ -282,7 +287,7 @@ class Renderer:
 
         # ---- 左侧面板背景 ----
         left_panel_rect = pygame.Rect(0, 0, left_width_px, logical_h)
-        pygame.draw.rect(ds, (40, 45, 55), left_panel_rect)
+        pygame.draw.rect(ds, PANEL_BG, left_panel_rect)
         left_padding = int(_LEFT_PADDING * scale)
         left_content_x = left_padding
         left_content_width = left_width_px - 2 * left_padding
@@ -292,22 +297,22 @@ class Renderer:
         ds.blit(title_surf, (title_x, int(_TITLE_Y * scale)))
         # 分隔线（标题下方）
         sep_line_y = int(_TITLE_SEP_LINE_Y * scale)
-        pygame.draw.line(ds, (60, 60, 70),
+        pygame.draw.line(ds, _SEP_COLOR,
                          (left_content_x, sep_line_y),
                          (left_content_x + left_content_width, sep_line_y), 1)
 
         # ---- 右侧面板背景 ----
         panel_rect = pygame.Rect(sidebar_left, 0,
                                  logical_w - sidebar_left, logical_h)
-        pygame.draw.rect(ds, (40, 45, 55), panel_rect)
+        pygame.draw.rect(ds, PANEL_BG, panel_rect)
         content_padding = int(_CONTENT_PADDING * scale)
         sidebar_content_left = sidebar_left + content_padding
         sidebar_content_right = sidebar_left + right_width_px - content_padding
 
-        # LEVEL 与 SCORE 标签（静态文字）—— 已移至动态绘制，此处不再渲染
+        # LEVEL/SCORE 标签为动态绘制，此处仅画分隔线
         # 分隔线（LEVEL/SCORE 下方）
         sep_y1 = int(_SEP_LINE_Y * scale)
-        pygame.draw.line(ds, (60, 60, 70),
+        pygame.draw.line(ds, _SEP_COLOR,
                          (sidebar_content_left, sep_y1),
                          (sidebar_content_right, sep_y1), 1)
 
@@ -316,17 +321,17 @@ class Renderer:
         return bg
 
     # ------------------------------------------------------------------
-    # 以下方法为原 TetrisApp 中各个 _draw_* 的直接迁移
+    # 动态绘制方法
     # ------------------------------------------------------------------
 
     def _draw_board(
         self, ds: pygame.Surface, state: GameState,
         bs: int, board_left: int,
-        _board_w: int, _board_h: int, _border_color: tuple[int, int, int],
+        board_w: int, board_h: int, border_color: tuple[int, int, int],
         now: int,  # 当前时间（毫秒），用于消行动画
     ) -> None:
-        """绘制 10×20 棋盘、当前操控块
-           同时绘制 ghost piece（落点影子）和消行动画闪烁"""
+        """绘制 10×20 棋盘、当前操控块，同时绘制 ghost piece（落点影子）
+        和消行动画闪烁。"""
         # A. 绘制主棋盘（已锁定的方块）
         # 注意：engine 内部 grid 使用 bottom-origin (grid[0] 为底部)，
         # 渲染时需要将 internal row 映射为屏幕行（0=top）
@@ -388,7 +393,7 @@ class Renderer:
                     alpha = int(255 * (1 - elapsed / _CLEAR_ANIM_DURATION))
                     for row in self._anim_clearing_rows:
                         # 创建半透明白色矩形
-                        flash_surf = pygame.Surface((_board_w, bs), pygame.SRCALPHA)
+                        flash_surf = pygame.Surface((board_w, bs), pygame.SRCALPHA)
                         flash_surf.fill((255, 255, 255, alpha))
                         # row 为内部索引（0=底部）；映射到屏幕行
                         screen_row = GRID_HEIGHT - 1 - row
@@ -398,14 +403,14 @@ class Renderer:
             self._anim_clearing_rows = []
 
         # 动态绘制棋盘边框（上、左、下）及右侧分隔线，覆盖可能残留的像素点
-        pygame.draw.line(ds, _border_color, (board_left, 0),
-                         (board_left + _board_w, 0), 2)
-        pygame.draw.line(ds, _border_color, (board_left, 0),
-                         (board_left, _board_h), 2)
-        pygame.draw.line(ds, _border_color, (board_left, _board_h),
-                         (board_left + _board_w, _board_h), 2)
-        pygame.draw.line(ds, _border_color, (board_left + _board_w, 0),
-                         (board_left + _board_w, _board_h), 2)
+        pygame.draw.line(ds, border_color, (board_left, 0),
+                         (board_left + board_w, 0), 2)
+        pygame.draw.line(ds, border_color, (board_left, 0),
+                         (board_left, board_h), 2)
+        pygame.draw.line(ds, border_color, (board_left, board_h),
+                         (board_left + board_w, board_h), 2)
+        pygame.draw.line(ds, border_color, (board_left + board_w, 0),
+                         (board_left + board_w, board_h), 2)
 
     def _draw_left_panel(
         self, ds: pygame.Surface, state: GameState,
@@ -451,11 +456,11 @@ class Renderer:
         now: int,  # 当前时间（毫秒），用于时间统计
     ) -> None:
         """绘制右侧侧边栏（LEVEL/SCORE 区域、预览、底部统计）。
-           布局修改为：
-             Row1: "LEVEL" 标签 + 等级数值（标签颜色与 SCORE 相同，数值白色，
-                     标签左对齐，数值右对齐）
-             Row2: SCORE 标签（font_small，灰蓝色，左对齐）
-             Row3: 得分数值（font_big，金色，右对齐）
+
+        布局：
+          Row1: "LEVEL" 标签 + 等级数值（标签左对齐，数值右对齐）
+          Row2: SCORE 标签（font_small，灰蓝色，左对齐）
+          Row3: 得分数值（font_big，金色，右对齐）
         """
         assert self.font_big is not None
         assert self.font_small is not None
@@ -465,7 +470,7 @@ class Renderer:
         sidebar_content_right = sidebar_left + right_width_px - content_padding
         sidebar_content_width = sidebar_content_right - sidebar_content_left
 
-        # ---------- 新布局：三行文字 ----------
+        # ---------- LEVEL/SCORE 三行布局 ----------
         # 行间距（统一使用 _RIGHT_GAP）
         row_gap = int(_RIGHT_GAP * scale)
 
@@ -493,15 +498,13 @@ class Renderer:
         row1_height = max(lv_label_surf.get_height(), lv_val_surf.get_height())
 
         # ---- 在 LEVEL 行与 SCORE 标签之间画分隔线 ----
-        sep_color = (60, 60, 70)   # 与静态背景分隔线颜色一致
         sep_gap = int(6 * scale)   # 分隔线上下间距
         sep_y = row1_y + row1_height + sep_gap
-        pygame.draw.line(ds, sep_color,
+        pygame.draw.line(ds, _SEP_COLOR,
                          (sidebar_content_left, sep_y),
                          (sidebar_content_right, sep_y), 1)
         # SCORE 标签放在分隔线下方，同样留出间距
-        sep_gap2 = int(6 * scale)
-        row2_y = sep_y + sep_gap2
+        row2_y = sep_y + sep_gap
 
         # ---- Row2: SCORE 标签 ----
         score_label_str = "SCORE"
@@ -526,7 +529,7 @@ class Renderer:
         preview_y = int(_PREVIEW_Y * scale)
         # 预览背景
         preview_rect_inner = pygame.Rect(preview_x, preview_y, preview_size, preview_size)
-        pygame.draw.rect(ds, (40, 45, 55), preview_rect_inner)
+        pygame.draw.rect(ds, PANEL_BG, preview_rect_inner)
 
         # NOTE: SHAPES_DATA uses the engine internal bottom-origin
         # coordinate system (y increases upward). When drawing the
@@ -728,7 +731,7 @@ class Renderer:
     def _draw_overlays(
         self, ds: pygame.Surface, state: GameState,
         scale: float, logical_w: int, logical_h: int,
-        board_left: int, _board_w: int, _board_h: int,
+        board_left: int, board_w: int, board_h: int,
     ) -> None:
         """绘制 Game Over / Pause / Confirm Quit / Help 弹窗。"""
         # 帮助覆盖层优先级最高
@@ -736,7 +739,7 @@ class Renderer:
             self._draw_help_overlay(ds, logical_w, logical_h, scale)
             return
 
-        board_rect = pygame.Rect(board_left, 0, _board_w, _board_h)
+        board_rect = pygame.Rect(board_left, 0, board_w, board_h)
 
         # Game Over
         if state.game_over:

@@ -1,6 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 """
-PyInstaller Specification File for MyTetris Professional (macOS Application)
+PyInstaller Specification File for MyTetris (macOS Application)
 Architecture: macOS Standard Bundle (onedir mode for compliant sandboxing)
 
 This configuration handles the multi-layered bundle structure required by macOS,

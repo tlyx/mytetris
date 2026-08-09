@@ -30,6 +30,7 @@ from input_handler import InputHandler
 from renderer import (
     BLOCK_SIZE,
     LEFT_WIDTH,
+    PANEL_BG,
     RIGHT_WIDTH,
     SCREEN_HEIGHT,
     SCREEN_WIDTH,
@@ -211,8 +212,8 @@ class TetrisApp:
         self._logical = None   # 逻辑表面，渲染时按比例缩放
 
     def _init_sidebar_style(self) -> None:
-        """设置侧边栏背景色（灰蓝色调）。"""
-        self.sidebar_bg = (40, 45, 55)
+        """设置侧边栏背景色（灰蓝色调，与 Renderer 面板配色一致）。"""
+        self.sidebar_bg = PANEL_BG
 
     @staticmethod
     def _init_icon() -> None:
