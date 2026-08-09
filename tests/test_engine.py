@@ -2,11 +2,11 @@
 # test_engine.py — 引擎核心逻辑测试
 # 覆盖生成对齐、移动边界、旋转、消行计分、Ghost、下落速度、7-bag。
 
-from engine import GRID_HEIGHT, GRID_WIDTH, SHAPES_DATA, TetrisEngine
+from engine import GRID_HEIGHT, GRID_WIDTH, SHAPES_DATA, GameEngine
 
 
 def make_empty_engine():
-    eng = TetrisEngine()
+    eng = GameEngine()
     # reset() already called in constructor; ensure a clean start
     eng.reset()
     return eng
@@ -89,10 +89,10 @@ def test_get_ghost_y_simple():
 
 
 def test_fall_speed_monotonic():
-    from engine import TetrisEngine
-    s1 = TetrisEngine.fall_speed(1)
-    s2 = TetrisEngine.fall_speed(2)
-    s10 = TetrisEngine.fall_speed(10)
+    from engine import GameEngine
+    s1 = GameEngine.fall_speed(1)
+    s2 = GameEngine.fall_speed(2)
+    s10 = GameEngine.fall_speed(10)
     assert isinstance(s1, int)
     assert s2 <= s1  # higher level => smaller interval (faster)
     assert s10 <= s2

@@ -79,7 +79,7 @@ class ConfigManager:
         except OSError as exc:
             print(f"WARNING: Failed to save config: {exc}")
 
-    # ---------- 便捷属性访问（与原有 TetrisApp 属性名一致） ----------
+    # ---------- 便捷属性访问（与原有 GameApp 属性名一致） ----------
     @property
     def clear_anim_enabled(self) -> bool:
         val = self._data["clear_anim_enabled"]

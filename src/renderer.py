@@ -2,7 +2,7 @@
 #
 # 设计原则：
 #  1. 接收 GameState 对象（只读快照）作为输入。
-#  2. 不持有任何 TetrisApp 或 TetrisEngine 的引用。
+#  2. 不持有任何 GameApp 或 GameEngine 的引用。
 #  3. 只负责将状态绘制到给定的 Pygame Surface 上。
 #
 # 此文件主要负责：
@@ -64,7 +64,7 @@ _HELP_GAP = 12                           # 帮助覆盖层各行间距
 _STATUS_COLOR: tuple[int, int, int] = (255, 200, 80)
 
 # ---- 面板/边框/分隔线配色（避免散落的魔法数） ----
-PANEL_BG: tuple[int, int, int] = (40, 45, 55)        # 左右面板背景（tetris 也用它填充窗口）
+PANEL_BG: tuple[int, int, int] = (40, 45, 55)        # 左右面板背景（app 也用它填充窗口）
 _BORDER_COLOR: tuple[int, int, int] = (80, 85, 95)   # 棋盘边框
 _SEP_COLOR: tuple[int, int, int] = (60, 60, 70)      # 面板分隔线
 

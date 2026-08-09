@@ -170,7 +170,7 @@ def cells_in_bounds(
 
 
 @final
-class TetrisEngine:
+class GameEngine:
     """游戏逻辑引擎，不依赖任何图形库。"""
 
     # 消行得分表（类常量）
@@ -329,7 +329,7 @@ class TetrisEngine:
         # lines_cleared ∈ 0..4（tetromino 在 10 宽网格中单行至多占 4 格），
         # 直接索引：若未来引入更宽的块导致越界，KeyError 立即暴露而非静默按 4 行计分
         self.add_score(
-            TetrisEngine.SCORE_TABLE[lines_cleared] * self.level + combo_bonus
+            GameEngine.SCORE_TABLE[lines_cleared] * self.level + combo_bonus
         )
 
         # 更新等级

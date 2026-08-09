@@ -35,18 +35,18 @@
 代码按职责拆分,依赖方向严格单向。布局:全部代码位于 `src/`(平铺的顶层模块,非包),包括入口 `main.py`;`tests/`、`docs/` 位于项目根。导入解析:运行 `uv run src/main.py` 时解释器自动把脚本目录(src)加入路径;pytest 由 `tests/conftest.py` 注入 src;pyright 经 `extraPaths` 解析。
 
 ```
-main.py → tetris.py (TetrisApp)
-tetris.py → renderer.py, ui_states.py, keyboard_handler.py,
+main.py → app.py (GameApp)
+app.py → renderer.py, ui_states.py, keyboard_handler.py,
             audio_manager.py, config_manager.py, contracts.py,
-            bot.py (BotRunner), engine.py (TetrisEngine)
+            bot.py (BotRunner), engine.py (GameEngine)
 bot.py → contracts.py, engine.py (仅共享几何原语)
 renderer.py → contracts.py, engine.py (仅常量/形状)
 ```
 
 | 模块 | 职责 |
 | --- | --- |
-| `main.py` | 入口;构造 `TetrisApp` 并运行。 |
-| `tetris.py` | 应用外壳:窗口、事件循环、状态切换、输入路由、bot 驱动。 |
+| `main.py` | 入口;构造 `GameApp` 并运行。 |
+| `app.py` | 应用外壳:窗口、事件循环、状态切换、输入路由、bot 驱动。 |
 | `engine.py` | 纯游戏规则——无图形依赖,可独立单元测试。 |
 | `renderer.py` | 将 `GameState` 绘制到 Surface;绝不触碰应用或引擎。 |
 | `ui_states.py` | 状态模式:每个 UI 状态对应一个处理器类。 |
@@ -62,13 +62,13 @@ renderer.py → contracts.py, engine.py (仅常量/形状)
 - **逻辑不进 UI。** 游戏规则在 `engine.py`;渲染器消费快照;应用负责串联。
 - **bot 是外部智能体,不是游戏功能。** 游戏只通过 `BotInterface` 协议与每帧一次的 `tick()` 调用与它交互;渲染器对它一无所知(只绘制 `status_line`)。
 - **共享规则是刻意为之。** 几何原语(`rotate_shape`、`collides`、`drop_y`、`spawn_y`、`cells_in_bounds`)是 `engine.py` 中的模块级纯函数,引擎与 bot 都从同一处导入,模拟语义永远不会漂移。
-- **`TetrisApp` 按职责分组,且三处顺序一致。** 类注解、`__init__` 调用序列与 `_init_*` 帮手方法的顺序完全一致——配置 → 窗口与显示 → 引擎会话 → UI 流程 → 时间源 → 输入 → 渲染 → 音频 → bot——以 `# ---- … ----` 组头标记。新增成员时三处都要加到对应组;此约定无 lint 强制,靠手动维护。
+- **`GameApp` 按职责分组,且三处顺序一致。** 类注解、`__init__` 调用序列与 `_init_*` 帮手方法的顺序完全一致——配置 → 窗口与显示 → 引擎会话 → UI 流程 → 时间源 → 输入 → 渲染 → 音频 → bot——以 `# ---- … ----` 组头标记。新增成员时三处都要加到对应组;此约定无 lint 强制,靠手动维护。
 
 ## 3. 命名约定
 
 | 类别 | 约定 | 示例 |
 | --- | --- | --- |
-| 类 | PascalCase | `TetrisEngine`、`BotRunner`、`GameState` |
+| 类 | PascalCase | `GameEngine`、`BotRunner`、`GameState` |
 | 函数 / 方法 | snake_case | `lock_and_clear_lines`、`cycle_strategy` |
 | 模块级函数 | snake_case,内部实现加 `_` 前缀 | `_best_move`、`_evaluate` |
 | 常量 | UPPER_SNAKE_CASE | `GRID_WIDTH`、`MAX_SCORE` |
@@ -86,11 +86,11 @@ renderer.py → contracts.py, engine.py (仅常量/形状)
 
 - **严格模式。** `pyrightconfig.json` 设置 `typeCheckingMode: "strict"`,并关闭 `reportUnusedCallResult` 与 `reportAny`。
 - **全量标注**:参数、返回值、模块级与类级属性、容器元素类型(`list[list[tuple[int, int, int] | None]]`,而不是裸 `list`)。
-- 仅在注解引用运行时不可用的名字时才使用 `from __future__ import annotations`:前向引用或 `TYPE_CHECKING` 下导入的名字(本仓库唯一场景是 `ui_states.py`——它用 `TYPE_CHECKING` 导入的 `TetrisEngine` 做注解,Python 3.13 上必需)。不要处处添加:Python 3.14+(PEP 649)注解默认惰性求值,它在 3.14 上已是空操作。
-- 对不允许被继承的类使用 `@final`(`TetrisEngine`、`TetrisApp`、`BotRunner`、`Renderer`、…)。
-- 接口契约使用 `Protocol`(`BotInterface`、`AppInterface`);依赖协议,只在组合根(`TetrisApp._init_bot`)构造具体实现。
+- 仅在注解引用运行时不可用的名字时才使用 `from __future__ import annotations`:前向引用或 `TYPE_CHECKING` 下导入的名字(本仓库唯一场景是 `contracts.py`——它用 `TYPE_CHECKING` 导入的 `GameEngine` 做注解,Python 3.13 上必需)。不要处处添加:Python 3.14+(PEP 649)注解默认惰性求值,它在 3.14 上已是空操作。
+- 对不允许被继承的类使用 `@final`(`GameEngine`、`GameApp`、`BotRunner`、`Renderer`、…)。
+- 接口契约使用 `Protocol`(`BotInterface`、`AppInterface`);依赖协议,只在组合根(`GameApp._init_bot`)构造具体实现。
 - 不可变数据载体使用 `@dataclass(frozen=True)`(`GameState`、`BotSnapshot`)。
-- 属于实例契约的类级常量使用 `typing.ClassVar`(`TetrisEngine.SCORE_TABLE`)。
+- 属于实例契约的类级常量使用 `typing.ClassVar`(`GameEngine.SCORE_TABLE`)。
 - 重写基类方法时使用 `@override`(见 `ui_states.py`)。
 - 仅为统一签名而保留、未使用的参数,以下划线开头命名(`_landing_height`)。
 
@@ -151,10 +151,10 @@ imports…
 
 ## 6. 依赖规则
 
-- **依赖接口,不依赖实现。** `TetrisApp` 持有 `bot: BotInterface`;具体 `BotRunner` 只在 `_init_bot` 中创建。
-- **逻辑模块不碰 pygame。** pygame 只存在于集成层——`tetris.py`、`renderer.py`、`ui_states.py`、`keyboard_handler.py`、`audio_manager.py`。逻辑模块(`engine.py`、`bot.py`、`contracts.py`、`config_manager.py`、`utils.py`)绝不 import pygame;共享的 `Action` 词汇表放在 `contracts.py`。
-- **渲染器只读。** 它接收 `GameState` 快照,不持有 `TetrisApp`/`TetrisEngine` 引用,渲染通用的 `status_line` 而不是了解"bot"。
-- **bot 是玩家,不是后门。** 它通过与人类键盘输入完全相同的路径(`TetrisApp._apply_action`)发出 `Action`,并受同样的重力、锁定延迟与计分约束。绝不给它直接访问引擎的能力,也不要为它关闭游戏机制。
+- **依赖接口,不依赖实现。** `GameApp` 持有 `bot: BotInterface`;具体 `BotRunner` 只在 `_init_bot` 中创建。
+- **逻辑模块不碰 pygame。** pygame 只存在于集成层——`app.py`、`renderer.py`、`ui_states.py`、`keyboard_handler.py`、`audio_manager.py`。逻辑模块(`engine.py`、`bot.py`、`contracts.py`、`config_manager.py`、`utils.py`)绝不 import pygame;共享的 `Action` 词汇表放在 `contracts.py`。
+- **渲染器只读。** 它接收 `GameState` 快照,不持有 `GameApp`/`GameEngine` 引用,渲染通用的 `status_line` 而不是了解"bot"。
+- **bot 是玩家,不是后门。** 它通过与人类键盘输入完全相同的路径(`GameApp._apply_action`)发出 `Action`,并受同样的重力、锁定延迟与计分约束。绝不给它直接访问引擎的能力,也不要为它关闭游戏机制。
 - 模块需要其他模块的状态时,优先使用窄而显式的接口(`BotSnapshot`、`tick(current_piece_id, make_snapshot)`),而不是传递整个对象。
 
 ## 7. 引擎约定
@@ -174,7 +174,7 @@ imports…
 - 白盒测试直接访问引擎内部;这类文件在第 1 行携带文件级 `# pyright: reportPrivateUsage=false` 指令压制私有访问诊断(不保留辅助 shim 模块)。
 - 优先确定性构造:显式构造盘面(标注类型的 grid、显式 `piece_id`),而不是依赖随机 bag。
 - 测试必须相互隔离、整包安全;不得依赖真实墙钟时序(线程测试使用超时与宽裕的截止时间)。
-- App 层测试以 dummy SDL 驱动无头启动 `TetrisApp`(`SDL_VIDEODRIVER=dummy`、`SDL_AUDIODRIVER=dummy`)。
+- App 层测试以 dummy SDL 驱动无头启动 `GameApp`(`SDL_VIDEODRIVER=dummy`、`SDL_AUDIODRIVER=dummy`)。
 
 ## 9. 工具与质量保障
 

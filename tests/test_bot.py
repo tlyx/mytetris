@@ -38,7 +38,7 @@ from engine import (
     GRID_HEIGHT,
     GRID_WIDTH,
     SHAPES_DATA,
-    TetrisEngine,
+    GameEngine,
     cells_in_bounds,
     rotate_shape,
 )
@@ -51,16 +51,16 @@ def make_engine(
     board: list[list[tuple[int, int, int] | None]],
     current: str,
     next_type: str,
-) -> TetrisEngine:
+) -> GameEngine:
     """构造只读场景：求解函数只读取 grid/current_type/next_type。"""
-    eng = TetrisEngine()
+    eng = GameEngine()
     eng.grid = copy.deepcopy(board)
     eng.current_type = current
     eng.next_type = next_type
     return eng
 
 
-def solve_engine(eng: TetrisEngine) -> tuple[int, int] | None:
+def solve_engine(eng: GameEngine) -> tuple[int, int] | None:
     """对引擎当前块做一次 2-ply 求解。"""
     return _best_move(
         eng.grid,
@@ -264,7 +264,7 @@ def test_no_legal_placement_returns_none() -> None:
 
 
 def make_snapshot(
-    eng: TetrisEngine, piece_id: int | None = None
+    eng: GameEngine, piece_id: int | None = None
 ) -> BotSnapshot:
     """从引擎构造投递给 bot 线程的只读快照。
 
@@ -283,8 +283,8 @@ def make_snapshot(
     )
 
 
-def apply_actions(eng: TetrisEngine, actions: list[Action]) -> None:
-    """模拟主线程逐动作应用（与 TetrisApp._apply_action 的引擎机械一致）。"""
+def apply_actions(eng: GameEngine, actions: list[Action]) -> None:
+    """模拟主线程逐动作应用（与 GameApp._apply_action 的引擎机械一致）。"""
     for action in actions:
         if action == Action.MOVE_LEFT:
             eng.move(-1, 0)
@@ -299,7 +299,7 @@ def apply_actions(eng: TetrisEngine, actions: list[Action]) -> None:
 
 def test_plan_to_actions_locks_piece() -> None:
     """计划 → 动作序列 → 引擎机械，与人类按键等价（旋转/移动/硬降/锁定）。"""
-    eng = TetrisEngine()
+    eng = GameEngine()
     eng.reset()
     plan = _best_move(
         eng.grid,
@@ -482,7 +482,7 @@ def test_runner_thread_emits_actions_and_stops() -> None:
     runner = BotRunner()
     runner.start()
     try:
-        eng = TetrisEngine()
+        eng = GameEngine()
         eng.reset()
         runner._mailbox.post(make_snapshot(eng))
         deadline = time.monotonic() + 2.0

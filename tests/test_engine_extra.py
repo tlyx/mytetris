@@ -11,7 +11,7 @@ from engine import (
     LOCK_RESET_LIMIT,
     MAX_SCORE,
     SHAPES_DATA,
-    TetrisEngine,
+    GameEngine,
     cells_in_bounds,
     collides,
     drop_y,
@@ -22,7 +22,7 @@ from engine import (
 # SHAPES_DATA was previously imported but is not needed here
 
 def make_empty_engine():
-    eng = TetrisEngine()
+    eng = GameEngine()
     eng.reset()
     return eng
 
@@ -104,7 +104,7 @@ def test_lock_and_clear_multiple_lines_scoring():
     eng.current_shape = []
     eng.lock_and_clear_lines()
     assert eng.total_lines == prev_total + 3
-    assert eng.score == prev_score + TetrisEngine.SCORE_TABLE.get(3, 800) * eng.level
+    assert eng.score == prev_score + GameEngine.SCORE_TABLE.get(3, 800) * eng.level
 
 
 def test_get_piece_cells_after_move_and_rotate():
@@ -219,7 +219,7 @@ def test_cells_in_bounds_filters_out_of_bounds():
 
 def test_hard_drop_returns_distance_to_bottom():
     """硬降返回落下的格数，块确实贴底（O/S/Z 因含 py=-1 单元停于 anchor y=1）。"""
-    eng = TetrisEngine()
+    eng = GameEngine()
     eng.reset()
     start_y = eng.y
     start_x = eng.x
@@ -231,7 +231,7 @@ def test_hard_drop_returns_distance_to_bottom():
 
 def test_add_score_caps_at_max():
     """add_score 累加并封顶到 MAX_SCORE。"""
-    eng = TetrisEngine()
+    eng = GameEngine()
     eng.reset()
     eng.add_score(100)
     assert eng.score == 100
@@ -243,7 +243,7 @@ def test_add_score_caps_at_max():
 
 def test_combo_bonus_accumulates_and_resets():
     """连击（指南标准）：连续消行第 2 次起 +50×(N-1)×level；不消行则清零。"""
-    eng = TetrisEngine()
+    eng = GameEngine()
     eng.reset()
     eng.score = 0
 
@@ -278,7 +278,7 @@ def test_combo_bonus_accumulates_and_resets():
 
 def test_resting_window_locks_on_expiry():
     """贴地锁定：首次 handle_resting 记录时刻，满 LOCK_DELAY_MS 返回锁定信号。"""
-    eng = TetrisEngine()
+    eng = GameEngine()
     eng.reset()
     while eng.move(0, -1):  # 贴底
         pass
@@ -291,7 +291,7 @@ def test_resting_window_locks_on_expiry():
 
 def test_lock_reset_budget_capped():
     """锁定重置预算：贴地期间 15 次移动重置后，第 16 次不再重置计时。"""
-    eng = TetrisEngine()
+    eng = GameEngine()
     eng.reset()
     while eng.move(0, -1):  # 贴底
         pass
@@ -304,7 +304,7 @@ def test_lock_reset_budget_capped():
     eng.reset_lock_delay(count=True)
     assert eng.resting_since == 0
     # 空中移动不计预算
-    eng2 = TetrisEngine()
+    eng2 = GameEngine()
     eng2.reset()
     eng2.reset_lock_delay(count=True)
     assert eng2.lock_resets == 0
@@ -312,7 +312,7 @@ def test_lock_reset_budget_capped():
 
 def test_drop_scoring_in_engine():
     """软降/硬降计分由引擎完成（指南标准：软降 +1/格，硬降 +2/格）。"""
-    eng = TetrisEngine()
+    eng = GameEngine()
     eng.reset()
     assert eng.soft_drop() is True
     assert eng.score == 1  # 软降一格 +1

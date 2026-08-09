@@ -1,14 +1,14 @@
-# bot.py — 自动游戏机器人，独立于 TetrisApp
+# bot.py — 自动游戏机器人，独立于 GameApp
 #
 # 公平性设计：bot 不再直连引擎。游戏主循环每帧调用一次 BotRunner.tick()
 # 传入当前方块 id 与快照工厂，取回可应用的按键动作（Action）；内部换块
-# 投递、节流、过期丢弃全部封装。动作经 TetrisApp._apply_action 喂进与
+# 投递、节流、过期丢弃全部封装。动作经 GameApp._apply_action 喂进与
 # 人类键盘完全相同的输入路径。重力、锁定延迟、计分对 bot 一视同仁；
 # 求解期间若块已被重力锁定，放弃结果对新块重算——像真正的人一样：
 # 想太久，方块自己掉下去锁掉。
 #
 # 对外 API（游戏主体只依赖这些）：
-#   - BotRunner    : 具体实现（组合点在 TetrisApp._init_bot）
+#   - BotRunner    : 具体实现（组合点在 GameApp._init_bot）
 #   - STRATEGIES / DEFAULT_STRATEGY : 评估策略的可配置行为
 #   （BotInterface / BotSnapshot 是跨组件契约，定义见 contracts.py）
 #
@@ -24,10 +24,10 @@
 # cycle_strategy 切换）：
 #   - modern（默认）：经典 Dellacherie 特征（landing height / 消行 /
 #     行过渡 / 列过渡 / 空洞 / 井深和），重存活、稳如老狗；
-#   - legacy：Dellacherie 之前的手调启发式，清行更大胆（Tetris 略多
+#   - legacy：Dellacherie 之前的手调启发式，清行更大胆（四连消略多
 #     但更早顶死）。
 #
-# 注：曾尝试"挖井攒 Tetris"（hunter）策略——任何井奖励（井深和/最大
+# 注：曾尝试"挖井攒四连消"（hunter）策略——任何井奖励（井深和/最大
 # 井深/锚定井深）都会在 2-ply 内层搜索中把空盘决策翻成靠边竖放，级联
 # 成乱堆秒死。挖井策略本质需要知道 I 何时到来（bag 前瞻），单格预览
 # 的加法特征表达不了，故不提供该策略。
@@ -266,7 +266,7 @@ def _legacy_evaluate(
 
     与 Dellacherie 不同：无落点高度惩罚（参数保留以统一 STRATEGIES 签名，
     未使用，故以下划线命名），权重手调，中间堆高倾向明显、清行更大胆
-    （Tetris 略多但更早顶死）。
+    （四连消略多但更早顶死）。
     """
     heights = _column_heights(grid)
     holes = 0
@@ -388,7 +388,7 @@ class BotRunner:
 
     游戏侧每帧只调用 tick()：传入当前方块 id 与快照工厂，取回可应用
     的动作。换块投递、队列消费、过期动作丢弃等内部机制全部封装在
-    runner 内部，TetrisApp 不感知。
+    runner 内部，GameApp 不感知。
 
     :param strategy: 评估策略名（见 STRATEGIES），默认 modern。
     """

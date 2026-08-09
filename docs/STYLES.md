@@ -49,18 +49,18 @@ and `tests/conftest.py` adds `src` for pytest; pyright resolves via
 `extraPaths`.
 
 ```
-main.py → tetris.py (TetrisApp)
-tetris.py → renderer.py, ui_states.py, keyboard_handler.py,
+main.py → app.py (GameApp)
+app.py → renderer.py, ui_states.py, keyboard_handler.py,
             audio_manager.py, config_manager.py, contracts.py,
-            bot.py (BotRunner), engine.py (TetrisEngine)
+            bot.py (BotRunner), engine.py (GameEngine)
 bot.py → contracts.py, engine.py (shared geometry primitives only)
 renderer.py → contracts.py, engine.py (constants/shapes only)
 ```
 
 | Module | Responsibility |
 | --- | --- |
-| `main.py` | Entry point; constructs `TetrisApp` and runs it. |
-| `tetris.py` | App shell: window, event loop, state switching, input routing, bot driving. |
+| `main.py` | Entry point; constructs `GameApp` and runs it. |
+| `app.py` | App shell: window, event loop, state switching, input routing, bot driving. |
 | `engine.py` | Pure game rules — no graphics dependency, unit-testable in isolation. |
 | `renderer.py` | Draws a `GameState` onto a Surface; never touches the app or the engine. |
 | `ui_states.py` | State pattern: one handler class per app/UI state. |
@@ -83,7 +83,7 @@ Guidelines:
   (`rotate_shape`, `collides`, `drop_y`, `spawn_y`, `cells_in_bounds`) are
   module-level pure functions in `engine.py` that both the engine and the bot
   import, so simulation semantics can never drift apart.
-- **`TetrisApp` is organized by responsibility, in one canonical order.**
+- **`GameApp` is organized by responsibility, in one canonical order.**
   Class annotations, the `__init__` call sequence, and the `_init_*` helper
   methods all follow the same group order — config → window/display → engine
   session → UI flow → time source → input → rendering → audio → bot — marked
@@ -94,7 +94,7 @@ Guidelines:
 
 | Kind | Convention | Example |
 | --- | --- | --- |
-| Classes | PascalCase | `TetrisEngine`, `BotRunner`, `GameState` |
+| Classes | PascalCase | `GameEngine`, `BotRunner`, `GameState` |
 | Functions / methods | snake_case | `lock_and_clear_lines`, `cycle_strategy` |
 | Module-level functions | snake_case, `_`-private when internal | `_best_move`, `_evaluate` |
 | Constants | UPPER_SNAKE_CASE | `GRID_WIDTH`, `MAX_SCORE` |
@@ -121,19 +121,19 @@ Rules:
 - Use `from __future__ import annotations` only where annotations reference
   names that are not available at runtime: forward references or
   `TYPE_CHECKING`-only imports (the one case in this repo is
-  `ui_states.py`, which annotates with a `TYPE_CHECKING`-imported
-  `TetrisEngine` and needs it for Python 3.13). Do not add it everywhere:
+  `contracts.py`, which annotates with a `TYPE_CHECKING`-imported
+  `GameEngine` and needs it for Python 3.13). Do not add it everywhere:
   on Python 3.14+ (PEP 649) annotations are lazy by default, so it is a
   no-op there anyway.
 - Use `@final` on classes that are not meant to be subclassed
-  (`TetrisEngine`, `TetrisApp`, `BotRunner`, `Renderer`, …).
+  (`GameEngine`, `GameApp`, `BotRunner`, `Renderer`, …).
 - Use `Protocol` for interface contracts (`BotInterface`, `AppInterface`);
   depend on the protocol, construct the concrete implementation only at the
-  composition root (`TetrisApp._init_bot`).
+  composition root (`GameApp._init_bot`).
 - Use `@dataclass(frozen=True)` for immutable data carriers
   (`GameState`, `BotSnapshot`).
 - Use `typing.ClassVar` for class-level constants that are part of the
-  instance contract (`TetrisEngine.SCORE_TABLE`).
+  instance contract (`GameEngine.SCORE_TABLE`).
 - Use `@override` when overriding a base-class method (see `ui_states.py`).
 - Unused parameters that exist only for signature uniformity are named with a
   leading underscore (`_landing_height`).
@@ -199,20 +199,20 @@ imports…
 
 ## 6. Dependency Rules
 
-- **Depend on interfaces, not implementations.** `TetrisApp` holds
+- **Depend on interfaces, not implementations.** `GameApp` holds
   `bot: BotInterface`; the concrete `BotRunner` is created only in
   `_init_bot`.
 - **No pygame in logic modules.** pygame is confined to the integration
-  layer — `tetris.py`, `renderer.py`, `ui_states.py`,
+  layer — `app.py`, `renderer.py`, `ui_states.py`,
   `keyboard_handler.py`, `audio_manager.py`. Logic modules (`engine.py`,
   `bot.py`, `contracts.py`, `config_manager.py`,
   `utils.py`) never import pygame; the shared `Action` vocabulary lives
   in `contracts.py`.
 - **The renderer is read-only.** It takes a `GameState` snapshot, holds no
-  reference to `TetrisApp`/`TetrisEngine`, and renders a generic
+  reference to `GameApp`/`GameEngine`, and renders a generic
   `status_line` instead of knowing about "the bot".
 - **The bot is a player, not a backdoor.** It emits `Action`s through the
-  same path as human keyboard input (`TetrisApp._apply_action`), and is
+  same path as human keyboard input (`GameApp._apply_action`), and is
   subject to the same gravity, lock delay, and scoring. Never give it direct
   engine access or disable game mechanics for it.
 - When a module needs state from another module, prefer narrow, explicit
@@ -249,7 +249,7 @@ imports…
   explicit `piece_id`s) instead of depending on the random bag.
 - Tests must be isolated and full-suite safe; no tests depend on real
   wall-clock timing (thread tests use timeouts and generous deadlines).
-- App-level tests boot `TetrisApp` headless with dummy SDL drivers
+- App-level tests boot `GameApp` headless with dummy SDL drivers
   (`SDL_VIDEODRIVER=dummy`, `SDL_AUDIODRIVER=dummy`).
 
 ## 9. Tooling & QA

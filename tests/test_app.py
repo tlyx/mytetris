@@ -11,19 +11,19 @@
 import json
 import os
 
-# pygame 无头环境：必须在构造 TetrisApp（初始化显示/音频）之前设置
+# pygame 无头环境：必须在构造 GameApp（初始化显示/音频）之前设置
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
+from app import GameApp
 from config_manager import ConfigManager
 from contracts import Action
 from engine import LOCK_DELAY_MS
-from tetris import TetrisApp
 
 
-def _app_with_piece_at_bottom() -> TetrisApp:
+def _app_with_piece_at_bottom() -> GameApp:
     """构造 App 并把当前块硬降到贴底（再下移必失败）。"""
-    app = TetrisApp()
+    app = GameApp()
     app.game.reset()
     while app.game.move(0, -1):
         pass
@@ -51,7 +51,7 @@ def test_fall_timer_applies_when_bot_enabled() -> None:
 
 def test_cycle_bot_strategy() -> None:
     """循环切换 bot 策略：顺序遍历注册表。"""
-    app = TetrisApp()
+    app = GameApp()
     assert app.bot.strategy == "modern"
     app.cycle_bot_strategy()
     assert app.bot.strategy == "legacy"
@@ -61,7 +61,7 @@ def test_cycle_bot_strategy() -> None:
 
 def test_drop_actions_score_points() -> None:
     """软降每格 +1、硬降每格 +2（指南标准计分）。"""
-    app = TetrisApp()
+    app = GameApp()
     app.game.reset()
 
     score_before = app.game.score
@@ -146,6 +146,6 @@ def test_ghost_enabled_loaded_from_config(tmp_path, monkeypatch) -> None:
     cfg = tmp_path / "config.json"
     cfg.write_text(json.dumps({"ghost_enabled": True}))
     monkeypatch.setattr(ConfigManager, "_config_file", lambda self: cfg)
-    app = TetrisApp()
+    app = GameApp()
     assert app.ghost_enabled is True
     assert app.config.ghost_enabled is True

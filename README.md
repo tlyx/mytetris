@@ -19,7 +19,7 @@
 ## Features
 
 *   **Classic Gameplay**: Includes all 7 standard tetrominoes with rotation, wall‑kick, and collision detection.
-*   **Modular Architecture**: Clean separation between game engine logic (`TetrisEngine`) and application framework (`TetrisApp`).
+*   **Modular Architecture**: Clean separation between game engine logic (`GameEngine`) and application framework (`GameApp`).
 *   **Dynamic Difficulty**: Speed increases as you level up (every 10 lines).
 *   **Smooth Rendering**: Built for 60 FPS performance with hardware‑accelerated surfaces.
 *   **Intuitive UI**:

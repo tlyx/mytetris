@@ -1,4 +1,4 @@
-# tetris.py — 应用外壳：窗口、事件循环、状态机与组合根
+# app.py — 应用外壳：窗口、事件循环、状态机与组合根
 #
 # 设计目标：使用逻辑表面（_logical）独立于物理窗口尺寸，
 # 保证所有文字与方块在视网膜屏上依然清晰。
@@ -24,7 +24,7 @@ from audio_manager import AudioManager
 from bot import BotRunner
 from config_manager import ConfigManager
 from contracts import Action, BotInterface, BotSnapshot, GameState
-from engine import GRID_HEIGHT, GRID_WIDTH, MAX_SCORE, TetrisEngine
+from engine import GRID_HEIGHT, GRID_WIDTH, MAX_SCORE, GameEngine
 from keyboard_handler import KeyboardHandler
 from renderer import (
     BLOCK_SIZE,
@@ -60,7 +60,7 @@ _HELP_FONT_FILE = resource_path("assets/fonts/DejaVuSansMono.ttf")
 # ---------------------------------------------
 
 @final
-class TetrisApp:
+class GameApp:
     """我的方块主应用程序类，负责窗口管理、事件循环和音频控制。"""
 
     # ---- 配置（最先加载，各组件按配置构造） ----
@@ -74,7 +74,7 @@ class TetrisApp:
     window_bg: tuple[int, int, int]  # 窗口背景色
 
     # ---- 游戏引擎与会话 ----
-    game: TetrisEngine
+    game: GameEngine
     fall_event: int  # 重力下落定时器事件
     clock: pygame.time.Clock
     high_score: int
@@ -130,7 +130,7 @@ class TetrisApp:
         self._init_window_and_surfaces()
         self._init_window_style()
         self._enforce_min_size()
-        TetrisApp._init_icon()
+        GameApp._init_icon()
         pygame.mouse.set_visible(True)  # 初始时鼠标可见（不再全局隐藏）
 
         # ---- 游戏引擎与会话 ----
@@ -229,7 +229,7 @@ class TetrisApp:
     # ---- 游戏引擎与会话 ----
     def _init_game_state(self) -> None:
         """初始化游戏引擎、下落定时器与时钟（回合公共状态由 _reset_round_state 提供）。"""
-        self.game = TetrisEngine()
+        self.game = GameEngine()
         self.fall_event = pygame.USEREVENT + 1
         self.clock = pygame.time.Clock()
         self._reset_round_state()
@@ -391,7 +391,7 @@ class TetrisApp:
 
     def _update_speed(self) -> None:
         """根据等级计算下落速度（engine 统一公式；set_timer 幂等，可重复调用）。"""
-        speed = TetrisEngine.fall_speed(self.game.level)
+        speed = GameEngine.fall_speed(self.game.level)
         pygame.time.set_timer(self.fall_event, speed)
 
     def _update_high_score(self) -> None:
@@ -487,7 +487,7 @@ class TetrisApp:
         board_h_px = GRID_HEIGHT * bs
 
         # 鼠标隐藏逻辑委托给独立方法
-        TetrisApp._update_mouse_visibility(
+        GameApp._update_mouse_visibility(
             x_off, y_off, board_left_px, board_w_px, board_h_px,
         )
 

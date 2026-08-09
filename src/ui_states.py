@@ -3,7 +3,7 @@
 # 此文件主要负责：
 #  - 状态机：Playing / Paused / GameOver / ConfirmQuit / Help
 #  - 各状态下的按键分发与状态转换
-#  - AppInterface 契约（TetrisApp 对外接口）见 contracts.py
+#  - AppInterface 契约（GameApp 对外接口）见 contracts.py
 
 from __future__ import annotations
 

@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Protocol
 # 仅用于注解；运行时零依赖（type-only 边，避免与 keyboard_handler 的导入环）
 if TYPE_CHECKING:
     from config_manager import ConfigManager
-    from engine import TetrisEngine
+    from engine import GameEngine
     from keyboard_handler import KeyboardHandler
 
 
@@ -97,13 +97,13 @@ class BotSnapshot:
 
 
 # ------------------------------------------------------------------
-# 接口协议（行为契约；实现位于各自组合根：BotRunner / TetrisApp）
+# 接口协议（行为契约；实现位于各自组合根：BotRunner / GameApp）
 # ------------------------------------------------------------------
 
 class BotInterface(Protocol):
     """游戏主体依赖的 bot 接口（可整体替换实现）。
 
-    TetrisApp 只依赖此协议：换 bot 实现（如深度强化学习版）时，
+    GameApp 只依赖此协议：换 bot 实现（如深度强化学习版）时，
     提供同接口即可，游戏代码零改动。
     """
 
@@ -121,8 +121,8 @@ class BotInterface(Protocol):
 
 
 class AppInterface(Protocol):
-    """TetrisApp 对外暴露的接口（供状态处理器调用）。"""
-    game: TetrisEngine
+    """GameApp 对外暴露的接口（供状态处理器调用）。"""
+    game: GameEngine
     keyboard_handler: KeyboardHandler
     config: ConfigManager
     paused: bool

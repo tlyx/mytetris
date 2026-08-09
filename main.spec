@@ -69,7 +69,7 @@ with open(os.path.join(ZH_LPROJ, "InfoPlist.strings"), "w", encoding="utf-8") as
 # =========================================================================
 a = Analysis(
     # 入口位于 src/：PyInstaller 自动把脚本所在目录加入分析路径，
-    # 项目模块（tetris/engine/...）无需 pathex 即可解析。
+    # 项目模块（app/engine/...）无需 pathex 即可解析。
     ['src/main.py'],
     binaries=[],
     datas=[
