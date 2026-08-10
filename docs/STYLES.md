@@ -238,10 +238,15 @@ imports…
   rule — ≥3 of the 4 diagonals around the T center occupied
   (`is_t_spin`, rotation-independent since the center is the shape
   origin) — and `last_was_rotation`: the rotation must be the literal
-  last action, so any successful move/soft drop/hard drop clears the
-  flag. Rotate-then-hard-drop is deliberately NOT a T-spin. Scoring
-  is `T_SPIN_TABLE` (no-clear 100, single 800, double 1200, triple
-  1600, ×level); the combo bonus stacks orthogonally.
+  last action, so any successful move/soft drop clears the flag.
+  Hard drop only clears it when it actually moves the piece
+  (distance > 0) — a grounded hard drop (distance 0) is just the
+  "lock now" confirm, so the rotation still counts. Rotating
+  mid-air and hard-dropping into the slot is therefore NOT a
+  T-spin, while rotating into a resting slot and confirming with a
+  0-distance hard drop is. Scoring is `T_SPIN_TABLE` (no-clear 100,
+  single 800, double 1200, triple 1600, ×level); the combo bonus
+  stacks orthogonally.
 - Every spawn increments `piece_id`; treat it as the identity of a piece
   *instance* (same-type pieces are still distinct instances).
 - New geometry/collision logic must be added as a shared pure function in the

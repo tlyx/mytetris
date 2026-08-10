@@ -569,3 +569,64 @@ def test_t_spin_end_to_end_player_flow():
     eng.lock_and_clear_lines()
     assert eng.total_lines == 1
     assert eng.score == 800  # T_SPIN_TABLE[1] × level(1)
+
+
+def test_grounded_hard_drop_after_rotate_keeps_t_spin():
+    """贴地硬降（距离 0）不算"旋转后硬降"：旋转仍是最后动作，T-spin 成立。
+
+    语义：硬降只有真的移动了方块才作废旋转标志；方块已入槽贴地时
+    硬降只是立即锁定，旋转才是完成入位的动作。
+    """
+    eng = _make_t_spin_scene(rows=1)  # T 已旋转到 rot2、贴地于槽位,标志 True
+    assert eng.last_was_rotation is True
+    distance = eng.hard_drop()  # 贴地:距离 0,标志保留
+    assert distance == 0
+    assert eng.last_was_rotation is True  # 旋转仍是最后动作
+    eng.lock_and_clear_lines()
+    assert eng.total_lines == 1
+    assert eng.score == 800  # T-spin 单消成立
+
+
+def test_hard_drop_moving_piece_clears_t_spin():
+    """真正的"旋转后硬降"：硬降移动了方块（距离 > 0）→ 旋转作废，不算 T-spin。"""
+    eng = make_empty_engine()
+    eng.next_type = "T"
+    eng._spawn_piece()
+    assert eng.rotate() is True  # 空中旋转,标志 True
+    distance = eng.hard_drop()  # 空中硬降:距离 > 0
+    assert distance > 0
+    assert eng.last_was_rotation is False  # 每次成功 move 已清除标志
+
+
+def test_t_spin_requires_t_piece():
+    """非 T 块即使 3 角满足也不算 T-spin（current_type 门控）。
+
+    用无消行场景区分：常规 0 分；若误判 T-spin 会拿到无消行 T-spin 的 100 分。
+    """
+    eng = make_empty_engine()
+    for col in range(GRID_WIDTH):
+        if col != 5:
+            eng.grid[0][col] = (1, 1, 1)
+    eng.grid[1][3] = (1, 1, 1)
+    eng.grid[2][4] = (1, 1, 1)
+    # L 块:旋转置位标志,直接摆到 (5,1)(赋值非动作,标志保留)
+    eng.next_type = "L"
+    eng._spawn_piece()
+    assert eng.rotate() is True  # 空中旋转,标志 True
+    eng.current_shape = rotate_shape(SHAPES_DATA["L"], 0)
+    eng.rotation = 0
+    eng.x, eng.y = 5, 1
+    assert eng.last_was_rotation is True
+    # 3 角确实满足(锁定前,L 自身单元不在盘面,不影响角位判定)
+    assert is_t_spin(eng.grid, 5, 1) is True
+    eng.lock_and_clear_lines()
+    assert eng.total_lines == 0
+    assert eng.score == 0  # 非 T 块 → 常规无消行 0 分，而非 T-spin 的 100
+
+
+def test_t_spin_scores_level_multiplier():
+    """T-spin 分值 ×level：level 2 单消 = 1600。"""
+    eng = _make_t_spin_scene(rows=1)
+    eng.level = 2
+    eng.lock_and_clear_lines()
+    assert eng.score == 1600
