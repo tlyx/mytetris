@@ -630,3 +630,43 @@ def test_t_spin_scores_level_multiplier():
     eng.level = 2
     eng.lock_and_clear_lines()
     assert eng.score == 1600
+
+
+def test_srs_tables_match_official_guideline():
+    """SRS 踢表与官方表逐条一致（顺时针 4 过渡，y 翻转为底部原点）。
+
+    防抄录错误：任何手滑改表都会在这里暴露。
+    """
+    official_jl = {
+        (0, 1): [(0, 0), (-1, 0), (-1, -1), (0, 2), (-1, 2)],
+        (1, 2): [(0, 0), (1, 0), (1, 1), (0, -2), (1, -2)],
+        (2, 3): [(0, 0), (1, 0), (1, -1), (0, 2), (1, 2)],
+        (3, 0): [(0, 0), (-1, 0), (-1, 1), (0, -2), (-1, -2)],
+    }
+    official_i = {
+        (0, 1): [(0, 0), (-2, 0), (1, 0), (-2, 1), (1, -2)],
+        (1, 2): [(0, 0), (-1, 0), (2, 0), (-1, -2), (2, 1)],
+        (2, 3): [(0, 0), (2, 0), (-1, 0), (2, -1), (-1, 2)],
+        (3, 0): [(0, 0), (1, 0), (-2, 0), (1, 2), (-2, -1)],
+    }
+    assert _SRS_KICKS_JLSTZ == official_jl
+    assert _SRS_KICKS_I == official_i
+
+
+def test_srs_kick_on_rotation_2_to_3():
+    """2→3 过渡的踢位：(0,0) 被堵时用 (1,0) 横向踢（非 0→R 过渡路径）。"""
+    eng = make_empty_engine()
+    eng.next_type = "J"
+    eng._spawn_piece()
+    assert eng.rotate() is True
+    assert eng.rotate() is True  # → rotation 2
+    old_x = eng.x
+    new_shape = rotate_shape(SHAPES_DATA["J"], 3)  # 目标 rot3 形状
+    for dx, dy in new_shape:
+        tx = eng.x + dx
+        ty = eng.y + dy
+        if 0 <= tx < GRID_WIDTH and 0 <= ty < GRID_HEIGHT:
+            eng.grid[ty][tx] = (8, 8, 8)
+    assert eng.rotate() is True  # 2→3：原地被堵 → (1,0) 踢
+    assert eng.rotation == 3
+    assert eng.x == old_x + 1

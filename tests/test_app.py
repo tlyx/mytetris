@@ -149,3 +149,42 @@ def test_ghost_enabled_loaded_from_config(tmp_path, monkeypatch) -> None:
     app = GameApp()
     assert app.ghost_enabled is True
     assert app.config.ghost_enabled is True
+
+
+def test_t_spin_playthrough_via_app_actions():
+    """通过 TetrisApp 真实动作路径打出 T-spin 单消（补偿无法手测的用户）。
+
+    动作序列与手玩一致：空中旋转 → 右移 → 软降进缺口 → 收尾旋转 →
+    走锁定窗口（handle_fall_timer 贴地计时）。锁定瞬间应恰 +800。
+    """
+    app = GameApp()
+    app.game.reset()
+    # 搭结构：底行留第 5 列缺口 + 帽子 (3,1)/(4,2)
+    for col in range(10):
+        if col != 5:
+            app.game.grid[0][col] = (1, 1, 1)
+    app.game.grid[1][3] = (1, 1, 1)
+    app.game.grid[2][4] = (1, 1, 1)
+    # 指定 T 块
+    app.game.next_type = "T"
+    app.game._spawn_piece()
+    # ① 空中旋转 → rot1
+    app._apply_action(Action.ROTATE)
+    # ② 右移到缺口上方
+    while app.game.x < 5:
+        app._apply_action(Action.MOVE_RIGHT)
+    # ③ 软降进缺口（软降清标志，无妨）
+    while app.game.soft_drop():
+        pass
+    # ④ 收尾旋转（最后动作）
+    app._apply_action(Action.ROTATE)
+    assert app.game.last_was_rotation is True
+    assert app.game.rotation == 2
+    # ⑤ 走锁定窗口：首 tick 开始贴地计时，窗口满后锁定
+    score_before = app.game.score
+    app._now = 1000
+    app.handle_fall_timer()  # 贴地 → resting_since = 1000
+    app._now = 1000 + LOCK_DELAY_MS + 1
+    app.handle_fall_timer()  # 窗口满 → 锁定结算
+    assert app.game.total_lines == 1
+    assert app.game.score - score_before == 800  # T-spin 单消 +800
