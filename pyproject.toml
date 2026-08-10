@@ -1,6 +1,6 @@
 [project]
 name = "taoclear"
-version = "0.9.16"
+version = "0.9.17-dev"
 description = "Homemade falling-block game with AI"
 readme = "README.md"
 requires-python = ">=3.13"
