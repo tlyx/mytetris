@@ -404,9 +404,13 @@ def test_failed_move_keeps_rotation_flag():
     assert eng.last_was_rotation is True  # 失败的移动不清除标志
 
 
-def _corner_grid(filled: set[tuple[int, int]]) -> list[list[tuple[int, int, int] | None]]:
+def _corner_grid(
+    filled: set[tuple[int, int]],
+) -> list[list[tuple[int, int, int] | None]]:
     """构造以 (5, 5) 为中心、指定对角被占的网格。"""
-    grid = [[None for _ in range(GRID_WIDTH)] for _ in range(GRID_HEIGHT)]
+    grid: list[list[tuple[int, int, int] | None]] = [
+        [None for _ in range(GRID_WIDTH)] for _ in range(GRID_HEIGHT)
+    ]
     for gx, gy in filled:
         grid[gy][gx] = (1, 1, 1)
     return grid

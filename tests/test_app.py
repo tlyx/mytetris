@@ -10,6 +10,9 @@
 
 import json
 import os
+from pathlib import Path
+
+import pytest
 
 # pygame 无头环境：必须在构造 GameApp（初始化显示/音频）之前设置
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
@@ -137,7 +140,9 @@ def test_lock_delay_reset_budget_capped_at_15() -> None:
     assert app.game.current_type != piece_before
 
 
-def test_ghost_enabled_loaded_from_config(tmp_path, monkeypatch) -> None:
+def test_ghost_enabled_loaded_from_config(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """ghost 开关启动时读取配置，而非默认 False。
 
     回归：__init__ 里晚于 _init_config() 的 `self.ghost_enabled = False`
@@ -145,7 +150,11 @@ def test_ghost_enabled_loaded_from_config(tmp_path, monkeypatch) -> None:
     """
     cfg = tmp_path / "config.json"
     cfg.write_text(json.dumps({"ghost_enabled": True}))
-    monkeypatch.setattr(ConfigManager, "_config_file", lambda self: cfg)
+
+    def _fake_config_file(self: ConfigManager) -> Path:
+        return cfg
+
+    monkeypatch.setattr(ConfigManager, "_config_file", _fake_config_file)
     app = GameApp()
     assert app.ghost_enabled is True
     assert app.config.ghost_enabled is True

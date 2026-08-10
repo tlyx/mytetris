@@ -274,7 +274,7 @@ imports…
 | --- | --- | --- |
 | uv | Dependency/env management | `pyproject.toml`; dev deps: pillow, pyinstaller, pytest, ruff |
 | ruff | Lint + import sort | `[tool.ruff] src = ["src"]` (pins the source root so classification is cwd-independent) |
-| basedpyright | Type checking (strict) | `pyrightconfig.json`; tests excluded from CLI checks, kept strict via file directives |
+| basedpyright | Type checking (strict) | `pyrightconfig.json`; strict mode covers `src` and `tests` (no exclude — test files must be strict-clean too) |
 | pytest | Tests | `tests/` |
 
 - Run `ruff check .` and `uv run pytest -q` before committing; both must be

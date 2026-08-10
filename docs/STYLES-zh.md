@@ -183,7 +183,7 @@ imports…
 | --- | --- | --- |
 | uv | 依赖/环境管理 | `pyproject.toml`;dev 依赖:pillow、pyinstaller、pytest、ruff |
 | ruff | Lint + 导入排序 | `[tool.ruff] src = ["src"]`(固定源码根,使分类不随运行目录变化) |
-| basedpyright | 类型检查(strict) | `pyrightconfig.json`;CLI 检查排除 tests,经文件级指令保持严格 |
+| basedpyright | 类型检查(strict) | `pyrightconfig.json`;strict 覆盖 `src` 与 `tests`(无 exclude——测试文件同样必须 strict 干净) |
 | pytest | 测试 | `tests/` |
 
 - 提交前运行 `ruff check .` 与 `uv run pytest -q`,两者必须全绿。

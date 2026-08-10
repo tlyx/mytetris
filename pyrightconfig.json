@@ -2,9 +2,10 @@
   "typeCheckingMode": "strict",
   "reportUnusedCallResult": false,
   "reportAny": false,
-  "extraPaths": ["src"],
+  "extraPaths": [
+    "src"
+  ],
   "exclude": [
-    "tests",
     ".venv",
     "__pycache__"
   ]
