@@ -541,3 +541,31 @@ def test_t_spin_combo_bonus_stacks():
     eng.combo = 1
     eng.lock_and_clear_lines()
     assert eng.score == 800 + 50
+
+
+def test_t_spin_end_to_end_player_flow():
+    """端到端 T-spin 单消：只用真实动作(旋转/移动/锁定)，构造即玩家手玩路径。
+
+    配方：底行留缺口(第 5 列) + 帽子 (3,1)/(4,2)；T 空中转一次落入
+    缺口，再转一次收尾(最后动作是旋转)，锁定 → 800 分 + 消 1 行。
+    """
+    eng = make_empty_engine()
+    for col in range(GRID_WIDTH):
+        if col != 5:
+            eng.grid[0][col] = (1, 1, 1)
+    eng.grid[1][3] = (1, 1, 1)
+    eng.grid[2][4] = (1, 1, 1)
+
+    eng.next_type = "T"
+    eng._spawn_piece()
+    assert eng.rotate() is True       # 空中转到 rot1
+    while eng.x < 5:
+        assert eng.move(1, 0) is True  # 移到缺口上方
+    while eng.move(0, -1):            # 落入缺口,贴底
+        pass
+    assert eng.x == 5 and eng.y == 1 and eng.rotation == 1
+    assert eng.rotate() is True       # 收尾旋转 → rot2,最后动作
+    assert eng.last_was_rotation is True
+    eng.lock_and_clear_lines()
+    assert eng.total_lines == 1
+    assert eng.score == 800  # T_SPIN_TABLE[1] × level(1)
